@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "notifications": [
+    {
+      "id": "example-expired",
+      "text": "This example is already expired, so a fresh clone shows nothing. Edit this file to broadcast.",
+      "tone": "info",
+      "priority": "normal",
+      "animation": "waving",
+      "durationMs": 8000,
+      "startsAt": "2020-01-01T00:00:00Z",
+      "expiresAt": "2020-01-02T00:00:00Z"
+    }
+  ],
+  "release": {
+    "latestVersion": "0.6.0",
+    "notesUrl": "https://example.invalid/keycode-pet/releases",
+    "mandatory": false
+  }
+}

@@ -8,7 +8,7 @@
  * M3 the controller, M4–M8 the rest.
  */
 
-import { app, dialog, screen, type BrowserWindow } from 'electron'
+import { app, dialog, net, screen, type BrowserWindow } from 'electron'
 import { createDisplayManager, type DisplayManager } from './display-manager.js'
 import { createBackdropWindow, shouldShowBackdrop } from './backdrop-window.js'
 import { installHarnessControl } from './harness-control.js'
@@ -23,10 +23,18 @@ import { createReminderService, type ReminderService } from './reminder-service.
 import { createCalloutHost, type CalloutHost } from './callout-host.js'
 import { createToastManager, type ToastManager } from './toast.js'
 import { REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
+import {
+  createPoller,
+  resolveManifestUrl,
+  resolvePollMinutes,
+  type Poller,
+} from '../broadcast/broadcast-poller.js'
+import { appendSeenId } from './settings-schema.js'
 import { PRODUCT_NAME } from '../config/constants.js'
 import { floorForWorkArea } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
+import { env } from '../config/env.js'
 import { emit } from './harness-handshake.js'
 import { readFileSync } from 'node:fs'
 
@@ -40,6 +48,7 @@ export interface AppShell {
   callouts: CalloutHost
   reminders: ReminderService
   toasts: ToastManager
+  poller: Poller
   backdrop: BrowserWindow | null
   onSecondInstance(): void
   dispose(): Promise<void>
@@ -197,6 +206,55 @@ export async function startApp(): Promise<AppShell> {
   })
   reminders.start()
 
+  // ---- Broadcast.
+  //
+  // The default URL is the local dev server, because no host has been chosen yet. Switching to a real
+  // one is a single env var; see docs/BROADCAST.md.
+  const manifestUrl = resolveManifestUrl(process.env, 'http://127.0.0.1:8787/manifest.json')
+
+  // TWO independent conditions. `app.isPackaged` is not env-overridable, so a shipped build cannot be
+  // talked into accepting loopback HTTP even by someone who sets the flag.
+  const allowLoopbackHttp = !app.isPackaged && env.allowInsecureManifestRequested
+
+  const poller = createPoller(manifestUrl, {
+    fetch: net.fetch.bind(net),
+    allowLoopbackHttp,
+    userAgent: `KeycodePet/${app.getVersion()}`,
+    log,
+    getSeenIds: () => settings.get().seenBroadcastIds,
+    async markSeen(id) {
+      // patchNow, not patch: "shown exactly once, ever" is a durability claim, and the debounce would
+      // leave a window where a crash re-shows the message.
+      await settings.patchNow({
+        seenBroadcastIds: appendSeenId(settings.get().seenBroadcastIds, id),
+      })
+    },
+    onNotifications(notifications) {
+      for (const entry of notifications) {
+        callouts.show({
+          sourceId: 'broadcast',
+          text: entry.text,
+          tone: entry.tone,
+          priority: entry.priority,
+          durationMs: entry.durationMs,
+          animation: entry.animation,
+          ...(entry.url ? { url: entry.url } : {}),
+        })
+      }
+    },
+    onRelease(release) {
+      // M8 turns this into an update callout. Recording it now keeps the poll single-purpose.
+      if (release) log('manifest release block', { latestVersion: release.latestVersion })
+    },
+  })
+
+  log('broadcast polling', {
+    url: manifestUrl,
+    everyMinutes: resolvePollMinutes(process.env),
+    allowLoopbackHttp,
+  })
+  poller.start()
+
   // The controller re-derives the floor every tick, so a display change needs no position fix-up
   // here — only a z-order re-assert, since window managers reorder on reconfiguration.
   const stopDisplayWatch = displays.onChanged(() => {
@@ -306,6 +364,7 @@ export async function startApp(): Promise<AppShell> {
     callouts,
     reminders,
     toasts,
+    poller,
     backdrop,
 
     onSecondInstance(): void {
@@ -322,6 +381,7 @@ export async function startApp(): Promise<AppShell> {
       stopSettingsWatch()
       menu.dispose()
       reminders.stop()
+      poller.stop()
       callouts.dispose()
       toasts.destroyAll()
       controller?.stop()
