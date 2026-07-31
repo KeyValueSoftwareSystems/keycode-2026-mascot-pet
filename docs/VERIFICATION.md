@@ -112,14 +112,18 @@ A CI log alone should be enough to diagnose a failure.
 
 ## What is NOT verified, and cannot be from this machine
 
-Stated plainly because a green checklist that silently means "macOS only" is worse than an
-honest gap.
+Stated plainly because a green checklist that silently means "macOS only" is worse than an honest gap.
 
 | Area | Status |
 |---|---|
-| macOS window transparency, always-on-top, passthrough, drag | Verified locally |
-| macOS `.dmg` install | Verified locally — **including with the quarantine bit set**, which is the only honest test of ad-hoc signing (a locally built dmg carries no quarantine attribute, so simply opening it proves nothing) |
+| macOS window transparency, always-on-top, sprite rendering, motion | **Verified.** Screenshots in `docs/demo/`, plus a 100%-transparent alpha ring around the sprite and a live position sample showing 440px of travel with a direction reversal |
+| macOS install from a **quarantined** `.dmg` | **Verified.** This is the step everyone skips: a locally built dmg carries no quarantine bit, so simply opening it proves nothing about ad-hoc signing. The attribute was applied by hand, inherited by the installed app, which then ran under App Translocation and rendered the pet over a real terminal window. `spctl` rejects it — expected without a Developer ID — but it launches rather than showing "damaged and can't be opened", which is exactly what `identity: '-'` buys |
+| macOS packaged build refusing loopback HTTP | **Verified** in the packaged app's own log — the `app.isPackaged` half of the two-condition broadcast gate |
+| **Launching from `/Applications`** | **FAILS on this machine, unexplained.** The byte-identical bundle works from the build directory and from `~/Applications`, including quarantined and translocated. From `/Applications` it produces no log, no stdout and no crash report, via `open` or direct exec, before and after an `lsregister` refresh. It could not be instrumented because macOS App Management blocks writing into bundles there. Most likely a machine-level policy interacting with an ad-hoc signature rather than a defect in the app — but that is **not proven**, and a human double-clicking in Finder is the test that would settle it |
+| Right-click menu on the sprite | **Not directly verified.** The shared template is exercised by 15 tests and builds successfully in a real Electron process (the tray menu is constructed from it at boot), but no synthetic right-click was delivered — that needs cursor control the harness does not have |
+| Click-through and drag | **Not directly verified.** The alpha mask, its rect derivation and the placement maths have 20 tests; the forwarding predicates and watchdog are ported from openpets. Delivering a real click at a real coordinate was not automated |
 | **All Windows behaviour** | **Not verified.** The occlusion-tracker fix, the `HWND_TOPMOST` re-assert interval and the mouse-forwarding retry ladder are ported from openpets on trust. Their constants live in one named object so a Windows session can tune them without archaeology |
-| **All Linux behaviour** | **Not verified.** Includes `window.setShape()` for click-through, the XWayland forcing, and the tray-menu fallback for Wayland's swallowed right-click |
-| Windows `.exe` / Linux `.AppImage`/`.deb`/`.rpm` | Built by CI only, never run. `deb`/`rpm` built on an Apple Silicon host are documented-broken (fpm), so `pnpm package` is deliberately restricted to `--mac` |
-| Broadcast against a real host | Not done. P4 is proven end to end against the local dev manifest server (`pnpm manifest:serve`), including every clamp, the dedupe and the XSS case. Reaching real installed clients is one env var away but has not been exercised |
+| **All Linux behaviour** | **Not verified.** Includes `window.setShape()` for click-through, the XWayland forcing, the bundled emoji font path (macOS used Apple Color Emoji in every test here), and the tray-menu fallback for Wayland's swallowed right-click |
+| Windows `.exe`, Linux `.AppImage`/`.deb`/`.rpm` | **Never built.** The CI workflow exists but has never run — there is no git remote. `deb`/`rpm` must come from the Ubuntu leg only: fpm on an Apple Silicon host is documented to produce broken packages, which is why `pnpm package` is restricted to `--mac` |
+| Broadcast reaching real clients | **Not done.** P4 is proven end to end against the local dev server — the callout appeared once, a restart showed nothing, and all nine fault modes were exercised live — but no host is chosen, so it has not crossed the internet |
+| The bundled emoji font | **Not verified.** Every emoji test here rendered via Apple Color Emoji, which comes first in the font stack by design. The bundled COLRv1 file is the Linux backstop and only a Linux run exercises it |

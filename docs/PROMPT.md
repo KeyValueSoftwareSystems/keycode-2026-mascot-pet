@@ -97,12 +97,18 @@ macOS `dmg`+`zip` (ad-hoc signed, `identity: "-"`), Windows `nsis` (`perMachine:
 ### Anti-proofs — these must also hold
 
 ```bash
-grep -rniE 'plugin|marketplace|catalog|lan-|lease' apps/desktop/src/   # → 0
+# CORRECTED during the build. The original commands had two false positives and one guaranteed
+# failure: unanchored `lease` matches "please", `lan-` matches "plan-", and the CSS grep matched the
+# *generated* stylesheet living in the same directory as the hand-written one.
+grep -rniE '\bplugins?\b|\bmarketplace\b|\bcatalog\b|\blan-|\bleases?\b' apps/desktop/src/   # → 0
 grep -rn 'innerHTML\|outerHTML\|insertAdjacentHTML' apps/desktop/src/renderer/   # → 0
 grep -rn 'react\|tailwind' apps/desktop/package.json   # → 0
-grep -rnE '208px|steps\([0-9]' apps/desktop/src/renderer/*.css   # → 0 (only generated files carry these)
+grep -rnE '\b208px\b|steps\([0-9]' --exclude='*.generated.*' apps/desktop/src/renderer/*.css   # → 0
 grep -rn 'requestAnimationFrame' apps/desktop/src/renderer/   # → 0 (CSS drives frames, not JS)
 ```
+
+These are enforced as tests in `tests/renderer/discipline.spec.ts` rather than left as commands to
+remember to run.
 
 No hand-authored animation geometry. No framework in the pet renderer. No per-frame JavaScript. No HTML-string interpolation anywhere the manifest's text can reach.
 
@@ -300,7 +306,17 @@ Ten minutes of pet life in a few milliseconds, deterministic, on CI, with no dis
 
 They are not synchronized and must not be. Moving a window on every animation frame is expensive enough to stutter some compositors (§7); stepping the sprite in main would mean an IPC message per frame. Each clock lives where it is cheap. Coalesce position updates and never issue a `setBounds` that changes nothing.
 
-**The floor, and the pet's actual feet.** The floor is the bottom of `screen.getDisplayNearestPoint(...).workArea` — above the Dock, above the taskbar. But the sprite's feet are *not* at the bottom of its 192×208 cell; there is transparent padding, and the amount is a property of the art. Derive `footInset` from the **generated alpha mask** (§5.4) as the distance from cell bottom to the lowest opaque pixel, and place the window at `y = floor.y - windowHeight + bubbleAreaHeight + footInset`. Hardcoding this number is how the pet ends up floating above the taskbar or with its shoes buried in it — and how it breaks the moment the art is swapped.
+**The floor, and the pet's actual feet.** The floor is the bottom of `screen.getDisplayNearestPoint(...).workArea` — above the Dock, above the taskbar. But the sprite's feet are *not* at the bottom of its 192×208 cell; there is transparent padding, and the amount is a property of the art. Derive `footInset` from the **generated alpha mask** (§5.4) as the distance from cell bottom to the lowest opaque pixel.
+
+> **CORRECTED during the build.** This section originally gave `y = floor.y - windowHeight + bubbleAreaHeight + footInset`, which double-counts: the bubble area is at the *top* of the window, above the sprite, so adding it lifts the pet by the full bubble height. The correct term is the sprite's *bottom* offset inside the window:
+>
+> ```
+> windowY = floor.y - (spriteOrigin.y + frameHeight - footInset)
+> ```
+>
+> And a second correction found by assertion: the window must be sized to **end at the sprite's lowest opaque row**, not at the bottom of its cell. Sized to the full cell, its bottom `footInset` rows are transparent, so feet-on-floor requires the window to hang below the work area — which macOS clamps back inside the visible frame, silently lifting the pet by exactly `footInset`. See `floor-placement.ts`.
+
+Hardcoding these numbers is how the pet ends up floating above the taskbar or with its shoes buried in it — and how it breaks the moment the art is swapped.
 
 ### 4.4 Callouts: one arbiter, two slots
 
@@ -503,7 +519,9 @@ P2 and the `footInset` in §4.3 both need to know which pixels are actually the 
 - A **union mask across every frame of every state** — one 192×208 coverage map, at **4px granularity** (48×52 cells, tiny to ship, trivial to test against).
 - **Union, not per-frame**, deliberately: a per-frame mask makes the grabbable area pulse as the sprite animates, so the pet becomes intermittently un-grabbable in a way that feels broken and reads as a bug. Slight over-grab is invisible; flicker is not. Per-state refinement is a possible upgrade — record it in `DECISIONS.md`, do not build it.
 - Also emit `footInset` (cell bottom → lowest opaque pixel) and the mask's bounding box.
-- A test asserts every cell `validation.json` reports as `used` has coverage in the mask, and that the ~20% fill figure (≈8,000 of 39,936 px) still holds. That test is what catches an art swap that silently breaks hit-testing.
+- A test asserts every cell `validation.json` reports as `used` has coverage in the mask.
+
+> **CORRECTED during the build.** The "~20% fill figure (≈8,000 of 39,936 px)" is a **per-frame** property; the *union* mask such a test would actually run against is much denser. Measured on this art: per-frame mean **8,349 px (20.9%)**, union **14,111 px (35.3%)**, and the 4px cell grid **942/2,496 (37.7%)** set. Assert the two separately or the test is simply wrong.
 
 The renderer hit-tests `mousemove` against this mask (plus the visible bubble rect when one is showing) and reports `pointerOverPet`. Main calls `setIgnoreMouseEvents` accordingly.
 
@@ -602,7 +620,8 @@ The headline capability, and the reason this is its own milestone rather than ha
 - [ ] macOS `dmg` + `zip`, **ad-hoc signed (`identity: "-"`)** — without it, Apple Silicon shows the misleading "damaged and can't be opened" dialog and the POC looks broken before it launches
 - [ ] Windows `nsis`, `perMachine: false`
 - [ ] Linux `AppImage` + `deb` + `rpm` + `tar.gz`
-- [ ] `asar: true`; `files` filter excludes `source-sheet.png`, `preview.png`, `validation.json` and `reference/`
+- [ ] `files` filter excludes `source-sheet.png`, `preview.png`, `validation.json`, `reference/` — **and `pet/spritesheet.png`**, which this list originally omitted: the renderer bundle already contains the sheet, so shipping the original too pays for it twice. Also **not** the emoji font from `assets/`, for the same reason.
+- [ ] `asar` — **turned OFF during the build.** Electron 42 silently fails to load an ESM entry point from inside an asar archive: the process starts and never runs its main script, with no error anywhere. See `electron-builder.config.cjs`
 - [ ] Artifact sizes recorded in `docs/demo/`
 *Gate:* installed from the artifact — not `pnpm dev` — on macOS, and the pet appears and runs. **Windows and Linux cannot be verified from the Mac (§8); a CI matrix producing artifacts plus a manual spot-check on each is what closes this milestone.** Do not mark M7 done on macOS evidence alone; say plainly what was and was not verified.
 
