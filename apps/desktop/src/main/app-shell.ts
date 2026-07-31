@@ -15,9 +15,9 @@ import { installHarnessControl } from './harness-control.js'
 import { SettingsStore } from './settings-store.js'
 import { createTray, type TrayController } from './tray.js'
 import { createPetWindow, type PetWindow } from './pet-window.js'
+import { createPetController, type PetController } from './pet-controller.js'
 import { floorForWorkArea } from './floor-placement.js'
 import { isAnimationState } from '../pet-animations.generated.js'
-import type { PetFrame } from '../pet-frame.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { emit } from './harness-handshake.js'
 import { readFileSync } from 'node:fs'
@@ -27,6 +27,7 @@ export interface AppShell {
   settings: SettingsStore
   tray: TrayController
   pet: PetWindow
+  controller: PetController
   backdrop: BrowserWindow | null
   onSecondInstance(): void
   dispose(): Promise<void>
@@ -78,9 +79,7 @@ export async function startApp(): Promise<AppShell> {
     ? Math.min(startFloor.maxX, Math.max(startFloor.minX, saved.x))
     : startFloor.minX + (startFloor.maxX - startFloor.minX) * 0.35
 
-  /** Harness-only state pinning, so `smoke:states` can drive every animation in one launch. */
-  let forcedState: string | null = process.env.KEYCODE_PET_FORCE_STATE ?? null
-  let animationNonce: 0 | 1 = 0
+  let controller: PetController | null = null
 
   const pet = await createPetWindow({
     initialFloor: startFloor,
@@ -90,11 +89,11 @@ export async function startApp(): Promise<AppShell> {
       onReady(): void {
         emit({ ev: 'sprite-ready', window: 'pet' })
         pet.emitWindowReady(startDisplay)
-        sendCurrentFrame()
+        controller?.tickNow()
       },
       onPointerOverPet(): void {
-        // M3 uses this to pause movement under the cursor; M2 only needs the passthrough
-        // switch, which pet-window has already applied.
+        // The passthrough switch is pet-window's job and already applied. Nothing behavioural
+        // hangs off hover today; M5 may use it to hold a bubble open under the cursor.
       },
       onContextMenu(): void {
         // M4 pops the shared menu here.
@@ -102,16 +101,16 @@ export async function startApp(): Promise<AppShell> {
       },
       onDragStart(): void {
         pet.setDragging(true)
+        controller?.enqueue({ kind: 'drag-start' })
+        controller?.tickNow()
       },
       onDragEnd(): void {
         pet.setDragging(false)
-        const displayNow = displays.nearest({
-          x: pet.petCentreX(),
-          y: startFloor.y - 1,
-        })
-        settings.patch({
-          position: { displayKey: displayNow.key, x: pet.petCentreX() },
-        })
+        const dropped = controller?.petCentreX() ?? startX
+        controller?.enqueue({ kind: 'drag-end', petCentreX: dropped })
+        controller?.tickNow()
+        const displayNow = displays.nearest({ x: dropped, y: startFloor.y - 1 })
+        settings.patch({ position: { displayKey: displayNow.key, x: dropped } })
       },
       onOpenCalloutUrl(): void {
         // M5/M6 own callouts; M8 validates and opens the URL.
@@ -119,35 +118,34 @@ export async function startApp(): Promise<AppShell> {
     },
   })
 
-  /**
-   * The single place a frame is built, until M3's motion engine takes over.
-   *
-   * M2's pet is static: it renders, it is transparent, it is grabbable. Making it *alive* is M3.
-   */
-  const sendCurrentFrame = (): void => {
-    const animation = forcedState && isAnimationState(forcedState) ? forcedState : 'idle'
-    const frame: PetFrame = {
-      animation,
-      animationNonce,
-      facing: 'right',
-      sprite: pet.placement.spriteOrigin,
-      bubble: null,
-      overlay: animation === 'sleep' ? 'sleep-z' : 'none',
-    }
-    pet.sendFrame(frame)
-    emit({ ev: 'frame', animation, nonce: animationNonce, facing: frame.facing })
+  controller = createPetController({
+    pet,
+    displays,
+    getMovementEnabled: () => settings.get().movementEnabled,
+    onPositionChanged(displayKey, petCentreX) {
+      settings.patch({ position: { displayKey, x: petCentreX } })
+    },
+    startPetCentreX: startX,
+    startFloor,
+    // Seeded from the clock so two launches do not produce an identical pet, while the engine
+    // itself stays deterministic given a seed.
+    seed: Date.now() & 0x7fffffff,
+    log,
+  })
+
+  const forcedFromEnv = process.env.KEYCODE_PET_FORCE_STATE
+  if (forcedFromEnv && isAnimationState(forcedFromEnv)) {
+    controller.setForcedState(forcedFromEnv)
   }
 
-  // Re-clamp on display changes: a monitor unplugged while the pet is on it must not orphan it
-  // off-screen. Recomputed from `screen` rather than from cached bounds.
+  controller.start()
+
+  // The controller re-derives the floor every tick, so a display change needs no position fix-up
+  // here — only a z-order re-assert, since window managers reorder on reconfiguration.
   const stopDisplayWatch = displays.onChanged(() => {
-    const centre = pet.petCentreX()
-    const display = displays.nearest({ x: centre, y: startFloor.y - 1 })
-    const floor = floorForWorkArea(display.workArea, display.key)
-    const clamped = Math.min(floor.maxX, Math.max(floor.minX, centre))
-    pet.moveTo(clamped, floor)
     pet.reassertAlwaysOnTop()
-    log('re-clamped after a display change', { displayKey: display.key, x: Math.round(clamped) })
+    controller?.tickNow()
+    log('display configuration changed; re-asserted z-order')
   })
 
   /**
@@ -177,11 +175,7 @@ export async function startApp(): Promise<AppShell> {
         log('harness asked for an unknown animation state', { state })
         return
       }
-      forcedState = state
-      // Flip the nonce so re-selecting the *same* state still restarts its animation. This is
-      // the mechanism under test when smoke:states drives every state in one launch.
-      animationNonce = animationNonce === 0 ? 1 : 0
-      sendCurrentFrame()
+      controller?.setForcedState(state)
     },
   })
 
@@ -192,6 +186,7 @@ export async function startApp(): Promise<AppShell> {
     settings,
     tray,
     pet,
+    controller,
     backdrop,
 
     onSecondInstance(): void {
@@ -205,6 +200,7 @@ export async function startApp(): Promise<AppShell> {
       disposed = true
       stopHarnessControl()
       stopDisplayWatch()
+      controller?.stop()
       // Flush before tearing anything down — an unflushed position or reminder deadline is
       // exactly the state that must survive a quit.
       await settings.flush()
