@@ -24,20 +24,23 @@ const distDir = resolve(here, '..')
 /** `apps/desktop` — the package root. */
 const packageDir = resolve(distDir, '..')
 
-/**
- * In a packaged app everything lives under `app.asar`; `app.getAppPath()` points at it.
- * In dev it points at the package dir, so both cases resolve the same way.
- */
-function appRoot(): string {
-  return app.isPackaged ? app.getAppPath() : packageDir
-}
-
 export function rendererFile(name: string): string {
   return join(distDir, 'renderer', name)
 }
 
+/**
+ * `apps/desktop/assets/...`, resolved relative to this file rather than to `app.getAppPath()`.
+ *
+ * Found by inspecting a built asar: `getAppPath()` returns the archive root, and inside it the repo
+ * layout is preserved — so assets live at `<asar>/apps/desktop/assets/`, not `<asar>/assets/`.
+ * Joining onto the archive root produced a path that does not exist, and the only symptom was a
+ * silently missing tray icon in the packaged app.
+ *
+ * Deriving from `distDir` needs no `isPackaged` branch at all: `dist` and `assets` are siblings in
+ * both layouts, so one expression is correct everywhere.
+ */
 export function assetPath(...parts: string[]): string {
-  return join(appRoot(), 'assets', ...parts)
+  return join(packageDir, 'assets', ...parts)
 }
 
 /**

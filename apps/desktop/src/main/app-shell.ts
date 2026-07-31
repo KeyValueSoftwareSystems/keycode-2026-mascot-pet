@@ -37,6 +37,7 @@ import { floorForWorkArea } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { env } from '../config/env.js'
+import { log as fileLog, logFilePath } from './logger.js'
 import { emit } from './harness-handshake.js'
 import { readFileSync } from 'node:fs'
 
@@ -73,9 +74,8 @@ function readPetMetadata(): PetMetadata {
 }
 
 export async function startApp(): Promise<AppShell> {
-  const log = (message: string, meta?: unknown): void => {
-    console.log(`[keycode-pet] ${message}`, meta ?? '')
-  }
+  // A packaged macOS app has no usable stdio, so diagnostics go to a file. See logger.ts.
+  const log = fileLog
 
   const displays = createDisplayManager()
   const settings = await SettingsStore.open({ dir: userDataDir(), log })
@@ -443,6 +443,7 @@ async function showAbout(pet: PetMetadata, recoveryReason: string | null): Promi
     `Pet: ${pet.displayName} (${pet.id})`,
     '',
     'Includes code adapted from openpets (MIT).',
+    ...(logFilePath() ? ['', `Log: ${logFilePath()}`] : []),
     ...(recoveryReason
       ? ['', `Note: settings were reset after a read error (${recoveryReason}).`]
       : []),

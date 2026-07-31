@@ -9,6 +9,7 @@
 
 import { app } from 'electron'
 import { emit } from './harness-handshake.js'
+import { log } from './logger.js'
 
 /** Set once the shell is up. Until then a second launch has nothing to focus. */
 let shellOnSecondInstance: (() => void) | null = null
@@ -67,6 +68,7 @@ async function boot(): Promise<void> {
   }
 
   await app.whenReady()
+  log('app ready', { packaged: app.isPackaged, version: app.getVersion() })
 
   emit({
     ev: 'app-ready',
@@ -113,17 +115,19 @@ if (!app.requestSingleInstanceLock()) {
 
   void boot().catch((error: unknown) => {
     emit({ ev: 'error', where: 'boot', message: String(error) })
-    console.error('[keycode-pet] boot failed', error)
+    // To a file, not the console: a packaged app has no usable stdio, and a boot failure with no
+    // trace is the single worst thing to hand a colleague.
+    log('BOOT FAILED', { error: String((error as Error)?.stack ?? error) })
     app.exit(1)
   })
 }
 
 process.on('uncaughtException', (error) => {
   emit({ ev: 'error', where: 'uncaughtException', message: String(error?.stack ?? error) })
-  console.error('[keycode-pet] uncaught exception', error)
+  log('UNCAUGHT EXCEPTION', { error: String(error?.stack ?? error) })
 })
 
 process.on('unhandledRejection', (reason) => {
   emit({ ev: 'error', where: 'unhandledRejection', message: String(reason) })
-  console.error('[keycode-pet] unhandled rejection', reason)
+  log('UNHANDLED REJECTION', { reason: String(reason) })
 })

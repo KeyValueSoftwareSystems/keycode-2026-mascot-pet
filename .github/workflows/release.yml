@@ -1,0 +1,98 @@
+name: Release
+
+# Written and committed but never run: this repository has no remote yet (a locked decision for this
+# build). It exists so that adding a remote is the only step needed to get Windows and Linux
+# artifacts, which cannot be produced on the macOS development machine.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      # Never fail-fast: if the Linux leg breaks, the macOS and Windows artifacts are still wanted.
+      fail-fast: false
+      matrix:
+        include:
+          # macOS 14 is an arm64 runner and builds both architectures.
+          - os: macos-14
+            flag: --mac
+            name: mac
+          - os: windows-latest
+            flag: --win
+            name: win
+          # Ubuntu 22.04 deliberately, not `latest`: the older glibc produces deb/rpm/AppImage
+          # artifacts that install on a wider range of distributions. This is also the ONLY leg that
+          # may build deb/rpm — see the note in docs/VERIFICATION.md about fpm on Apple Silicon.
+          - os: ubuntu-22.04
+            flag: --linux
+            name: linux
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Generated artifacts are committed so a fresh clone builds without a generate step. This is the
+      # check that stops them silently drifting from the generator.
+      - name: Generated files are fresh
+        run: |
+          pnpm generate
+          git diff --exit-code -- \
+            apps/desktop/src/renderer/pet.generated.css \
+            apps/desktop/src/pet-animations.generated.ts \
+            apps/desktop/src/sprite/alpha-mask.generated.ts \
+            apps/desktop/assets/pet/alpha-mask.json
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Package
+        run: pnpm build && pnpm exec electron-builder ${{ matrix.flag }} --publish never
+        env:
+          # Without this electron-builder tries to auto-discover a Developer ID on a runner that has
+          # none and fails the build — a CI-only failure that never reproduces locally.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Artifact sizes
+        shell: bash
+        run: |
+          {
+            echo "### ${{ matrix.name }} artifacts"
+            echo ''
+            echo '```'
+            ls -lh release/ | grep -Ev '^total|^d' | awk '{printf "%-10s %s\n", $5, $9}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keycode-pet-${{ matrix.name }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14

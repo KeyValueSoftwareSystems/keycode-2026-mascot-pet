@@ -2,9 +2,14 @@
   "name": "keycode-pet-workspace",
   "version": "0.0.0",
   "private": true,
-  "description": "Keycode mascot desktop companion — workspace root",
+  "description": "Keycode mascot desktop companion \u2014 workspace root",
   "license": "UNLICENSED",
+  "author": {
+    "name": "KeyValue Systems",
+    "email": "doyle@keyvalue.systems"
+  },
   "type": "module",
+  "main": "apps/desktop/dist/main/main.js",
   "packageManager": "pnpm@11.6.0",
   "engines": {
     "node": ">=20"
@@ -22,7 +27,12 @@
     "smoke:states": "pnpm build && node scripts/smoke.mjs --all-states",
     "manifest:serve": "node scripts/dev-manifest-server.mjs",
     "package": "pnpm build && electron-builder --mac --config electron-builder.config.cjs",
-    "package:all": "pnpm build && electron-builder --mac --win --linux --config electron-builder.config.cjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "package:linux-ci-only": "pnpm build && electron-builder --linux --config electron-builder.config.cjs",
+    "package:win-ci-only": "pnpm build && electron-builder --win --config electron-builder.config.cjs"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
@@ -30,7 +40,6 @@
     "electron-builder": "^26.10.0",
     "typescript": "^6.0.3",
     "vite": "^8.2.0",
-    "vitest": "^4.1.10",
-    "zod": "^4.4.3"
+    "vitest": "^4.1.10"
   }
 }
