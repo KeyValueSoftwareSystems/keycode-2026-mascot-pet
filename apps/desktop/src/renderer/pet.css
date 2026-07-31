@@ -80,12 +80,20 @@ body {
   border-left: 3px solid var(--tone-info);
   background: var(--bubble-bg);
   color: var(--bubble-fg);
+  /*
+   * System emoji fonts first, bundled font last. macOS and Windows both ship one, so they never
+   * load the 4.8MB file; Linux falls through to it. See pet.fonts.css.
+   */
   font:
     13px / 1.35 system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
-    sans-serif;
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Noto Color Emoji',
+    'Keycode Emoji';
   /* Wraps long words rather than overflowing: manifest text is not under our control. */
   overflow-wrap: anywhere;
 }

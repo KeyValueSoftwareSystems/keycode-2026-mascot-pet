@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Same posture as the pet window. `font-src` carries the bundled emoji font; `connect-src 'none'`
+      because a toast has no business talking to anything.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; font-src 'self' file: data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Keycode Pet notification</title>
+    <link rel="stylesheet" href="./pet.fonts.css" />
+    <link rel="stylesheet" href="./toast.css" />
+  </head>
+  <body>
+    <!--
+      A real HTML file with a preload, rather than openpets' `data:text/html` URL.
+      Two reasons: a data: URL has an opaque origin and cannot load the bundled emoji font under any
+      CSP short of inlining it per toast, and a template-string page means HTML-string interpolation
+      of untrusted text lives in the codebase. This way there is no interpolation anywhere.
+    -->
+    <div id="toast">
+      <span id="dot" aria-hidden="true"></span>
+      <span id="text"></span>
+    </div>
+    <script type="module" src="./toast.ts"></script>
+  </body>
+</html>

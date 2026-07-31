@@ -73,6 +73,8 @@ function parseArgs(argv) {
     keepOpen: false,
     allStates: false,
     composite: true,
+    callout: null,
+    toast: false,
   }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -103,6 +105,12 @@ function parseArgs(argv) {
         break
       case '--no-composite':
         opts.composite = false
+        break
+      case '--callout':
+        opts.callout = argv[(i += 1)]
+        break
+      case '--toast':
+        opts.toast = true
         break
       default:
         if (arg.startsWith('--')) throw new Error(`Unknown flag ${arg}`)
@@ -645,6 +653,12 @@ async function run() {
     // the compositor presented a frame" — has no portable signal, so this is an honest
     // heuristic. The not-blank assertion is what stops it silently passing on a blank window.
     await new Promise((r) => setTimeout(r, opts.settleMs))
+
+    if (opts.callout) {
+      session.send({ cmd: 'show-callout', text: opts.callout, toast: opts.toast })
+      // Let the bubble paint and the emoji font resolve before capturing.
+      await new Promise((r) => setTimeout(r, 700))
+    }
 
     if (opts.allStates) {
       const states = readAnimationStates()

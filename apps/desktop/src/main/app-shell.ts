@@ -19,9 +19,13 @@ import { createPetController, type PetController } from './pet-controller.js'
 import { createMenuController, type MenuController } from './menu.js'
 import { createActions } from './actions.js'
 import type { MenuViewModel, UpdateState } from './menu-template.js'
+import { createReminderService, type ReminderService } from './reminder-service.js'
+import { createCalloutHost, type CalloutHost } from './callout-host.js'
+import { createToastManager, type ToastManager } from './toast.js'
+import { REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
 import { PRODUCT_NAME } from '../config/constants.js'
 import { floorForWorkArea } from './floor-placement.js'
-import { isAnimationState } from '../pet-animations.generated.js'
+import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { emit } from './harness-handshake.js'
 import { readFileSync } from 'node:fs'
@@ -33,6 +37,9 @@ export interface AppShell {
   pet: PetWindow
   controller: PetController
   menu: MenuController
+  callouts: CalloutHost
+  reminders: ReminderService
+  toasts: ToastManager
   backdrop: BrowserWindow | null
   onSecondInstance(): void
   dispose(): Promise<void>
@@ -117,7 +124,10 @@ export async function startApp(): Promise<AppShell> {
         settings.patch({ position: { displayKey: displayNow.key, x: dropped } })
       },
       onOpenCalloutUrl(): void {
-        // M5/M6 own callouts; M8 validates and opens the URL.
+        // M8 adds the validated open. Until then a bubble is never marked clickable, so this
+        // cannot be reached from the UI — but the path exists so M8 is a one-line change.
+        const url = callouts?.currentUrl()
+        log('callout link requested', { hasUrl: Boolean(url) })
       },
     },
   })
@@ -143,6 +153,49 @@ export async function startApp(): Promise<AppShell> {
   }
 
   controller.start()
+
+  // ---- Callouts and reminders.
+  const toasts = createToastManager({ log })
+
+  const callouts: CalloutHost = createCalloutHost({
+    onShowingChanged(showing) {
+      controller?.setCallout(
+        showing
+          ? {
+              text: showing.text,
+              tone: showing.tone,
+              pinned: Boolean(showing.pin),
+              // Never advertise a link the app cannot open yet. M8 flips this on.
+              clickable: false,
+            }
+          : null,
+      )
+    },
+    onAnimation(animation) {
+      controller?.enqueue({ kind: 'reaction', state: animation })
+      controller?.tickNow()
+    },
+    onToast(request) {
+      toasts.show({ text: request.text, tone: request.tone, durationMs: request.durationMs })
+    },
+    isPetVisible: () => !pet.win.isDestroyed() && pet.win.isVisible(),
+    log,
+  })
+
+  const reminders = createReminderService({
+    settings,
+    log,
+    onFire(kind, message) {
+      callouts.show({
+        sourceId: 'reminder',
+        text: message,
+        tone: 'info',
+        priority: 'normal',
+        animation: resolveTrigger(REMINDER_TRIGGERS[kind]),
+      })
+    },
+  })
+  reminders.start()
 
   // The controller re-derives the floor every tick, so a display change needs no position fix-up
   // here — only a z-order re-assert, since window managers reorder on reconfiguration.
@@ -204,7 +257,14 @@ export async function startApp(): Promise<AppShell> {
   trayRef = tray
 
   // Any settings change re-renders the menus, so a checkbox can never disagree with the store.
-  const stopSettingsWatch = settings.onChange(() => menu.refresh())
+  const stopSettingsWatch = settings.onChange((_next, _prev, changed) => {
+    menu.refresh()
+    // Enabling a reminder must schedule it now rather than at the next 15s tick, and disabling must
+    // clear its deadline immediately.
+    if (changed.includes('waterReminderEnabled') || changed.includes('stretchReminderEnabled')) {
+      reminders.evaluateNow()
+    }
+  })
 
   const stopHarnessControl = installHarnessControl({
     pet: () => pet.win,
@@ -215,6 +275,22 @@ export async function startApp(): Promise<AppShell> {
         return
       }
       controller?.setForcedState(state)
+    },
+    showCallout(request): void {
+      const tone = (['info', 'success', 'warning', 'error'] as const).find((t) => t === request.tone)
+      const priority = (['low', 'normal', 'high', 'urgent'] as const).find(
+        (p) => p === request.priority,
+      )
+      callouts.show({
+        sourceId: 'system',
+        text: request.text,
+        tone: tone ?? 'info',
+        priority: priority ?? 'normal',
+        ...(request.toast ? { durationMs: 8_000 } : {}),
+      })
+      if (request.toast) {
+        toasts.show({ text: request.text, tone: tone ?? 'info', durationMs: 8_000 })
+      }
     },
   })
 
@@ -227,6 +303,9 @@ export async function startApp(): Promise<AppShell> {
     pet,
     controller,
     menu,
+    callouts,
+    reminders,
+    toasts,
     backdrop,
 
     onSecondInstance(): void {
@@ -242,6 +321,9 @@ export async function startApp(): Promise<AppShell> {
       stopDisplayWatch()
       stopSettingsWatch()
       menu.dispose()
+      reminders.stop()
+      callouts.dispose()
+      toasts.destroyAll()
       controller?.stop()
       // Flush before tearing anything down — an unflushed position or reminder deadline is
       // exactly the state that must survive a quit.

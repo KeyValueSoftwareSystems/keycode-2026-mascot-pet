@@ -27,6 +27,7 @@ const DIST = join(APP, 'dist')
 /** [from, to] pairs, relative to the repo root and to `dist` respectively. */
 const COPIES = [
   ['apps/desktop/src/preload/pet-preload.cjs', 'preload/pet-preload.cjs'],
+  ['apps/desktop/src/preload/toast-preload.cjs', 'preload/toast-preload.cjs'],
   ['pet/spritesheet.png', 'renderer/spritesheet.png'],
 ]
 

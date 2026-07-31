@@ -30,6 +30,8 @@ import { emit, isHarnessEnabled } from './harness-handshake.js'
 export type HarnessCommand =
   | { cmd: 'capture-window'; path: string; window: 'pet' | 'backdrop' }
   | { cmd: 'set-state'; state: string }
+  /** Show a callout, so the bubble and the emoji font can be screenshotted. */
+  | { cmd: 'show-callout'; text: string; tone?: string; priority?: string; toast?: boolean }
   | { cmd: 'quit' }
 
 export interface HarnessTargets {
@@ -37,6 +39,8 @@ export interface HarnessTargets {
   backdrop: () => BrowserWindow | null
   /** Pin the pet to one animation state. Provided from M3 onward. */
   setForcedState?: (state: string) => void
+  /** Show a callout. Provided from M5 onward. */
+  showCallout?: (request: { text: string; tone?: string; priority?: string; toast?: boolean }) => void
 }
 
 export function installHarnessControl(targets: HarnessTargets): () => void {
@@ -88,6 +92,20 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           return
         }
         targets.setForcedState(command.state)
+        return
+      }
+
+      case 'show-callout': {
+        if (!targets.showCallout) {
+          emit({ ev: 'error', where: 'harness:show-callout', message: 'no callout sink registered' })
+          return
+        }
+        targets.showCallout({
+          text: command.text,
+          ...(command.tone === undefined ? {} : { tone: command.tone }),
+          ...(command.priority === undefined ? {} : { priority: command.priority }),
+          ...(command.toast === undefined ? {} : { toast: command.toast }),
+        })
         return
       }
 

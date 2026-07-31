@@ -1,0 +1,36 @@
+/*
+ * Emoji font.
+ *
+ * Broadcast text will contain emoji — "Keycode is on fire 🔥" is the example in the spec — and a
+ * fresh Linux install cannot be assumed to have a colour emoji font. Without one the bubble shows
+ * tofu boxes in the single message every user sees.
+ *
+ * System fonts come FIRST in the stack (see the `font-family` in pet.css and toast.css), so macOS
+ * uses Apple Color Emoji and Windows uses Segoe UI Emoji and neither ever loads these bytes. The
+ * bundle is purely the Linux backstop.
+ *
+ * `unicode-range` means the file is only fetched when a character in one of these blocks actually
+ * appears, so an emoji-free bubble costs nothing. `font-display: block` avoids a visible swap from
+ * tofu to emoji mid-render.
+ *
+ * NOTE: the file is 4.8 MB, not the ~1.6 MB estimated during planning. The COLRv1 build is still
+ * roughly half the CBDT build. Shipping it only in the Linux artifacts would save that on macOS and
+ * Windows; recorded in DECISIONS.md as a deliberate simplification rather than an oversight.
+ */
+
+@font-face {
+  font-family: 'Keycode Emoji';
+  font-display: block;
+  src: url('../../assets/fonts/NotoColorEmoji-COLRv1.ttf') format('truetype');
+  unicode-range:
+    U+1F000-1FAFF,
+    U+1F1E6-1F1FF,
+    U+2600-27BF,
+    U+2B00-2BFF,
+    U+FE0F,
+    U+200D,
+    U+2190-21FF,
+    U+2B50,
+    U+3030,
+    U+303D;
+}

@@ -25,6 +25,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         pet: resolve(import.meta.dirname, 'src/renderer/pet.html'),
+        toast: resolve(import.meta.dirname, 'src/renderer/toast.html'),
         backdrop: resolve(import.meta.dirname, 'src/renderer/backdrop.html'),
       },
     },
