@@ -1,0 +1,166 @@
+/*
+ * GENERATED FILE — DO NOT EDIT.
+ * Source of truth: pet/spritesheet.json
+ * Regenerate with: pnpm generate
+ */
+
+.pet-sprite {
+  width: 192px;
+  height: 208px;
+  background-repeat: no-repeat;
+  background-size: 1536px 1872px;
+  background-position: 0 0;
+  /* REQUIRED, not stylistic: without it the browser smooths the pixel art into mush,
+     and it is worst on exactly the HiDPI displays this is developed on. */
+  image-rendering: pixelated;
+}
+
+@keyframes kp-drink-0 {
+  from { background-position: 0 -1248px; }
+  to { background-position: -960px -1248px; }
+}
+@keyframes kp-drink-1 {
+  from { background-position: 0 -1248px; }
+  to { background-position: -960px -1248px; }
+}
+.pet-sprite[data-state="drink"][data-nonce="0"] {
+  animation: kp-drink-0 1800ms steps(6, jump-none) 2 forwards;
+}
+.pet-sprite[data-state="drink"][data-nonce="1"] {
+  animation: kp-drink-1 1800ms steps(6, jump-none) 2 forwards;
+}
+
+@keyframes kp-failed-0 {
+  from { background-position: 0 -1040px; }
+  to { background-position: -1344px -1040px; }
+}
+@keyframes kp-failed-1 {
+  from { background-position: 0 -1040px; }
+  to { background-position: -1344px -1040px; }
+}
+.pet-sprite[data-state="failed"][data-nonce="0"] {
+  animation: kp-failed-0 1220ms steps(8, jump-none) 2 forwards;
+}
+.pet-sprite[data-state="failed"][data-nonce="1"] {
+  animation: kp-failed-1 1220ms steps(8, jump-none) 2 forwards;
+}
+
+@keyframes kp-idle-0 {
+  from { background-position: 0 0px; }
+  to { background-position: -960px 0px; }
+}
+@keyframes kp-idle-1 {
+  from { background-position: 0 0px; }
+  to { background-position: -960px 0px; }
+}
+.pet-sprite[data-state="idle"][data-nonce="0"] {
+  animation: kp-idle-0 5500ms steps(6, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="idle"][data-nonce="1"] {
+  animation: kp-idle-1 5500ms steps(6, jump-none) infinite forwards;
+}
+
+@keyframes kp-jumping-0 {
+  from { background-position: 0 -832px; }
+  to { background-position: -768px -832px; }
+}
+@keyframes kp-jumping-1 {
+  from { background-position: 0 -832px; }
+  to { background-position: -768px -832px; }
+}
+.pet-sprite[data-state="jumping"][data-nonce="0"] {
+  animation: kp-jumping-0 840ms steps(5, jump-none) 2 forwards;
+}
+.pet-sprite[data-state="jumping"][data-nonce="1"] {
+  animation: kp-jumping-1 840ms steps(5, jump-none) 2 forwards;
+}
+
+@keyframes kp-review-0 {
+  from { background-position: 0 -1664px; }
+  to { background-position: -960px -1664px; }
+}
+@keyframes kp-review-1 {
+  from { background-position: 0 -1664px; }
+  to { background-position: -960px -1664px; }
+}
+.pet-sprite[data-state="review"][data-nonce="0"] {
+  animation: kp-review-0 1030ms steps(6, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="review"][data-nonce="1"] {
+  animation: kp-review-1 1030ms steps(6, jump-none) infinite forwards;
+}
+
+@keyframes kp-running-0 {
+  from { background-position: 0 -1456px; }
+  to { background-position: -960px -1456px; }
+}
+@keyframes kp-running-1 {
+  from { background-position: 0 -1456px; }
+  to { background-position: -960px -1456px; }
+}
+.pet-sprite[data-state="running"][data-nonce="0"] {
+  animation: kp-running-0 820ms steps(6, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="running"][data-nonce="1"] {
+  animation: kp-running-1 820ms steps(6, jump-none) infinite forwards;
+}
+
+@keyframes kp-running-left-0 {
+  from { background-position: 0 -416px; }
+  to { background-position: -1344px -416px; }
+}
+@keyframes kp-running-left-1 {
+  from { background-position: 0 -416px; }
+  to { background-position: -1344px -416px; }
+}
+.pet-sprite[data-state="running-left"][data-nonce="0"] {
+  animation: kp-running-left-0 1060ms steps(8, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="running-left"][data-nonce="1"] {
+  animation: kp-running-left-1 1060ms steps(8, jump-none) infinite forwards;
+}
+
+@keyframes kp-running-right-0 {
+  from { background-position: 0 -208px; }
+  to { background-position: -1344px -208px; }
+}
+@keyframes kp-running-right-1 {
+  from { background-position: 0 -208px; }
+  to { background-position: -1344px -208px; }
+}
+.pet-sprite[data-state="running-right"][data-nonce="0"] {
+  animation: kp-running-right-0 1060ms steps(8, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="running-right"][data-nonce="1"] {
+  animation: kp-running-right-1 1060ms steps(8, jump-none) infinite forwards;
+}
+
+@keyframes kp-sleep-0 {
+  from { background-position: 0 0px; }
+  to { background-position: -960px 0px; }
+}
+@keyframes kp-sleep-1 {
+  from { background-position: 0 0px; }
+  to { background-position: -960px 0px; }
+}
+.pet-sprite[data-state="sleep"][data-nonce="0"] {
+  animation: kp-sleep-0 16000ms steps(6, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="sleep"][data-nonce="1"] {
+  animation: kp-sleep-1 16000ms steps(6, jump-none) infinite forwards;
+}
+
+@keyframes kp-waving-0 {
+  from { background-position: 0 -624px; }
+  to { background-position: -576px -624px; }
+}
+@keyframes kp-waving-1 {
+  from { background-position: 0 -624px; }
+  to { background-position: -576px -624px; }
+}
+.pet-sprite[data-state="waving"][data-nonce="0"] {
+  animation: kp-waving-0 700ms steps(4, jump-none) 2 forwards;
+}
+.pet-sprite[data-state="waving"][data-nonce="1"] {
+  animation: kp-waving-1 700ms steps(4, jump-none) 2 forwards;
+}

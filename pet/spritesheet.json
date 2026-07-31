@@ -1,5 +1,5 @@
 {
-  "$comment": "Animation state map for the pixel-coder placeholder pet. Geometry matches openpets' defaultPetSprite exactly, so openpets' CSS sprite renderer works unchanged. Durations are openpets' defaults, which line up with these frame counts.",
+  "$comment": "Animation state map for the pixel-coder placeholder pet. THIS FILE IS THE SINGLE SOURCE OF TRUTH for animation geometry: `pnpm generate` turns it into the renderer's CSS keyframes and into the AnimationState TypeScript union. Never hand-write a row offset, frame count or duration anywhere else. Geometry matches openpets' defaultPetSprite exactly.",
   "sheet": {
     "fileName": "spritesheet.png",
     "width": 1536,
@@ -12,14 +12,55 @@
   },
   "states": {
     "idle": { "row": 0, "frames": 6, "durationMs": 5500, "iterations": "infinite" },
-    "running-right": { "row": 1, "frames": 8, "durationMs": 1060 },
-    "running-left": { "row": 2, "frames": 8, "durationMs": 1060 },
+    "running-right": { "row": 1, "frames": 8, "durationMs": 1060, "iterations": "infinite" },
+    "running-left": { "row": 2, "frames": 8, "durationMs": 1060, "iterations": "infinite" },
     "waving": { "row": 3, "frames": 4, "durationMs": 700, "iterations": 2 },
     "jumping": { "row": 4, "frames": 5, "durationMs": 840, "iterations": 2 },
-    "failed": { "row": 5, "frames": 8, "durationMs": 1220, "iterations": 2, "note": "frames 6-8 are identical; animation holds on the final slumped pose" },
-    "waiting": { "row": 6, "frames": 6, "durationMs": 1010, "note": "DUPLICATE: byte-identical to row 0 (idle). Row is effectively free for a new action." },
-    "running": { "row": 7, "frames": 6, "durationMs": 820, "note": "in-place busy/working loop, not locomotion" },
-    "review": { "row": 8, "frames": 6, "durationMs": 1030, "note": "hand-to-chin thinking pose" }
+    "failed": {
+      "row": 5,
+      "frames": 8,
+      "durationMs": 1220,
+      "iterations": 2,
+      "note": "8 declared frames but only 6 distinct: the last three repeat, which is what holds the final slumped pose. Do NOT 'optimise' this to 6 frames — that changes the timing and loses the beat."
+    },
+    "drink": {
+      "row": 6,
+      "frames": 6,
+      "durationMs": 1800,
+      "iterations": 2,
+      "note": "Reclaimed from the old `waiting` state, which was byte-identical to row 0 and so was never an animation at all. Art is still pending: until it is drawn this plays the idle frames, which keeps the water-reminder trigger path complete and testable today."
+    },
+    "running": {
+      "row": 7,
+      "frames": 6,
+      "durationMs": 820,
+      "iterations": "infinite",
+      "note": "In-place busy/working loop, NOT locomotion — locomotion is running-left/running-right. Never wire this to movement."
+    },
+    "review": { "row": 8, "frames": 6, "durationMs": 1030, "iterations": "infinite" },
+    "sleep": {
+      "row": 0,
+      "frames": 6,
+      "durationMs": 16000,
+      "iterations": "infinite",
+      "note": "The idle frames re-timed very slow, paired with a pure-CSS 'Z' overlay. Ships with no new art at all; two states sharing one row is deliberate and allowed."
+    }
+  },
+  "aliases": {
+    "$comment": "Substitutions for states the behaviour spec needs but the art does not contain yet. The reactionMap deliberately keeps naming the state it *wants*, so when the art lands the only change is deleting the alias entry — no code edits, no mapping edits. An alias target must be a real declared state; the generator enforces that.",
+    "stretch": "jumping"
+  },
+  "plannedNewStates": {
+    "$comment": "Still absent from the sheet. Requires extending it to 12 rows (1536x2496).",
+    "stretch": {
+      "row": 9,
+      "frames": 6,
+      "durationMs": 2200,
+      "iterations": 2,
+      "status": "todo",
+      "requiresSheetExtension": true,
+      "note": "Aliased to `jumping` until drawn — see the `aliases` block."
+    }
   },
   "freeCells": {
     "$comment": "Unused (fully transparent) cells available for new frames without resizing the sheet.",
@@ -30,14 +71,8 @@
     "row7": [6, 7],
     "row8": [6, 7]
   },
-  "plannedNewStates": {
-    "$comment": "Needed by the behaviour spec but absent from this sheet. Row 6 is reclaimable; rows 9-11 require extending the sheet to 1536x2496.",
-    "drink": { "row": 6, "frames": 6, "durationMs": 1800, "iterations": 2, "status": "todo", "note": "reclaim the duplicate waiting row" },
-    "stretch": { "row": 9, "frames": 6, "durationMs": 2200, "iterations": 2, "status": "todo", "requiresSheetExtension": true },
-    "sleep": { "row": 10, "frames": 4, "durationMs": 4000, "iterations": "infinite", "status": "todo", "requiresSheetExtension": true, "note": "can be approximated without new art: idle re-timed very slow + a CSS Z bubble" }
-  },
   "reactionMap": {
-    "$comment": "trigger -> animation state. Keep this indirection so new triggers are a mapping entry, not renderer work.",
+    "$comment": "trigger -> animation state. Keep this indirection so a new trigger is a mapping entry rather than renderer work. A value may name a state or an alias.",
     "idle": "idle",
     "run-left": "running-left",
     "run-right": "running-right",
@@ -49,6 +84,8 @@
     "thinking": "review",
     "busy": "running",
     "error": "failed",
-    "movement-disabled": "sleep"
+    "movement-disabled": "sleep",
+    "movement-enabled": "idle",
+    "drag-release": "jumping"
   }
 }
