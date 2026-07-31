@@ -1,0 +1,54 @@
+{
+  "$comment": "Animation state map for the pixel-coder placeholder pet. Geometry matches openpets' defaultPetSprite exactly, so openpets' CSS sprite renderer works unchanged. Durations are openpets' defaults, which line up with these frame counts.",
+  "sheet": {
+    "fileName": "spritesheet.png",
+    "width": 1536,
+    "height": 1872,
+    "frameWidth": 192,
+    "frameHeight": 208,
+    "columns": 8,
+    "rows": 9,
+    "hasAlpha": true
+  },
+  "states": {
+    "idle": { "row": 0, "frames": 6, "durationMs": 5500, "iterations": "infinite" },
+    "running-right": { "row": 1, "frames": 8, "durationMs": 1060 },
+    "running-left": { "row": 2, "frames": 8, "durationMs": 1060 },
+    "waving": { "row": 3, "frames": 4, "durationMs": 700, "iterations": 2 },
+    "jumping": { "row": 4, "frames": 5, "durationMs": 840, "iterations": 2 },
+    "failed": { "row": 5, "frames": 8, "durationMs": 1220, "iterations": 2, "note": "frames 6-8 are identical; animation holds on the final slumped pose" },
+    "waiting": { "row": 6, "frames": 6, "durationMs": 1010, "note": "DUPLICATE: byte-identical to row 0 (idle). Row is effectively free for a new action." },
+    "running": { "row": 7, "frames": 6, "durationMs": 820, "note": "in-place busy/working loop, not locomotion" },
+    "review": { "row": 8, "frames": 6, "durationMs": 1030, "note": "hand-to-chin thinking pose" }
+  },
+  "freeCells": {
+    "$comment": "Unused (fully transparent) cells available for new frames without resizing the sheet.",
+    "row0": [6, 7],
+    "row3": [4, 5, 6, 7],
+    "row4": [5, 6, 7],
+    "row6": [6, 7],
+    "row7": [6, 7],
+    "row8": [6, 7]
+  },
+  "plannedNewStates": {
+    "$comment": "Needed by the behaviour spec but absent from this sheet. Row 6 is reclaimable; rows 9-11 require extending the sheet to 1536x2496.",
+    "drink": { "row": 6, "frames": 6, "durationMs": 1800, "iterations": 2, "status": "todo", "note": "reclaim the duplicate waiting row" },
+    "stretch": { "row": 9, "frames": 6, "durationMs": 2200, "iterations": 2, "status": "todo", "requiresSheetExtension": true },
+    "sleep": { "row": 10, "frames": 4, "durationMs": 4000, "iterations": "infinite", "status": "todo", "requiresSheetExtension": true, "note": "can be approximated without new art: idle re-timed very slow + a CSS Z bubble" }
+  },
+  "reactionMap": {
+    "$comment": "trigger -> animation state. Keep this indirection so new triggers are a mapping entry, not renderer work.",
+    "idle": "idle",
+    "run-left": "running-left",
+    "run-right": "running-right",
+    "broadcast-notification": "waving",
+    "update-available": "jumping",
+    "celebrating": "jumping",
+    "water-reminder": "drink",
+    "stretch-reminder": "stretch",
+    "thinking": "review",
+    "busy": "running",
+    "error": "failed",
+    "movement-disabled": "sleep"
+  }
+}

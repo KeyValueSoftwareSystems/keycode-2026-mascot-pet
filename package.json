@@ -1,0 +1,35 @@
+{
+  "name": "keycode-pet-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Keycode mascot desktop companion — workspace root",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@11.6.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "install-electron",
+    "generate": "node scripts/generate-sprite-css.mjs && node scripts/generate-alpha-mask.mjs",
+    "generate:check": "node scripts/generate-sprite-css.mjs --check && node scripts/generate-alpha-mask.mjs --check",
+    "build": "pnpm generate:check && pnpm -F @keycode/desktop build",
+    "dev": "pnpm -F @keycode/desktop dev",
+    "typecheck": "pnpm -F @keycode/desktop typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "pnpm build && node scripts/smoke.mjs",
+    "smoke:states": "pnpm build && node scripts/smoke.mjs --all-states",
+    "manifest:serve": "node scripts/dev-manifest-server.mjs",
+    "package": "pnpm build && electron-builder --mac --config electron-builder.config.cjs",
+    "package:all": "pnpm build && electron-builder --mac --win --linux --config electron-builder.config.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "electron": "^42.8.0",
+    "electron-builder": "^26.10.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  }
+}

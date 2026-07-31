@@ -1,0 +1,19 @@
+{
+  "name": "@keycode/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Keycode Pet — Electron desktop companion",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "pnpm build:main && pnpm build:renderer",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "dev": "electron .",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.renderer.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

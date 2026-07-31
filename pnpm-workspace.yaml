@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+
+# Electron 42 no longer ships a postinstall hook; the binary is fetched by the root
+# `postinstall` script instead (see package.json). electron-winstaller only matters when
+# building the Windows NSIS target, which happens on a Windows CI runner, never here.
+allowBuilds:
+  electron-winstaller: false

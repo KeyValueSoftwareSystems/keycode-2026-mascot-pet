@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+reference/
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+
+# Harness output that is regenerated, not evidence
+docs/demo/tmp/
