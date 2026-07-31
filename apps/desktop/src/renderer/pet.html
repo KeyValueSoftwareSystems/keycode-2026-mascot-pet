@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Strict CSP. `img-src` needs the local scheme because the spritesheet is loaded from disk;
+      `font-src` will carry the bundled emoji font from M5. Scripts are bundle-only: no inline
+      script, no eval. `connect-src 'none'` is the belt-and-braces version of "the renderer never
+      fetches anything" — all network access lives in main.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; font-src 'self' file: data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Keycode Pet</title>
+    <link rel="stylesheet" href="./pet.generated.css" />
+    <link rel="stylesheet" href="./pet.css" />
+  </head>
+  <body>
+    <!--
+      One window holds the sprite and the bubble. The bubble follows the pet for free, there is
+      one set of bounds to place, and one alpha mask to hit-test against. The cost is a window
+      much larger than the visible character, which is exactly what the mask handles.
+    -->
+    <div id="bubble" hidden>
+      <span id="bubble-text"></span>
+    </div>
+    <div id="sprite" class="pet-sprite" data-state="idle" data-nonce="0" data-facing="right"></div>
+    <!-- Pure-CSS sleep affordance. This is what lets `sleep` ship with no new art. -->
+    <div id="zzz" aria-hidden="true"><span>z</span><span>z</span><span>z</span></div>
+    <script type="module" src="./pet.ts"></script>
+  </body>
+</html>

@@ -435,6 +435,58 @@ function assertNotBlank(png, region, label) {
   )
 }
 
+/**
+ * A6 — the pixel art is crisp, not smoothed.
+ *
+ * Acceptance criterion 5, and otherwise only checkable by eye. On a 2x display with
+ * `image-rendering: pixelated`, each source pixel must land as an exact NxN block of identical
+ * colour. Smoothing (the CSS default) interpolates between neighbours instead, so blocks stop
+ * being uniform. Sampling block interiors makes this a direct test of the rendering mode.
+ *
+ * Skipped at scale 1, where there is no upscaling and therefore nothing to smooth.
+ */
+function assertPixelArtCrisp(png, region, scale, label) {
+  const block = Math.round(scale)
+  if (block < 2) return null
+
+  let checked = 0
+  let uniform = 0
+
+  for (let by = region.y; by + block <= region.y + region.height; by += block) {
+    for (let bx = region.x; bx + block <= region.x + region.width; bx += block) {
+      const first = pixelAt(png, bx, by)
+      if (first[3] <= 32) continue // skip transparent blocks; nothing to smooth there
+      let same = true
+      for (let dy = 0; dy < block && same; dy += 1) {
+        for (let dx = 0; dx < block; dx += 1) {
+          const p = pixelAt(png, bx + dx, by + dy)
+          if (rgbDistance(p, first) > 2 || Math.abs(p[3] - first[3]) > 2) {
+            same = false
+            break
+          }
+        }
+      }
+      checked += 1
+      if (same) uniform += 1
+    }
+  }
+
+  if (checked === 0) return null
+
+  const ratio = uniform / checked
+  // Blocks straddling a source-pixel boundary are not expected to be uniform when the region
+  // origin is not block-aligned, so this is a strong majority rather than a demand for 100%.
+  if (ratio < 0.9) {
+    throw new SmokeFailure(
+      EXIT.assertion,
+      `${label}: only ${(ratio * 100).toFixed(1)}% of ${block}x${block} pixel blocks are uniform ` +
+        `(expected >=90%). The sprite is being smoothed — check that image-rendering: pixelated ` +
+        `is still applied to .pet-sprite.`,
+    )
+  }
+  return ratio
+}
+
 /** A4 — the pet's feet sit on the work-area floor, not floating and not clipped into the Dock. */
 function assertFeetOnFloor(spriteRect, display, label) {
   const feet = spriteRect.y + spriteRect.height
@@ -515,11 +567,17 @@ async function assertPass(session, opts, name) {
       Math.max(8, Math.round(24 * scale)),
     )
     assertFeetOnFloor(pet.spriteRect, pet.display, 'A4 feet-on-floor')
+    const crisp = assertPixelArtCrisp(png, region, scale, 'A6 pixel-art-crisp')
     console.log(`  ✓ A1 sprite painted (${(fill * 100).toFixed(1)}% of the bbox has alpha)`)
     console.log(`  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring)`)
     console.log(`  ✓ A3 image is not blank (${colours} distinct colours)`)
     console.log('  ✓ A4 feet are on the work-area floor')
-    results.push('A1', 'A2', 'A3', 'A4')
+    if (crisp !== null) {
+      console.log(`  ✓ A6 pixel art is crisp (${(crisp * 100).toFixed(1)}% of blocks uniform)`)
+    } else {
+      console.log('  · A6 skipped (scale 1: no upscaling to smooth)')
+    }
+    results.push('A1', 'A2', 'A3', 'A4', 'A6')
   } else {
     // Before M3 there is no sprite. The only meaningful check is that we captured a real image.
     const colours = assertNotBlank(png, { x: 0, y: 0, width: png.width, height: png.height }, 'A3')
