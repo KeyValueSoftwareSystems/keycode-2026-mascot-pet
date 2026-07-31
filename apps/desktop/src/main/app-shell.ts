@@ -30,6 +30,8 @@ import {
   type Poller,
 } from '../broadcast/broadcast-poller.js'
 import { appendSeenId } from './settings-schema.js'
+import { createUpdateService, type UpdateService } from '../updates/update-service.js'
+import { openExternalChecked } from './open-external.js'
 import { PRODUCT_NAME } from '../config/constants.js'
 import { floorForWorkArea } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
@@ -49,6 +51,7 @@ export interface AppShell {
   reminders: ReminderService
   toasts: ToastManager
   poller: Poller
+  updates: UpdateService
   backdrop: BrowserWindow | null
   onSecondInstance(): void
   dispose(): Promise<void>
@@ -133,10 +136,9 @@ export async function startApp(): Promise<AppShell> {
         settings.patch({ position: { displayKey: displayNow.key, x: dropped } })
       },
       onOpenCalloutUrl(): void {
-        // M8 adds the validated open. Until then a bubble is never marked clickable, so this
-        // cannot be reached from the UI — but the path exists so M8 is a one-line change.
-        const url = callouts?.currentUrl()
-        log('callout link requested', { hasUrl: Boolean(url) })
+        // Main holds the URL and re-validates it here. The renderer only ever asked to open "the
+        // current callout's link" and never saw a string.
+        openExternalChecked(callouts?.currentUrl(), { log })
       },
     },
   })
@@ -174,8 +176,7 @@ export async function startApp(): Promise<AppShell> {
               text: showing.text,
               tone: showing.tone,
               pinned: Boolean(showing.pin),
-              // Never advertise a link the app cannot open yet. M8 flips this on.
-              clickable: false,
+              clickable: Boolean(callouts.currentUrl()),
             }
           : null,
       )
@@ -210,6 +211,8 @@ export async function startApp(): Promise<AppShell> {
   //
   // The default URL is the local dev server, because no host has been chosen yet. Switching to a real
   // one is a single env var; see docs/BROADCAST.md.
+  let updates: UpdateService | null = null
+
   const manifestUrl = resolveManifestUrl(process.env, 'http://127.0.0.1:8787/manifest.json')
 
   // TWO independent conditions. `app.isPackaged` is not env-overridable, so a shipped build cannot be
@@ -243,9 +246,23 @@ export async function startApp(): Promise<AppShell> {
       }
     },
     onRelease(release) {
-      // M8 turns this into an update callout. Recording it now keeps the poll single-purpose.
-      if (release) log('manifest release block', { latestVersion: release.latestVersion })
+      updates?.onReleaseFromPoll(release)
     },
+  })
+
+  updates = createUpdateService({
+    currentVersion: app.getVersion(),
+    log,
+    getLastKnownRelease: () => settings.get().lastKnownRelease,
+    setLastKnownRelease: (version) => settings.patch({ lastKnownRelease: version }),
+    submitCallout: (request) => callouts.show(request),
+    showToast: (toast) => toasts.show(toast),
+    pollNow: () => poller.pollNow('user'),
+    onStateChange: (nextView) => {
+      updateState = { state: nextView.state, latestVersion: nextView.latestVersion }
+      menu.refresh()
+    },
+    openReleaseNotes: (url) => openExternalChecked(url, { log }),
   })
 
   log('broadcast polling', {
@@ -287,9 +304,12 @@ export async function startApp(): Promise<AppShell> {
     getCursorPoint: () => screen.getCursorScreenPoint(),
     showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
     checkForUpdates: () => {
-      // M8 wires the real check. Until then the menu item is present but inert, which is honest:
-      // the label reads "Check for updates…" and nothing claims to have checked.
-      log('check for updates requested (wired in M8)')
+      // If an update is already known, the item opens its notes; otherwise it runs a real check.
+      if (updateState.state === 'available') {
+        updates?.openNotes()
+        return
+      }
+      void updates?.checkNow()
     },
     quit: () => app.quit(),
     log,
@@ -365,6 +385,7 @@ export async function startApp(): Promise<AppShell> {
     reminders,
     toasts,
     poller,
+    updates,
     backdrop,
 
     onSecondInstance(): void {
