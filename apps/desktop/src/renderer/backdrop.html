@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Keycode Pet — verification backdrop</title>
+    <style>
+      /*
+       * Dev/harness only. This window exists for one reason: a transparent-window bug —
+       * a grey box, a halo, a drop shadow behind the sprite — is invisible against a white
+       * desktop. Screenshots taken over this backdrop show it immediately.
+       *
+       * The grid is here so scaling and smoothing artifacts are visible too: crisp 1px
+       * lines stay crisp, a resampled capture blurs them.
+       */
+      :root {
+        --backdrop: #101014;
+        --grid: rgba(255, 255, 255, 0.055);
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--backdrop);
+      }
+      body {
+        background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+        background-size: 32px 32px;
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: rgba(255, 255, 255, 0.3);
+      }
+      /* Static text: the CSP forbids scripts here, and the screenshot filename already
+         carries the run name, so there is nothing worth loosening the policy for. */
+      #label {
+        position: fixed;
+        top: 12px;
+        left: 14px;
+        letter-spacing: 0.04em;
+        white-space: pre;
+      }
+      /* A reference swatch strip: if a capture is colour-managed or bit-depth-reduced,
+         these known values shift and the smoke assertions say so instead of guessing. */
+      #swatches {
+        position: fixed;
+        top: 12px;
+        right: 14px;
+        display: flex;
+        gap: 0;
+      }
+      #swatches i {
+        display: block;
+        width: 24px;
+        height: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="label">KEYCODE PET · VERIFICATION BACKDROP</div>
+    <div id="swatches">
+      <i style="background: #000000"></i>
+      <i style="background: #404040"></i>
+      <i style="background: #808080"></i>
+      <i style="background: #c0c0c0"></i>
+      <i style="background: #ffffff"></i>
+    </div>
+  </body>
+</html>
