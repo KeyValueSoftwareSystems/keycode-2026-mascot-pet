@@ -48,6 +48,37 @@ export function emitOrCheck(path, content, { check = false } = {}) {
   return { changed: true, diff: firstDifference(rel, existing, content) }
 }
 
+/**
+ * Binary sibling of `emitOrCheck`, comparing bytes rather than lines.
+ *
+ * Separate because the text path reads as utf8, which mangles arbitrary bytes — a PNG
+ * compared that way can report "identical" for two different files.
+ *
+ * @returns {{ changed: boolean, diff: string | null }}
+ */
+export function emitOrCheckBuffer(path, buffer, { check = false } = {}) {
+  const rel = relative(process.cwd(), path)
+
+  if (!check) {
+    mkdirSync(dirname(path), { recursive: true })
+    if (existsSync(path) && readFileSync(path).equals(buffer)) return { changed: false, diff: null }
+    writeFileSync(path, buffer)
+    return { changed: true, diff: null }
+  }
+
+  if (!existsSync(path)) {
+    return { changed: true, diff: `${rel} does not exist but the generator produces it.` }
+  }
+  const existing = readFileSync(path)
+  if (existing.equals(buffer)) return { changed: false, diff: null }
+  return {
+    changed: true,
+    diff:
+      `${rel} is stale (${existing.length} bytes committed vs ${buffer.length} generated).\n` +
+      'Run `pnpm generate` and commit the result.',
+  }
+}
+
 function firstDifference(rel, actual, expected) {
   const a = actual.split('\n')
   const b = expected.split('\n')

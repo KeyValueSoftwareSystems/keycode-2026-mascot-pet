@@ -55,8 +55,6 @@ function applyCommandLineSwitches(): void {
 // ---------------------------------------------------------------------------------------
 
 async function boot(): Promise<void> {
-  app.setName('Keycode Pet')
-
   // The pet is a background companion, never a foreground app. `dock.hide()` alone leaves
   // it a "regular" app for activation purposes, which lets it steal focus and interferes
   // with cross-Space visibility; `accessory` is what actually makes it passive.
@@ -92,6 +90,13 @@ async function boot(): Promise<void> {
 // ---------------------------------------------------------------------------------------
 
 applyCommandLineSwitches()
+
+// MUST precede `requestSingleInstanceLock()`. The lock is a file inside `userData`, so taking
+// it resolves and caches that path — and `userData` is derived from `app.getName()`. Setting
+// the name afterwards is silently too late: the app keeps running, but its settings land in
+// a directory named after the package (`@keycode/desktop`) instead of the product, and a
+// later rename orphans the user's saved position and toggles.
+app.setName('Keycode Pet')
 
 if (!app.requestSingleInstanceLock()) {
   app.exit(0)

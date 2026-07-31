@@ -12,7 +12,7 @@
  * report something actionable instead of comparing garbage pixels.
  */
 
-import { inflateSync } from 'node:zlib'
+import { inflateSync, deflateSync } from 'node:zlib'
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -280,4 +280,86 @@ export function pixelAt(png, x, y) {
  */
 export function rgbDistance(a, b) {
   return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]))
+}
+
+// ---------------------------------------------------------------------------------------
+// Encoding
+//
+// Needed so generated artifacts — chiefly the tray icon, derived from the spritesheet's own
+// silhouette — can be produced without adding a native image dependency to the build.
+// Unlike the decoder, an encoder MUST write correct CRCs: macOS and Windows icon loaders
+// validate them, and a bad CRC yields a silently blank tray icon.
+// ---------------------------------------------------------------------------------------
+
+const CRC_TABLE = (() => {
+  const table = new Int32Array(256)
+  for (let n = 0; n < 256; n += 1) {
+    let c = n
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    }
+    table[n] = c
+  }
+  return table
+})()
+
+function crc32(buffer) {
+  let crc = -1
+  for (let i = 0; i < buffer.length; i += 1) {
+    crc = CRC_TABLE[(crc ^ buffer[i]) & 0xff] ^ (crc >>> 8)
+  }
+  return (crc ^ -1) >>> 0
+}
+
+function pngChunk(type, data) {
+  const length = Buffer.alloc(4)
+  length.writeUInt32BE(data.length, 0)
+  const typeAndData = Buffer.concat([Buffer.from(type, 'ascii'), data])
+  const crc = Buffer.alloc(4)
+  crc.writeUInt32BE(crc32(typeAndData), 0)
+  return Buffer.concat([length, typeAndData, crc])
+}
+
+/**
+ * Encode RGBA pixels as an 8-bit colour-type-6 PNG.
+ *
+ * @param {number} width
+ * @param {number} height
+ * @param {Uint8Array} rgba 4 bytes per pixel, row-major
+ * @returns {Buffer}
+ */
+export function encodePng(width, height, rgba) {
+  if (rgba.length !== width * height * 4) {
+    throw new PngFormatError(
+      `encodePng: expected ${width * height * 4} bytes of RGBA, got ${rgba.length}.`,
+    )
+  }
+
+  const stride = width * 4
+  const raw = Buffer.alloc((stride + 1) * height)
+  for (let y = 0; y < height; y += 1) {
+    // Filter type 0 (None). These images are tiny and generated once, so the extra few
+    // hundred bytes an adaptive filter would save are not worth the code.
+    raw[y * (stride + 1)] = 0
+    Buffer.from(rgba.buffer, rgba.byteOffset + y * stride, stride).copy(
+      raw,
+      y * (stride + 1) + 1,
+    )
+  }
+
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8 // bit depth
+  ihdr[9] = 6 // colour type: RGBA
+  ihdr[10] = 0 // deflate
+  ihdr[11] = 0 // adaptive filtering
+  ihdr[12] = 0 // no interlace
+
+  return Buffer.concat([
+    Buffer.from(PNG_SIGNATURE),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(raw, { level: 9 })),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ])
 }
