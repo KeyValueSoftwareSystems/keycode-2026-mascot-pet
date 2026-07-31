@@ -120,16 +120,22 @@ body {
 /* Sleep overlay — the no-new-art half of the `sleep` state                                  */
 /* --------------------------------------------------------------------------------------- */
 
+/*
+ * Positioned from the sprite origin (set on :root by the renderer, so siblings inherit it) plus an
+ * offset onto the character's head. 118px right of the cell's left edge lands just past the hair;
+ * 6px down from the cell top sits above it.
+ */
 #zzz {
   position: absolute;
   left: calc(var(--sprite-x, 0px) + 118px);
-  top: calc(var(--sprite-y, 0px) + 4px);
+  top: calc(var(--sprite-y, 0px) + 6px);
   display: none;
   pointer-events: none;
   font:
-    600 15px / 1 system-ui,
+    700 16px / 1 system-ui,
     sans-serif;
-  color: rgba(245, 245, 245, 0.85);
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 html[data-overlay='sleep-z'] #zzz {

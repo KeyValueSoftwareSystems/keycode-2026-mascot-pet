@@ -8,7 +8,7 @@
  * M3 the controller, M4–M8 the rest.
  */
 
-import { app, dialog, type BrowserWindow, type MenuItemConstructorOptions } from 'electron'
+import { app, dialog, screen, type BrowserWindow } from 'electron'
 import { createDisplayManager, type DisplayManager } from './display-manager.js'
 import { createBackdropWindow, shouldShowBackdrop } from './backdrop-window.js'
 import { installHarnessControl } from './harness-control.js'
@@ -16,6 +16,10 @@ import { SettingsStore } from './settings-store.js'
 import { createTray, type TrayController } from './tray.js'
 import { createPetWindow, type PetWindow } from './pet-window.js'
 import { createPetController, type PetController } from './pet-controller.js'
+import { createMenuController, type MenuController } from './menu.js'
+import { createActions } from './actions.js'
+import type { MenuViewModel, UpdateState } from './menu-template.js'
+import { PRODUCT_NAME } from '../config/constants.js'
 import { floorForWorkArea } from './floor-placement.js'
 import { isAnimationState } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
@@ -28,6 +32,7 @@ export interface AppShell {
   tray: TrayController
   pet: PetWindow
   controller: PetController
+  menu: MenuController
   backdrop: BrowserWindow | null
   onSecondInstance(): void
   dispose(): Promise<void>
@@ -96,8 +101,7 @@ export async function startApp(): Promise<AppShell> {
         // hangs off hover today; M5 may use it to hold a bubble open under the cursor.
       },
       onContextMenu(): void {
-        // M4 pops the shared menu here.
-        log('context menu requested (wired in M4)')
+        menu.popupOverPet()
       },
       onDragStart(): void {
         pet.setDragging(true)
@@ -148,24 +152,59 @@ export async function startApp(): Promise<AppShell> {
     log('display configuration changed; re-asserted z-order')
   })
 
-  /**
-   * M1's placeholder menu. M4 replaces this with the shared template that also feeds the
-   * sprite's right-click menu — the injection point exists so that swap needs no changes here.
-   */
-  const buildTemplate = (): MenuItemConstructorOptions[] => [
-    { label: 'Keycode Pet', enabled: false },
-    { type: 'separator' },
-    {
-      label: 'About',
-      click: () => {
-        void showAbout(petMeta, settings.recovery?.reason ?? null)
-      },
-    },
-    { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
-  ]
+  // ---- Menus. ONE template feeds both the sprite's right-click menu and the tray menu, because
+  // on Wayland the compositor swallows right-click on the sprite and the tray is the only way in.
+  let updateState: { state: UpdateState; latestVersion: string | null } = {
+    state: 'idle',
+    latestVersion: null,
+  }
 
-  const tray = createTray({ buildTemplate, tooltip: `Keycode Pet — ${petMeta.displayName}` })
+  const menuView = (): MenuViewModel => {
+    const current = settings.get()
+    return {
+      movementEnabled: current.movementEnabled,
+      waterReminderEnabled: current.waterReminderEnabled,
+      stretchReminderEnabled: current.stretchReminderEnabled,
+      update: updateState,
+    }
+  }
+
+  const actions = createActions({
+    settings,
+    controller,
+    displays,
+    getCursorPoint: () => screen.getCursorScreenPoint(),
+    showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
+    checkForUpdates: () => {
+      // M8 wires the real check. Until then the menu item is present but inert, which is honest:
+      // the label reads "Check for updates…" and nothing claims to have checked.
+      log('check for updates requested (wired in M8)')
+    },
+    quit: () => app.quit(),
+    log,
+  })
+
+  // The menu and the tray reference each other: the tray asks the menu for a template, and a state
+  // change asks the tray to rebuild. `createTray` calls `buildTemplate()` synchronously, so the menu
+  // must exist first — hence the explicit late binding rather than two consts that appear to work.
+  let trayRef: TrayController | null = null
+
+  const menu: MenuController = createMenuController({
+    view: menuView,
+    actions,
+    petWindow: () => pet.win,
+    // The tray menu is retained by the OS, so a state change has to push a rebuild into it.
+    onTemplateChanged: () => trayRef?.refresh(),
+  })
+
+  const tray = createTray({
+    buildTemplate: () => menu.template(),
+    tooltip: `${PRODUCT_NAME} — ${petMeta.displayName}`,
+  })
+  trayRef = tray
+
+  // Any settings change re-renders the menus, so a checkbox can never disagree with the store.
+  const stopSettingsWatch = settings.onChange(() => menu.refresh())
 
   const stopHarnessControl = installHarnessControl({
     pet: () => pet.win,
@@ -187,6 +226,7 @@ export async function startApp(): Promise<AppShell> {
     tray,
     pet,
     controller,
+    menu,
     backdrop,
 
     onSecondInstance(): void {
@@ -200,6 +240,8 @@ export async function startApp(): Promise<AppShell> {
       disposed = true
       stopHarnessControl()
       stopDisplayWatch()
+      stopSettingsWatch()
+      menu.dispose()
       controller?.stop()
       // Flush before tearing anything down — an unflushed position or reminder deadline is
       // exactly the state that must survive a quit.

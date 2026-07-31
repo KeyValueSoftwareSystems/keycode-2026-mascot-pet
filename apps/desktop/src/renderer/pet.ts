@@ -29,8 +29,11 @@ let spriteOrigin = { x: 0, y: 0 }
 function applyFrame(frame: PetFrame): void {
   spriteOrigin = frame.sprite
 
-  sprite.style.setProperty('--sprite-x', `${frame.sprite.x}px`)
-  sprite.style.setProperty('--sprite-y', `${frame.sprite.y}px`)
+  // Set on the root, not on #sprite. Custom properties inherit *downwards*, and #zzz is a sibling
+  // of #sprite — setting them on the sprite left the sleep overlay falling back to 0px and drifting
+  // from the top-left corner of the window instead of from the pet's head.
+  root.style.setProperty('--sprite-x', `${frame.sprite.x}px`)
+  root.style.setProperty('--sprite-y', `${frame.sprite.y}px`)
 
   // Setting data-state and data-nonce is the whole animation mechanism: the generated CSS keys
   // its keyframes off this pair, and a changed nonce is what makes the same state replay.
