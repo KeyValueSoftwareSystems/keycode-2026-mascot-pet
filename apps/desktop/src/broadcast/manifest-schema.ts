@@ -83,9 +83,30 @@ export const releaseSchema = z.strictObject({
  * nothing at all — not just the defaults. `pnpm manifest:publish` refuses to upload a manifest
  * containing `defaults` without an explicit flag for exactly this reason.
  */
-export const defaultsSchema = z.strictObject({
+/*
+ * NOT a strictObject, unlike the envelope around it.
+ *
+ * The envelope is strict so a typo'd top-level key is a loud failure rather than a setting that
+ * mysteriously has no effect. Inside a block that is *designed to grow*, strictness inverts into a
+ * liability: every new default would make every already-installed client reject the whole manifest and
+ * stop receiving announcements entirely. Unknown keys are dropped instead, so a client older than a
+ * given default simply ignores it — which is what forward compatibility means here.
+ *
+ * The failure modes are not comparable. An ignored unknown key costs one default not applying. A
+ * rejected envelope costs every announcement, for everyone, silently.
+ */
+export const defaultsSchema = z.object({
   waterMinutes: z.number().int().min(1).max(1_440).optional(),
   stretchMinutes: z.number().int().min(1).max(1_440).optional(),
+  /**
+   * How often to re-fetch this manifest, in minutes. Self-referential on purpose: each poll reads the
+   * value that will govern the next one.
+   *
+   * Shortening it takes effect at the next poll. *Lengthening* it is the direction to be careful with —
+   * a very long value is only recoverable after that long has elapsed, because clients have to fetch
+   * the file to learn it changed.
+   */
+  pollMinutes: z.number().int().min(1).max(1_440).optional(),
 })
 
 export const envelopeSchema = z.strictObject({
@@ -99,6 +120,7 @@ export const envelopeSchema = z.strictObject({
 export interface SafeDefaults {
   waterMinutes: number | null
   stretchMinutes: number | null
+  pollMinutes: number | null
 }
 
 export interface SafeNotification {
@@ -251,6 +273,7 @@ export function parseManifest(body: string): ParsedManifest | null {
     ? {
         waterMinutes: envelope.data.defaults.waterMinutes ?? null,
         stretchMinutes: envelope.data.defaults.stretchMinutes ?? null,
+        pollMinutes: envelope.data.defaults.pollMinutes ?? null,
       }
     : null
 

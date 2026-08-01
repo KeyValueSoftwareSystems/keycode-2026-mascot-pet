@@ -131,7 +131,8 @@ Optional, and **applied only where the user never made that choice locally**:
 ```jsonc
 "defaults": {
   "waterMinutes": 30,
-  "stretchMinutes": 60
+  "stretchMinutes": 60,
+  "pollMinutes": 5          // how often clients re-fetch THIS file
 }
 ```
 
@@ -148,11 +149,43 @@ Defaults are held **in memory only** and never written to disk. Nothing the mani
 process that received it, so there is no stale remote policy after a restart. The built-in intervals
 apply for the second between launch and the first poll, which does not matter for a 45-minute reminder.
 
+### `pollMinutes` — the manifest sets its own fetch interval
+
+Self-referential on purpose: each poll reads the value that governs the next one. Clamped to 1–1440,
+and the `KEYCODE_PET_POLL_MINUTES` env var still wins, because that is the knob used to debug the
+manifest and a remote value must not be able to override it.
+
+Changing it takes effect on the **next** poll, and a client that receives a new value recomputes its
+pending wait immediately — so shortening the interval does not first require the old, longer wait to
+elapse.
+
+**Lengthening is the dangerous direction.** A client has to fetch the file to learn the interval
+changed, so setting 1440 means nobody sees a correction for up to a day. Shortening is always
+recoverable. And 1 minute across a fleet is 60× the requests — fine for a handful of installs against
+a static file, worth thinking about beyond that. The ±20% jitter keeps them from arriving in lockstep.
+
 `petSize` is deliberately *not* a default. It is a cosmetic personal preference, so a team default for
 it has no reason to exist, and supporting one would mean adding a "never chosen" state to `petSize`
 purely to enable it.
 
-> ⛔ **Publishing `defaults` breaks every client older than v1.4.0.** The envelope is strict, so an
+### Why `defaults` is *not* strict, when the envelope is
+
+The envelope rejects unknown top-level keys so a typo is a loud failure rather than a setting that
+mysteriously has no effect. Inside `defaults` that same strictness inverts into a liability, because
+this block is **designed to grow**: every new default would make every already-installed client reject
+the *whole manifest* and stop receiving announcements entirely.
+
+So `defaults` drops unknown keys instead. The failure modes are not comparable — an ignored key costs
+one default not applying; a rejected envelope costs every announcement, for everyone, silently.
+
+This also makes the trust boundary stronger rather than weaker: a hypothetical `waterEnabled` cannot
+switch a reminder back on, because it is not merely rejected, it does nothing at all.
+
+> ⛔ **Publishing `defaults` breaks every client older than v1.4.0**, and adding `pollMinutes` breaks
+> **v1.4.0 itself** — that build shipped with a strict `defaults`, so an unknown key inside it rejects
+> the whole file. v1.5.0 is the first version that tolerates future keys, which makes this the last
+> addition here that needs a coordinated rollout. **Install v1.5.0 everywhere before publishing
+> `pollMinutes`.** The envelope is strict, so an
 > older build rejects the *whole file* on an unknown top-level key — it does not ignore `defaults`, it
 > ignores every announcement in the manifest, silently. `pnpm manifest:publish` refuses to upload a
 > manifest containing `defaults` unless you pass `--allow-defaults`, so this cannot happen by accident.

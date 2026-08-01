@@ -2,11 +2,11 @@
   "version": 1,
   "notifications": [
     {
-      "id": "hello-from-the-team-2026-08-02-b",
-      "text": "Hello from the Keycode team 👋 Broadcast is live — this reached you from the manifest.",
-      "tone": "success",
+      "id": "second-ping-2026-08-02",
+      "text": "Second ping 🚀 If you are reading this, the pet picked it up on its own poll — no restart.",
+      "tone": "info",
       "priority": "high",
-      "animation": "waving",
+      "animation": "jumping",
       "durationMs": 12000,
       "startsAt": "2026-08-01T00:00:00Z",
       "expiresAt": "2026-08-09T00:00:00Z"

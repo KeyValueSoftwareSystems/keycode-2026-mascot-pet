@@ -255,7 +255,11 @@ export async function startApp(): Promise<AppShell> {
    * about after a restart. The cost is that the built-in intervals apply for the second or so between
    * launch and the first poll — irrelevant for a 45-minute reminder.
    */
-  let manifestDefaults: { waterMinutes: number | null; stretchMinutes: number | null } | null = null
+  let manifestDefaults: {
+    waterMinutes: number | null
+    stretchMinutes: number | null
+    pollMinutes: number | null
+  } | null = null
 
   const effectiveDefaults = (): { waterMinutes: number; stretchMinutes: number } => ({
     waterMinutes: manifestDefaults?.waterMinutes ?? WATER_INTERVAL_MS / 60_000,
@@ -276,6 +280,7 @@ export async function startApp(): Promise<AppShell> {
     allowLoopbackHttp,
     userAgent: `KeycodePet/${app.getVersion()}`,
     log,
+    getPollMinutes: () => manifestDefaults?.pollMinutes ?? null,
     getSeenIds: () => settings.get().seenBroadcastIds,
     async markSeen(id) {
       // patchNow, not patch: "shown exactly once, ever" is a durability claim, and the debounce would
@@ -288,7 +293,9 @@ export async function startApp(): Promise<AppShell> {
       // Defaults only, never overrides: applied through `??` at read time against a local value of
       // null, which is the settings file's way of saying "never chosen here". A user who picked an
       // interval keeps it, and one who turned a reminder off stays off.
+      const pollChanged = defaults?.pollMinutes !== manifestDefaults?.pollMinutes
       const changed =
+        pollChanged ||
         defaults?.waterMinutes !== manifestDefaults?.waterMinutes ||
         defaults?.stretchMinutes !== manifestDefaults?.stretchMinutes
       manifestDefaults = defaults
@@ -297,6 +304,11 @@ export async function startApp(): Promise<AppShell> {
         // A changed default can move a deadline for anyone who never chose an interval.
         reminders.evaluateNow()
         menu?.refresh()
+      }
+      if (pollChanged) {
+        // Recompute the pending wait, or a shortened interval would not apply until the old, longer
+        // one had already elapsed.
+        poller.rescheduleNow()
       }
     },
     onNotifications(notifications) {

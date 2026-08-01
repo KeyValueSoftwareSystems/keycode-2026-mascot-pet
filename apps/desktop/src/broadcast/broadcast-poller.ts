@@ -55,6 +55,11 @@ export interface PollerDeps {
   onRelease: (release: SafeRelease | null) => void
   /** Team defaults from the manifest, or null when it carries none. */
   onDefaults?: (defaults: SafeDefaults | null) => void
+  /**
+   * The manifest-provided poll interval in minutes, or null. Read fresh on every reschedule, so a
+   * changed value governs the next wait without restarting anything.
+   */
+  getPollMinutes?: () => number | null
   allowLoopbackHttp: boolean
   userAgent?: string
   log?: (message: string, meta?: unknown) => void
@@ -66,6 +71,13 @@ export interface Poller {
   /** Poll now. Concurrent calls share the in-flight request rather than stacking. */
   pollNow(reason: PollReason): Promise<PollOutcome>
   status(): PollerStatus
+  /**
+   * Recompute the pending wait with the current interval.
+   *
+   * Without this, shortening the interval only takes effect after the *old* wait elapses — so setting
+   * 1 minute while a 5-minute timer is pending still means waiting five.
+   */
+  rescheduleNow(): void
 }
 
 /** Resolve the manifest URL, env override first. */
@@ -75,10 +87,18 @@ export function resolveManifestUrl(env: NodeJS.ProcessEnv, fallback: string): st
 }
 
 /** Resolve the poll interval in minutes, clamped. A bad value falls back rather than disabling polling. */
-export function resolvePollMinutes(env: NodeJS.ProcessEnv): number {
+export function resolvePollMinutes(
+  env: NodeJS.ProcessEnv,
+  /** Manifest-provided default, or null. The env override wins over it — it is a dev escape hatch. */
+  fromManifest: number | null = null,
+): number {
+  const clamp = (n: number): number => Math.min(POLL.maxMinutes, Math.max(POLL.minMinutes, n))
   const raw = Number(env.KEYCODE_PET_POLL_MINUTES)
-  if (!Number.isFinite(raw) || raw <= 0) return POLL.baseMinutes
-  return Math.min(POLL.maxMinutes, Math.max(POLL.minMinutes, raw))
+  if (Number.isFinite(raw) && raw > 0) return clamp(raw)
+  if (fromManifest !== null && Number.isFinite(fromManifest) && fromManifest > 0) {
+    return clamp(fromManifest)
+  }
+  return POLL.baseMinutes
 }
 
 /**
@@ -112,7 +132,8 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
   let lastBodyHash: string | null = null
   let status: PollerStatus = { state: 'idle', lastAt: null, lastError: null }
 
-  const baseDelay = (): number => resolvePollMinutes(process.env) * 60_000
+  const baseDelay = (): number =>
+    resolvePollMinutes(process.env, deps.getPollMinutes?.() ?? null) * 60_000
 
   const scheduleNext = (): void => {
     if (stopped) return
@@ -225,6 +246,10 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
 
     pollNow(reason: PollReason): Promise<PollOutcome> {
       return run(reason)
+    },
+
+    rescheduleNow(): void {
+      if (!stopped) scheduleNext()
     },
 
     status(): PollerStatus {

@@ -539,33 +539,67 @@ describe('manifest team defaults', () => {
   const wrap = (defaults: unknown) =>
     parseManifest(JSON.stringify({ version: 1, notifications: [], defaults }))
 
-  it('parses intervals when present', () => {
-    const parsed = wrap({ waterMinutes: 30, stretchMinutes: 90 })
-    expect(parsed?.defaults).toEqual({ waterMinutes: 30, stretchMinutes: 90 })
+  it('parses intervals and the poll interval when present', () => {
+    const parsed = wrap({ waterMinutes: 30, stretchMinutes: 90, pollMinutes: 1 })
+    expect(parsed?.defaults).toEqual({ waterMinutes: 30, stretchMinutes: 90, pollMinutes: 1 })
   })
 
   it('is null when the manifest carries none, so nothing is implied', () => {
     expect(parseManifest(JSON.stringify({ version: 1, notifications: [] }))?.defaults).toBeNull()
   })
 
-  it('allows either interval on its own', () => {
-    expect(wrap({ waterMinutes: 20 })?.defaults).toEqual({ waterMinutes: 20, stretchMinutes: null })
+  it('allows any subset on its own', () => {
+    expect(wrap({ waterMinutes: 20 })?.defaults).toEqual({
+      waterMinutes: 20,
+      stretchMinutes: null,
+      pollMinutes: null,
+    })
+    expect(wrap({ pollMinutes: 1 })?.defaults).toEqual({
+      waterMinutes: null,
+      stretchMinutes: null,
+      pollMinutes: 1,
+    })
   })
 
-  it('rejects the whole envelope for an out-of-range or unknown default', () => {
-    // Strict, like the rest of the envelope: a default that silently clamped would be a policy
-    // nobody chose, and a typo'd key that was ignored would look like it had applied.
+  it('rejects the whole envelope for an out-of-range value on a declared key', () => {
+    // A declared key still validates: a default that silently clamped would be a policy nobody chose.
     expect(wrap({ waterMinutes: 0 })).toBeNull()
     expect(wrap({ waterMinutes: 100_000 })).toBeNull()
     expect(wrap({ waterMinutes: 30.5 })).toBeNull()
-    expect(wrap({ waterMinutez: 30 })).toBeNull()
-    expect(wrap({ petSize: 'small' })).toBeNull()
+    expect(wrap({ pollMinutes: 0 })).toBeNull()
+  })
+
+  it('IGNORES unknown keys instead of rejecting the manifest — this block must stay extensible', () => {
+    // Deliberately not strict, unlike the envelope. `defaults` is designed to grow, and strictness
+    // there means every new default makes every older client reject the whole file and stop receiving
+    // announcements. The failure modes are not comparable: an ignored key costs one default; a
+    // rejected envelope costs every announcement, for everyone, silently.
+    const parsed = wrap({ waterMinutes: 20, somethingFromTheFuture: 'x', petSize: 'small' })
+    expect(parsed).not.toBeNull()
+    expect(parsed?.defaults).toEqual({ waterMinutes: 20, stretchMinutes: null, pollMinutes: null })
   })
 
   it('carries no way to force a reminder on', () => {
-    // The trust boundary: defaults may suggest *how often*, never *whether*. An `enabled` field here
-    // would let remote text switch a reminder back on after someone turned it off.
-    expect(wrap({ waterEnabled: true })).toBeNull()
-    expect(Object.keys(defaultsSchema.shape).sort()).toEqual(['stretchMinutes', 'waterMinutes'])
+    // The trust boundary: defaults may suggest *how often*, never *whether*. Now that unknown keys are
+    // dropped, the guarantee is stronger than "rejected" — such a field cannot do anything at all.
+    const parsed = wrap({ waterEnabled: true, waterMinutes: 20 })
+    expect(parsed?.defaults).toEqual({ waterMinutes: 20, stretchMinutes: null, pollMinutes: null })
+    // And the contract itself has no enable-like key to grow into one by accident.
+    expect(Object.keys(defaultsSchema.shape).sort()).toEqual([
+      'pollMinutes',
+      'stretchMinutes',
+      'waterMinutes',
+    ])
+  })
+
+  it('lets the manifest set the poll interval, with the env override winning', () => {
+    // The env var is a dev escape hatch, so it must beat a remote value — otherwise a manifest could
+    // override the one knob used to debug the manifest.
+    expect(resolvePollMinutes({}, 1)).toBe(1)
+    expect(resolvePollMinutes({}, null)).toBe(POLL.baseMinutes)
+    expect(resolvePollMinutes({ KEYCODE_PET_POLL_MINUTES: '7' }, 1)).toBe(7)
+    // Clamped like everything else arriving from outside.
+    expect(resolvePollMinutes({}, 99_999)).toBe(POLL.maxMinutes)
+    expect(resolvePollMinutes({}, 0)).toBe(POLL.baseMinutes)
   })
 })

@@ -33,7 +33,8 @@ test that reminders work** without waiting 45 minutes.
 
 The team can set default intervals for anyone who never picked one, via the manifest — see
 [docs/BROADCAST.md](docs/BROADCAST.md). Defaults never override a local choice, and there is no way for
-a manifest to switch a reminder back on.
+a manifest to switch a reminder back on. The manifest also sets **how often clients re-fetch it**
+(`pollMinutes`), so the broadcast cadence is changed by publishing rather than by shipping a build.
 
 **Three sizes.** Right-click → Size → Small / Medium / Large. `Large` is the size it has always
 rendered at, so upgrading changes nothing; `Small` is half that. Only the sprite scales — bubble text
@@ -93,7 +94,7 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 380 tests, no Electron required |
+| `pnpm test` | 382 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
@@ -203,7 +204,7 @@ available.
 ## Status
 
 All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
-releases from `v1.1.0`. 380 tests pass; typecheck is clean.
+releases from `v1.1.0`. 382 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.
