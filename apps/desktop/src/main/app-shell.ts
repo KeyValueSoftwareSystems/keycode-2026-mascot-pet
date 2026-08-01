@@ -358,7 +358,10 @@ export async function startApp(): Promise<AppShell> {
 
   log('broadcast polling', {
     url: manifestUrl,
-    everyMinutes: resolvePollMinutes(process.env),
+    // Named to say what it is: the interval *before* any manifest has been read. The manifest can
+    // shorten it, and does — but only from the first poll that actually sees the value, which is why
+    // reporting it as `everyMinutes` here read as a contradiction of the published `pollMinutes`.
+    startingEveryMinutes: resolvePollMinutes(process.env),
     allowLoopbackHttp,
   })
   poller.start()

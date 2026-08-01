@@ -178,6 +178,22 @@ Changing it takes effect on the **next** poll, and a client that receives a new 
 pending wait immediately — so shortening the interval does not first require the old, longer wait to
 elapse.
 
+**But the first poll of a session always uses the built-in 5 minutes.** A client has to fetch the file
+to learn the interval, so a freshly launched app waits up to 5 minutes for its first fetch however
+short `pollMinutes` is. That is not a bug and cannot be fixed from the manifest — it is what
+"self-referential" costs. The launch-time log line is named `startingEveryMinutes` to say exactly that,
+and the interval is logged again as `poll interval` whenever it actually changes, with where the value
+came from:
+
+```
+broadcast polling  { startingEveryMinutes: 5, … }   ← before any fetch
+poll interval      { minutes: 1, source: 'manifest', was: 5 }
+```
+
+Before those two changes the log reported `everyMinutes: 5` once at startup and then went silent —
+a successful poll logs nothing — so an app correctly polling every minute looked like one stuck on
+five, and there was no way to tell from the log which it was.
+
 **Lengthening is the dangerous direction.** A client has to fetch the file to learn the interval
 changed, so setting 1440 means nobody sees a correction for up to a day. Shortening is always
 recoverable. And 1 minute across a fleet is 60× the requests — fine for a handful of installs against

@@ -132,8 +132,31 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
   let lastBodyHash: string | null = null
   let status: PollerStatus = { state: 'idle', lastAt: null, lastError: null }
 
-  const baseDelay = (): number =>
-    resolvePollMinutes(process.env, deps.getPollMinutes?.() ?? null) * 60_000
+  /** Last interval reported, so a change is logged once rather than on every reschedule. */
+  let lastLoggedMinutes: number | null = null
+
+  const baseDelay = (): number => {
+    const fromManifest = deps.getPollMinutes?.() ?? null
+    const minutes = resolvePollMinutes(process.env, fromManifest)
+
+    // Log the interval when it *changes*, not on every reschedule.
+    //
+    // Without this there is no way to tell what cadence the app is actually on. The startup line is a
+    // snapshot taken before any manifest has been fetched, and a *successful* poll is deliberately
+    // silent — so after the manifest shortened the interval, nothing said so. The behaviour was right
+    // and completely unobservable, which is its own kind of bug: the first question anyone asks is
+    // "is it actually polling every minute?" and the log could not answer it.
+    if (minutes !== lastLoggedMinutes) {
+      const source = Number(process.env.KEYCODE_PET_POLL_MINUTES) > 0
+        ? 'env'
+        : fromManifest !== null
+          ? 'manifest'
+          : 'built-in default'
+      log('poll interval', { minutes, source, was: lastLoggedMinutes })
+      lastLoggedMinutes = minutes
+    }
+    return minutes * 60_000
+  }
 
   const scheduleNext = (): void => {
     if (stopped) return

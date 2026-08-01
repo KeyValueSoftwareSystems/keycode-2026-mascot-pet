@@ -2,11 +2,11 @@
   "version": 1,
   "notifications": [
     {
-      "id": "second-ping-2026-08-02",
-      "text": "Deploy freeze starts at 5pm 🔥 Click this bubble to dismiss it.",
+      "id": "cadence-proof-2026-08-02",
+      "text": "If this arrived within a minute of being published, the manifest's pollMinutes is in force ⏱",
       "tone": "info",
       "priority": "high",
-      "animation": "jumping",
+      "animation": "waving",
       "startsAt": "2026-08-01T00:00:00Z",
       "expiresAt": "2026-08-09T00:00:00Z"
     },
@@ -20,5 +20,8 @@
       "startsAt": "2020-01-01T00:00:00Z",
       "expiresAt": "2020-01-02T00:00:00Z"
     }
-  ]
+  ],
+  "defaults": {
+    "pollMinutes": 1
+  }
 }
