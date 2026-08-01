@@ -386,8 +386,15 @@ function assertSpritePainted(png, region, label) {
  *
  * Reading alpha directly is what makes this trustworthy: a composite could show the
  * backdrop colour through a window that is merely *painted* the same colour.
+ *
+ * `bubbleFloor` (in capture pixels, or null) excludes everything above it. The speech bubble is
+ * anchored just over the character's hair and is wider than the body, so when one is on screen the
+ * app is legitimately painting in the ring — above, and to both sides. Main reports the exact y
+ * below which no bubble pixel can exist, derived from the same generated per-state head top the
+ * renderer anchors to, so this excludes the bubble and nothing more. Everything from the hair down
+ * still has to be transparent, and a run without a callout still checks the whole ring.
  */
-function assertWindowTransparentAround(png, spriteRegion, label, ringPx) {
+function assertWindowTransparentAround(png, spriteRegion, label, ringPx, bubbleFloor = null) {
   let transparent = 0
   let total = 0
 
@@ -397,7 +404,8 @@ function assertWindowTransparentAround(png, spriteRegion, label, ringPx) {
     x < spriteRegion.x + spriteRegion.width + 1 &&
     y < spriteRegion.y + spriteRegion.height + 1
 
-  for (let y = spriteRegion.y - ringPx; y < spriteRegion.y + spriteRegion.height + ringPx; y += 1) {
+  const top = Math.max(spriteRegion.y - ringPx, bubbleFloor ?? -Infinity)
+  for (let y = top; y < spriteRegion.y + spriteRegion.height + ringPx; y += 1) {
     for (let x = spriteRegion.x - ringPx; x < spriteRegion.x + spriteRegion.width + ringPx; x += 1) {
       if (inSprite(x, y)) continue
       if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue
@@ -555,16 +563,28 @@ async function assertPass(session, opts, name) {
 
   const results = []
 
+  // Prefer the rect sampled at the moment of capture. `window-ready`'s copy is from startup, and
+  // the pet walks: indexing a later capture with it fails when you are lucky and, worse, checks
+  // the wrong pixels when you are not. Fall back only for a build with no capture-time rect.
+  const spriteRect = captured.spriteRect ?? pet?.spriteRect ?? null
+
   if (!opts.assert) {
     console.log('  · assertions skipped (--no-assert)')
-  } else if (pet?.spriteRect) {
+  } else if (spriteRect) {
     // Sprite rect is reported in screen DIP; convert to capture pixels relative to the window.
     const scale = png.width / captured.bounds.width
     const region = {
-      x: Math.round((pet.spriteRect.x - captured.bounds.x) * scale),
-      y: Math.round((pet.spriteRect.y - captured.bounds.y) * scale),
-      width: Math.round(pet.spriteRect.width * scale),
-      height: Math.round(pet.spriteRect.height * scale),
+      x: Math.round((spriteRect.x - captured.bounds.x) * scale),
+      y: Math.round((spriteRect.y - captured.bounds.y) * scale),
+      width: Math.round(spriteRect.width * scale),
+      height: Math.round(spriteRect.height * scale),
+    }
+    if (process.env.KEYCODE_PET_SMOKE_DEBUG) {
+      console.log(
+        `  · debug region=${JSON.stringify(region)} bounds=${JSON.stringify(captured.bounds)} ` +
+          `spriteRect=${JSON.stringify(spriteRect)} fresh=${Boolean(captured.spriteRect)} ` +
+          `png=${png.width}x${png.height}`,
+      )
     }
     const colours = assertNotBlank(png, region, 'A3 not-blank')
     const fill = assertSpritePainted(png, region, 'A1 sprite-painted')
@@ -573,11 +593,19 @@ async function assertPass(session, opts, name) {
       region,
       'A2 window-transparent',
       Math.max(8, Math.round(24 * scale)),
+      // Gated on main reporting a bubble actually on screen — never on `--callout`, because a
+      // broadcast or a reminder raises one with no flag involved. Absent, the full ring is checked.
+      captured.bubbleVisible && captured.bubbleFloorY !== undefined
+        ? Math.round((captured.bubbleFloorY - captured.bounds.y) * scale)
+        : null,
     )
-    assertFeetOnFloor(pet.spriteRect, pet.display, 'A4 feet-on-floor')
+    assertFeetOnFloor(spriteRect, pet.display, 'A4 feet-on-floor')
     const crisp = assertPixelArtCrisp(png, region, scale, 'A6 pixel-art-crisp')
     console.log(`  ✓ A1 sprite painted (${(fill * 100).toFixed(1)}% of the bbox has alpha)`)
-    console.log(`  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring)`)
+    console.log(
+      `  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring` +
+        `${captured.bubbleVisible ? ', from the hair down — a bubble is up' : ''})`,
+    )
     console.log(`  ✓ A3 image is not blank (${colours} distinct colours)`)
     console.log('  ✓ A4 feet are on the work-area floor')
     if (crisp !== null) {
@@ -601,11 +629,11 @@ async function assertPass(session, opts, name) {
     composite = captureComposite(compositePath, reference.display.index)
     if (composite.ok) {
       console.log(`  captured composite → docs/demo/${name}.png`)
-      if (opts.assert && pet?.spriteRect && opts.backdrop) {
+      if (opts.assert && spriteRect && pet && opts.backdrop) {
         const cpng = decodeOrThrow(compositePath)
         const ratio = assertCompositeShowsSprite(
           cpng,
-          pet.spriteRect,
+          spriteRect,
           pet.display,
           'A5 composite-shows-pet',
         )

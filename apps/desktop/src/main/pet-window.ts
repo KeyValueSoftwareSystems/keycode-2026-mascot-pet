@@ -44,6 +44,21 @@ export interface PetWindow {
   sendFrame(frame: PetFrame): void
   /** Screen rect of the pet's visible pixels — what the harness asserts against. */
   spriteRect(): Rectangle
+  /**
+   * Screen y of the current pose's topmost opaque pixel — the line at and below which the speech
+   * bubble can never paint, since it is anchored above the head with a tail pointing down at it.
+   *
+   * Exists for the harness: the transparency assertion samples a ring around the sprite, and once
+   * the bubble became a speech bubble it legitimately paints inside that ring. Without a bound the
+   * assertion either fails on a run that is behaving correctly, or gets loosened into meaning
+   * nothing. Derived from the same generated per-state head top the renderer uses, so there is no
+   * second copy of the geometry to drift.
+   *
+   * `visible` is whether a bubble is actually on screen. The harness must not infer that from its
+   * own `--callout` flag: a broadcast or a reminder puts a bubble up with no flag involved, and the
+   * assertion would then measure the bubble and report a transparency failure.
+   */
+  bubbleFloorY(): { y: number; visible: boolean }
   reassertAlwaysOnTop(): void
   setDragging(active: boolean): void
   emitWindowReady(display: DisplaySnapshot): void
@@ -96,6 +111,10 @@ export async function createPetWindow(options: {
   const shapeRects = shapeRectsForWindow(ALPHA_MASK, placement.spriteOrigin)
   const forwarding = createForwardingController(win, { shapeRects, log })
   let keeper: AlwaysOnTopKeeper | null = null
+  /** Last animation sent, so `bubbleFloorY()` can pick the right per-state head top. */
+  let lastAnimation: string | null = null
+  /** Whether the last frame carried a bubble. Harness-only; see `bubbleFloorY`. */
+  let lastBubbleVisible = false
 
   // ---- IPC from the renderer. Every handler checks provenance: a message from another
   // webContents has no business steering the pet window.
@@ -186,12 +205,22 @@ export async function createPetWindow(options: {
         })
         return
       }
+      lastAnimation = parsed.data.animation
+      lastBubbleVisible = parsed.data.bubble !== null
       win.webContents.send(IPC.frame, parsed.data)
     },
 
     spriteRect(): Rectangle {
       const bounds = win.isDestroyed() ? { x, y } : win.getBounds()
       return spriteScreenRect(ALPHA_MASK, bounds, placement.spriteOrigin) as Rectangle
+    },
+
+    bubbleFloorY(): { y: number; visible: boolean } {
+      const bounds = win.isDestroyed() ? { x, y } : win.getBounds()
+      const headTop =
+        (lastAnimation === null ? undefined : ALPHA_MASK.headTopByState[lastAnimation]) ??
+        ALPHA_MASK.bbox.y
+      return { y: bounds.y + placement.spriteOrigin.y + headTop, visible: lastBubbleVisible }
     },
 
     reassertAlwaysOnTop(): void {

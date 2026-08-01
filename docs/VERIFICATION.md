@@ -78,7 +78,7 @@ shift.
 | | Asserts | Fails when |
 |---|---|---|
 | **A1** sprite painted | ≥20% of the reported sprite rect has alpha > 32 | The sprite did not render, or rendered somewhere other than where main said it did. A single frame paints ~8360px into a 107×178 bbox ≈ 44%, so the 20% threshold is a 2× margin |
-| **A2** window transparent | ≥98% of a ring outside the sprite but inside the window has alpha ≤ 8 | **This is P1, automated.** A background colour, halo, drop shadow or rounded-corner artifact all fail. The ring is entirely window pixels, so passing proves the window itself is see-through |
+| **A2** window transparent | ≥98% of a ring outside the sprite but inside the window has alpha ≤ 8 | **This is P1, automated.** A background colour, halo, drop shadow or rounded-corner artifact all fail. The ring is entirely window pixels, so passing proves the window itself is see-through. With `--callout`, the ring starts at the character's hair — see below |
 | **A3** not blank | ≥12 distinct quantised colours among opaque pixels | A denied-permission black frame, or a flat-fill regression |
 | **A4** feet on floor | Sprite bottom is within 2px of the work-area floor | `footInset` or the placement formula is wrong — the pet floats above the Dock or sinks into it |
 | **A5** composite shows pet | ≥15% of the sprite rect differs from the backdrop colour | Composite only. The pet is behind the backdrop — the relative always-on-top levels inverted |
@@ -96,8 +96,29 @@ A CI log alone should be enough to diagnose a failure.
 | 4 | the in-process window capture failed |
 | 5 | a capture could not be decoded (16-bit / HDR) |
 
+### A2 and the speech bubble
+
+The bubble is anchored just above the character's hair and is wider than the body, so when one is
+on screen the app is legitimately painting inside A2's ring — above it *and to both sides*.
+
+Rather than loosen the threshold or skip the assertion, main reports `bubbleFloorY`: the screen y of
+the current pose's topmost opaque pixel, which is by construction below every bubble pixel. On a
+`--callout` run A2 excludes everything above that line and checks the rest, and the log says
+`from the hair down` so a partial ring can never be mistaken for a full one. It comes from the same
+generated per-state head top the renderer anchors the bubble to, so there is no second copy of the
+geometry to drift.
+
+Every run *without* `--callout` — which is every standard evidence run, including
+`m2-pet-over-dark` — still checks the complete ring, so the unqualified transparency claim is still
+made and still measured at 100%.
+
 ## Known heuristics and limits
 
+- **The sprite rect is sampled at the moment of capture**, not at `window-ready`. It used to be
+  read from the startup event, which meant that once the pet walked, the assertions indexed the
+  region it had left — failing on a correct build when you were lucky and checking the wrong pixels
+  when you were not. `capture-written` now carries a fresh rect. Set
+  `KEYCODE_PET_SMOKE_DEBUG=1` to print the region, the window bounds and whether the rect was fresh.
 - **The settle delay before capture is a heuristic.** `sprite-ready` (the renderer has
   `decode()`d the spritesheet) removes the dominant race, but *"has the compositor presented
   a frame"* has no portable signal. Default 400ms, override with

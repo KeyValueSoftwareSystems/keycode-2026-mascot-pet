@@ -347,6 +347,8 @@ export async function startApp(): Promise<AppShell> {
   const stopHarnessControl = installHarnessControl({
     pet: () => pet.win,
     backdrop: () => backdrop,
+    spriteRect: () => pet.spriteRect(),
+    bubbleFloorY: () => pet.bubbleFloorY(),
     setForcedState(state: string): void {
       if (!isAnimationState(state)) {
         log('harness asked for an unknown animation state', { state })

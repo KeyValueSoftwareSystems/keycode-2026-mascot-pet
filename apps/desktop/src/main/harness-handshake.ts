@@ -52,6 +52,15 @@ export type HandshakeEvent =
       width: number
       height: number
       bounds: HandshakeRect
+      /**
+       * The sprite rect at the instant of capture, so the assertions index the pixels that are
+       * actually in this image rather than where the pet was at startup. Pet window only.
+       */
+      spriteRect?: HandshakeRect
+      /** Screen y at and below which no speech-bubble pixel can exist. Pet window only. */
+      bubbleFloorY?: number
+      /** Whether a bubble was actually on screen for this capture. Pet window only. */
+      bubbleVisible?: boolean
     }
   | { ev: 'capture-failed'; path: string; reason: string }
   | { ev: 'error'; where: string; message: string }

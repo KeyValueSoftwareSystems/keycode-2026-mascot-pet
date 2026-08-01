@@ -19,13 +19,14 @@ export const GRANULARITY = 4
  * @param {{width:number,height:number,data:Uint8Array}} png
  * @param {{frameWidth:number,frameHeight:number}} sheet
  * @param {Array<{row:number,frames:number,name:string}>} states
- * @returns {{ union: Uint8Array, perFrameOpaque: number[], footInsetByState: Record<string, number> }}
+ * @returns {{ union: Uint8Array, perFrameOpaque: number[], footInsetByState: Record<string, number>, headTopByState: Record<string, number> }}
  */
 export function buildUnion(png, sheet, states) {
   const { frameWidth: fw, frameHeight: fh } = sheet
   const union = new Uint8Array(fw * fh)
   const perFrameOpaque = []
   const footInsetByState = {}
+  const headTopByState = {}
 
   const alpha = (x, y) => {
     if (x < 0 || y < 0 || x >= png.width || y >= png.height) return 0
@@ -34,6 +35,7 @@ export function buildUnion(png, sheet, states) {
 
   for (const state of states) {
     let lowestOpaqueRow = -1
+    let highestOpaqueRow = fh
 
     for (let frame = 0; frame < state.frames; frame += 1) {
       const originX = frame * fw
@@ -46,6 +48,7 @@ export function buildUnion(png, sheet, states) {
           opaque += 1
           union[y * fw + x] = 1
           if (y > lowestOpaqueRow) lowestOpaqueRow = y
+          if (y < highestOpaqueRow) highestOpaqueRow = y
         }
       }
 
@@ -56,9 +59,15 @@ export function buildUnion(png, sheet, states) {
       throw new Error(`state "${state.name}" (row ${state.row}) is entirely transparent.`)
     }
     footInsetByState[state.name] = fh - 1 - lowestOpaqueRow
+    // Highest opaque row in this state, across all its frames. The speech bubble hangs off this:
+    // anchoring to the *union* top instead puts every pose's bubble as high as the tallest pose
+    // (`jumping` reaches 34px above idle's hair), which leaves a visible gap and stops the bubble
+    // reading as attached to the character. Per state, not per frame — per frame would make it
+    // bob with the animation.
+    headTopByState[state.name] = highestOpaqueRow
   }
 
-  return { union, perFrameOpaque, footInsetByState }
+  return { union, perFrameOpaque, footInsetByState, headTopByState }
 }
 
 /** Tight bounding box of the set pixels. */

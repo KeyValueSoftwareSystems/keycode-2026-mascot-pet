@@ -137,6 +137,33 @@ The bubble follows the pet for free, there is one set of bounds to place, and on
 hit-test. The cost is a window much larger than the visible character — 360 × 304 for a body that is
 107 × 178 — which is exactly what the mask handles.
 
+### The bubble is anchored to the character, not to the window
+
+It is a comic speech bubble — near-white fill, hard dark outline, dark text, and an outlined tail
+whose mouth opens into the bubble body. It hugs its text, is centred on the body's horizontal
+centre, and the tail points down at the head. Anchoring it to the window instead — pinning it to the top corner and
+stretching it across the full width — is the obvious thing to write and looks wrong, because the
+window is 360px wide for a 107px body and the sprite cell has transparent padding above the hair. It
+leaves the bubble around 84px clear of the head, where it reads as an unrelated notification that
+happens to be nearby rather than as the pet speaking.
+
+Two custom properties carry the anchor, set on `:root` by the renderer from the generated mask:
+`--body-cx` and `--body-top`. The vertical one is the **per-state** head top, not the union bbox's.
+The union is the minimum over every pose — on this art `review` reaches 23px higher than idle's hair
+— so a union-anchored bubble floats that gap in the pose the pet spends most of its life in. Per
+state rather than per frame, because a per-frame anchor makes the bubble bob with the animation.
+
+Its height clamp is a whole number of text lines chosen to fit above the hair in the *highest* pose,
+so the bubble can never be clipped by the top of the window and an over-long message loses a whole
+line rather than half of one. A full 200-character message — the manifest schema's cap — wraps to
+five lines and does not reach the clamp.
+
+The fill is **opaque**, unlike the translucent panel it replaced: this bubble carries remote text
+someone is meant to read and act on, floating over whatever they are working on, and translucency
+over a busy window makes 13px text unreadable. Severity still rides on a coloured left edge rather
+than on the fill, so the shape reads as a speech bubble first and a status indicator second. The
+corner toast is a separate surface and stays dark — it is a notification, not the pet talking.
+
 ### Placement is measured, not assumed
 
 `footInset` is the distance from the bottom of a sprite cell to its lowest opaque pixel: **16px** on

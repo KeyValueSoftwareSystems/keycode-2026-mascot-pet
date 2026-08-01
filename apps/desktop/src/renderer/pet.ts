@@ -35,6 +35,15 @@ function applyFrame(frame: PetFrame): void {
   root.style.setProperty('--sprite-x', `${frame.sprite.x}px`)
   root.style.setProperty('--sprite-y', `${frame.sprite.y}px`)
 
+  // Where the *character* is, as opposed to where its cell is. The cell is 44% empty space
+  // horizontally and has transparent padding above the hair, so anchoring the bubble to the cell
+  // leaves it floating a long way off the head. These come from the generated mask so the offsets
+  // stay out of the hand-written CSS, which is asserted to contain no sheet geometry.
+  const bbox = ALPHA_MASK.bbox
+  const headTop = ALPHA_MASK.headTopByState[frame.animation] ?? bbox.y
+  root.style.setProperty('--body-cx', `${frame.sprite.x + bbox.x + bbox.width / 2}px`)
+  root.style.setProperty('--body-top', `${frame.sprite.y + headTop}px`)
+
   // Setting data-state and data-nonce is the whole animation mechanism: the generated CSS keys
   // its keyframes off this pair, and a changed nonce is what makes the same state replay.
   sprite.dataset.state = frame.animation

@@ -122,6 +122,20 @@ describe('hand-written CSS carries no generated geometry', () => {
       expect(css, `${file} hardcodes the frame height`).not.toMatch(/\b208px\b/)
     }
   })
+
+  it('anchors the bubble to the character through the published custom properties', () => {
+    // The bubble is a speech bubble, so its position is the character's, not the window's. The two
+    // halves of that live in different files — the renderer publishes the anchor, the CSS consumes
+    // it — and either one being dropped leaves a bubble that quietly floats back to a corner.
+    const pet = read(join(RENDERER_DIR, 'pet.ts'))
+    expect(pet).toContain('--body-cx')
+    expect(pet).toContain('--body-top')
+    expect(pet).toContain('headTopByState')
+
+    const css = read(join(RENDERER_DIR, 'pet.css'))
+    expect(css).toMatch(/var\(--body-cx/)
+    expect(css).toMatch(/var\(--body-top/)
+  })
 })
 
 describe('anti-proofs from docs/PROMPT.md §2', () => {

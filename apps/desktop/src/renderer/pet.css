@@ -13,9 +13,19 @@
   --tone-warning: #f59e0b;
   --tone-error: #ef4444;
 
-  --bubble-bg: rgba(20, 17, 17, 0.92);
-  --bubble-fg: #f5f5f5;
-  --bubble-radius: 12px;
+  /*
+   * A comic speech bubble: near-white fill, hard dark outline, dark text. Opaque on purpose — a
+   * translucent bubble over a busy window makes small text unreadable, and this one carries
+   * remote text people are meant to act on.
+   */
+  --bubble-bg: #fffff8;
+  --bubble-fg: #141111;
+  --bubble-line: #141111;
+  --bubble-line-width: 2px;
+  --bubble-radius: 14px;
+  /* Half-width and height of the tail triangle, and the clear air between its tip and the hair. */
+  --bubble-tail: 9px;
+  --bubble-tail-gap: 3px;
 }
 
 html,
@@ -67,17 +77,36 @@ body {
 /* Bubble                                                                                   */
 /* --------------------------------------------------------------------------------------- */
 
+/*
+ * A speech bubble, not a banner.
+ *
+ * It is anchored to the character rather than to the window: centred on the body's horizontal
+ * centre and sitting a few pixels above the hair, with a tail pointing down at it. Anchoring to
+ * the window instead — which is what `left/right/top: 8px` did — put the bubble ~84px above the
+ * head, because the window is 360px wide for a 107px body and the cell has transparent padding
+ * above the hair. It read as an unrelated notification rather than as the pet speaking.
+ *
+ * `--body-cx` / `--body-top` come from main via the renderer, derived from the generated mask
+ * bbox. `100%` here is the window height, so the `bottom` anchor puts the box's lower edge
+ * exactly one tail-plus-gap above the topmost opaque pixel of *any* pose — the bbox is a union,
+ * so a taller frame like `jumping` still cannot collide with it.
+ */
 #bubble {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  top: 8px;
+  left: var(--body-cx, 50%);
+  bottom: calc(100% - var(--body-top, 0px) + var(--bubble-tail) + var(--bubble-tail-gap));
+  transform: translateX(-50%);
   box-sizing: border-box;
-  max-height: 96px;
-  overflow: hidden;
-  padding: 8px 10px;
+  /* Hugs short text; wraps rather than overflowing the window on long text. */
+  width: max-content;
+  max-width: calc(100% - 40px);
+  padding: 8px 11px;
   border-radius: var(--bubble-radius);
-  border-left: 3px solid var(--tone-info);
+  border: var(--bubble-line-width) solid var(--bubble-line);
+  /* Tone rides on the left edge. The outline stays dark so the bubble reads as a speech bubble
+   * first and a severity indicator second. */
+  border-left-width: 5px;
+  border-left-color: var(--tone-info);
   background: var(--bubble-bg);
   color: var(--bubble-fg);
   /*
@@ -98,6 +127,53 @@ body {
   overflow-wrap: anywhere;
 }
 
+/*
+ * The tail, as two stacked triangles: the outline first, then the fill on top of it, shifted up by
+ * the line width. The offset is what leaves an even outline down both diagonals *and* lets the fill
+ * cover the bubble's own bottom border, so the tail reads as an opening rather than a shape glued
+ * underneath. A single bordered element cannot do this — CSS triangles are borders themselves.
+ *
+ * `overflow` must stay visible on #bubble or both are clipped away, so the height clamp that used
+ * to live here moved onto #bubble-text instead.
+ */
+#bubble::before,
+#bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  margin-left: calc(-1 * var(--bubble-tail));
+  border: var(--bubble-tail) solid transparent;
+  border-bottom-width: 0;
+}
+
+#bubble::before {
+  bottom: calc(-1 * var(--bubble-tail));
+  border-top-color: var(--bubble-line);
+}
+
+#bubble::after {
+  bottom: calc(-1 * var(--bubble-tail) + var(--bubble-line-width));
+  border-top-color: var(--bubble-bg);
+}
+
+/*
+ * Bounds the bubble so it cannot grow up past the top of the window.
+ *
+ * Five lines at 13px/1.35 = 88px. That is the most that fits above the hair in the *highest* pose
+ * (`review` reaches y=14, leaving 92px once padding and an 8px top margin are taken), so the
+ * bubble can never be clipped by the top of the window — and because the clamp is a whole number
+ * of lines, an over-long message loses a whole line rather than showing half of one.
+ *
+ * A full 200-character message — the manifest schema's cap — wraps to five lines at this width, so
+ * the clamp is not reachable by anything the broadcast path can deliver. Clipped rather than
+ * scrolled: there is nothing to scroll with in a click-through window.
+ */
+#bubble-text {
+  display: block;
+  max-height: 88px;
+  overflow: hidden;
+}
+
 #bubble[hidden] {
   display: none;
 }
@@ -113,8 +189,9 @@ body {
 }
 
 #bubble[data-pinned='true'] {
-  /* A pinned callout sits above transient ones and reads as more permanent. */
-  border-left-width: 5px;
+  /* A pinned callout sits above transient ones and reads as more permanent. Wider than the 5px
+   * default, or "pinned" would be indistinguishable from every other bubble. */
+  border-left-width: 9px;
 }
 
 #bubble[data-clickable='true'] {

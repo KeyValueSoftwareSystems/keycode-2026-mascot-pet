@@ -80,6 +80,30 @@ describe('alpha mask generation', () => {
     expect(ALPHA_MASK.bbox).toEqual({ x: 42, y: 14, width: 107, height: 178 })
   })
 
+  it('measures a per-state head top for every state, at or below the union top', () => {
+    // The speech bubble hangs off these. Every declared state needs one or the bubble silently
+    // falls back to the union top for that state and drifts away from the character's head.
+    const stateNames = states.map((s: { name: string }) => s.name).sort()
+    expect(Object.keys(ALPHA_MASK.headTopByState).sort()).toEqual(stateNames)
+
+    for (const [state, top] of Object.entries(ALPHA_MASK.headTopByState)) {
+      // The union top is the minimum over all states, so no state can be above it.
+      expect(top, `${state} is above the union bbox`).toBeGreaterThanOrEqual(ALPHA_MASK.bbox.y)
+      // And every head is above its own feet, or the rows have been read upside down.
+      expect(top, `${state} head is not above the feet`).toBeLessThan(
+        ALPHA_MASK.frameHeight - ALPHA_MASK.footInset,
+      )
+    }
+  })
+
+  it('anchors the bubble tighter than the union bbox would for the common poses', () => {
+    // The whole point of the per-state measurement: on this art `review` reaches to y=14 and sets
+    // the union top, which is 23px above idle's hair. A union-anchored bubble floats that far off
+    // the head in the pose the pet spends most of its life in.
+    expect(ALPHA_MASK.headTopByState['idle']).toBeGreaterThan(ALPHA_MASK.bbox.y + 15)
+    expect(Math.min(...Object.values(ALPHA_MASK.headTopByState))).toBe(ALPHA_MASK.bbox.y)
+  })
+
   it('reports a mostly-horizontal transparent margin, which is why bounds hit-testing is unusable', () => {
     // 107 of 192 columns used: ~44% of the cell width is empty space beside the character. A
     // bounds hit-test would swallow clicks across that whole band.
@@ -119,6 +143,7 @@ describe('alpha mask generation', () => {
     expect(maskJson.bbox).toEqual(ALPHA_MASK.bbox)
     expect(maskJson.shapeRects).toEqual(ALPHA_MASK.shapeRects)
     expect(maskJson.footInsetByState).toEqual(ALPHA_MASK.footInsetByState)
+    expect(maskJson.headTopByState).toEqual(ALPHA_MASK.headTopByState)
     expect(maskJson.stats).toEqual(ALPHA_MASK.stats)
     expect(Buffer.from(ALPHA_MASK.bits).toString('base64')).toBe(maskJson.bitsBase64)
   })

@@ -70,7 +70,7 @@ function main() {
     process.exit(2)
   }
 
-  const { union, perFrameOpaque, footInsetByState } = buildUnion(png, sheet, states)
+  const { union, perFrameOpaque, footInsetByState, headTopByState } = buildUnion(png, sheet, states)
   const bbox = boundingBox(union, sheet.frameWidth, sheet.frameHeight)
   const { cells, cols, rows } = toCellGrid(union, sheet.frameWidth, sheet.frameHeight, granularity)
   const bits = packBits(cells)
@@ -95,6 +95,7 @@ function main() {
     bbox,
     footInset,
     footInsetByState,
+    headTopByState,
     shapeRects,
     stats: {
       unionOpaquePixels: unionOpaque,
@@ -142,6 +143,10 @@ function buildTs(data, bits) {
     .map(([name, inset]) => `  '${name}': ${inset},`)
     .join('\n')
 
+  const headByState = Object.entries(data.headTopByState)
+    .map(([name, top]) => `  '${name}': ${top},`)
+    .join('\n')
+
   return `${tsBanner()}
 export interface MaskRect {
   readonly x: number
@@ -163,6 +168,14 @@ export interface AlphaMaskData {
   /** Cell bottom to lowest opaque pixel. The floor-placement input. */
   readonly footInset: number
   readonly footInsetByState: Readonly<Record<string, number>>
+  /**
+   * Cell top to the *highest* opaque pixel, per state. Where the speech bubble's tail points.
+   *
+   * Per state rather than from the union bbox: "jumping" reaches well above idle's hair, so a
+   * union-anchored bubble floats a visible gap above the character in every other pose. Per state
+   * rather than per frame because a per-frame anchor makes the bubble bob with the animation.
+   */
+  readonly headTopByState: Readonly<Record<string, number>>
   /** Cell-local rects covering the mask, for Electron setShape on Linux. */
   readonly shapeRects: readonly MaskRect[]
   /** Row-major, MSB-first coverage bits over the cell grid. */
@@ -205,6 +218,9 @@ export const ALPHA_MASK: AlphaMaskData = {
   footInset: ${data.footInset},
   footInsetByState: {
 ${footByState}
+  },
+  headTopByState: {
+${headByState}
   },
   shapeRects: [
 ${rects}

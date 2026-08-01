@@ -24,6 +24,18 @@
     "sleep": 16,
     "waving": 16
   },
+  "headTopByState": {
+    "drink": 37,
+    "failed": 52,
+    "idle": 37,
+    "jumping": 46,
+    "review": 14,
+    "running": 28,
+    "running-left": 46,
+    "running-right": 51,
+    "sleep": 37,
+    "waving": 37
+  },
   "shapeRects": [
     {
       "x": 76,

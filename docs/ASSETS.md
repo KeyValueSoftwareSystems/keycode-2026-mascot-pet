@@ -48,7 +48,7 @@ pnpm smoke:states                # one screenshot per state
 |---|---|
 | `apps/desktop/src/renderer/pet.generated.css` | `@keyframes` and per-state rules, two nonce variants each |
 | `apps/desktop/src/pet-animations.generated.ts` | The `AnimationState` union, `ANIMATIONS`, `REACTION_MAP`, `ANIMATION_ALIASES` |
-| `apps/desktop/src/sprite/alpha-mask.generated.ts` | Coverage bits, `bbox`, `footInset`, `setShape` rects |
+| `apps/desktop/src/sprite/alpha-mask.generated.ts` | Coverage bits, `bbox`, `footInset`, per-state head tops, `setShape` rects |
 | `apps/desktop/assets/pet/alpha-mask.json` | The same data, for tests and humans |
 | `apps/desktop/assets/tray/trayIconTemplate.png` (+`@2x`) | Run `pnpm exec node scripts/generate-tray-icon.mjs` — a silhouette of the new character |
 
@@ -123,6 +123,10 @@ Measured, by decoding the sheet rather than trusting `validation.json`:
 - Union across all 63 frames: **14,111 (35.3%)**
 - Union bounding box: `{ x: 42, y: 14, width: 107, height: 178 }`
 - `footInset`: **16**, identical for every state
+- Head top (cell top to the highest opaque pixel), per state: `review` 14, `running` 28, `idle`/
+  `sleep`/`drink`/`waving` 37, `jumping`/`running-left` 46, `running-right` 51, `failed` 52. The
+  speech bubble hangs off these, which is why they are measured per state rather than taken from the
+  union bbox — a union anchor would sit 23px clear of the head in the idle pose
 - `setShape` rects after run-merging: **26**, covering the mask area exactly
 
 The body is 107 of 192 columns, so **44% of each cell's width is empty space beside the character**.

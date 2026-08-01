@@ -41,6 +41,17 @@ export interface HarnessTargets {
   setForcedState?: (state: string) => void
   /** Show a callout. Provided from M5 onward. */
   showCallout?: (request: { text: string; tone?: string; priority?: string; toast?: boolean }) => void
+  /**
+   * The sprite's screen rect *right now*.
+   *
+   * Reported alongside every capture rather than only once at `window-ready`, because the pet
+   * moves. A rect sampled at startup and used to index a capture taken seconds later points at
+   * whatever the pet has since walked away from — which fails the pixel assertions when you are
+   * lucky and passes them against the wrong pixels when you are not.
+   */
+  spriteRect?: () => { x: number; y: number; width: number; height: number }
+  /** Screen y at and below which the speech bubble cannot paint. See PetWindow.bubbleFloorY. */
+  bubbleFloorY?: () => { y: number; visible: boolean }
 }
 
 export function installHarnessControl(targets: HarnessTargets): () => void {
@@ -68,6 +79,9 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           mkdirSync(dirname(command.path), { recursive: true })
           await writeFile(command.path, image.toPNG())
           const size = image.getSize()
+          const isPet = command.window === 'pet'
+          const rect = isPet ? targets.spriteRect?.() : undefined
+          const bubble = isPet ? targets.bubbleFloorY?.() : undefined
           emit({
             ev: 'capture-written',
             path: command.path,
@@ -75,6 +89,10 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
             width: size.width,
             height: size.height,
             bounds: win.getContentBounds(),
+            ...(rect ? { spriteRect: rect } : {}),
+            ...(bubble === undefined
+              ? {}
+              : { bubbleFloorY: bubble.y, bubbleVisible: bubble.visible }),
           })
         } catch (error) {
           emit({

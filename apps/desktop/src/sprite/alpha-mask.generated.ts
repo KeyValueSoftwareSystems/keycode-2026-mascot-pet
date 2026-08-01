@@ -24,6 +24,14 @@ export interface AlphaMaskData {
   /** Cell bottom to lowest opaque pixel. The floor-placement input. */
   readonly footInset: number
   readonly footInsetByState: Readonly<Record<string, number>>
+  /**
+   * Cell top to the *highest* opaque pixel, per state. Where the speech bubble's tail points.
+   *
+   * Per state rather than from the union bbox: "jumping" reaches well above idle's hair, so a
+   * union-anchored bubble floats a visible gap above the character in every other pose. Per state
+   * rather than per frame because a per-frame anchor makes the bubble bob with the animation.
+   */
+  readonly headTopByState: Readonly<Record<string, number>>
   /** Cell-local rects covering the mask, for Electron setShape on Linux. */
   readonly shapeRects: readonly MaskRect[]
   /** Row-major, MSB-first coverage bits over the cell grid. */
@@ -94,6 +102,18 @@ export const ALPHA_MASK: AlphaMaskData = {
   'running-right': 16,
   'sleep': 16,
   'waving': 16,
+  },
+  headTopByState: {
+  'drink': 37,
+  'failed': 52,
+  'idle': 37,
+  'jumping': 46,
+  'review': 14,
+  'running': 28,
+  'running-left': 46,
+  'running-right': 51,
+  'sleep': 37,
+  'waving': 37,
   },
   shapeRects: [
   { x: 76, y: 12, width: 8, height: 4 },
