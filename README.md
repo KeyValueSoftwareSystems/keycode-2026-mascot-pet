@@ -26,6 +26,10 @@ pnpm dev
 The pet appears at the bottom of your primary display and starts moving. A tray icon gives you the
 settings menu; right-clicking the pet gives you the same menu.
 
+**Drag it anywhere.** It is not stuck to the bottom of the screen — drop it mid-screen and it stays
+there, patrolling left and right at that height, and it comes back there after a restart. Drop it near
+the floor and it re-locks to the floor. "Reset position" always brings it home.
+
 To watch it over a dark backdrop, which is how you see transparency problems:
 
 ```bash
@@ -76,11 +80,11 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 335 tests, no Electron required |
+| `pnpm test` | 352 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
-| `pnpm smoke --name x --backdrop` | Launch, screenshot, assert pixels — see [docs/VERIFICATION.md](docs/VERIFICATION.md) |
+| `pnpm smoke --name x --backdrop [--place x,feetY]` | Launch, screenshot, assert pixels — see [docs/VERIFICATION.md](docs/VERIFICATION.md) |
 | `pnpm smoke:states` | One screenshot per animation state |
 | `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — see below |
 | `pnpm icons` | Regenerate app icons from the art (macOS only, output committed) |
@@ -185,7 +189,7 @@ available.
 ## Status
 
 All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
-releases from `v1.1.0`. 340 tests pass; typecheck is clean.
+releases from `v1.1.0`. 352 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.

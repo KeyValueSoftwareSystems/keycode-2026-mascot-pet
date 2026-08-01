@@ -32,6 +32,14 @@ export type HarnessCommand =
   | { cmd: 'set-state'; state: string }
   /** Show a callout, so the bubble and the emoji font can be screenshotted. */
   | { cmd: 'show-callout'; text: string; tone?: string; priority?: string; toast?: boolean }
+  /**
+   * Place the pet, as a drag would.
+   *
+   * Not a synthetic mouse drag: the harness has no cursor control, and `screen.getCursorScreenPoint`
+   * is what a real drag follows. This drives the same `place` path the drop handler ends at, so what
+   * it proves is the placement and clamping logic — not the pointer plumbing, which stays manual.
+   */
+  | { cmd: 'place'; x: number; feetY: number }
   | { cmd: 'quit' }
 
 export interface HarnessTargets {
@@ -52,6 +60,10 @@ export interface HarnessTargets {
   spriteRect?: () => { x: number; y: number; width: number; height: number }
   /** Screen y at and below which the speech bubble cannot paint. See PetWindow.bubbleFloorY. */
   bubbleFloorY?: () => { y: number; visible: boolean }
+  /** Whether the pet is floor-locked, so the harness knows if feet-on-floor is assertable. */
+  floorLocked?: () => boolean
+  /** Place the pet at an absolute position, as a drop would. */
+  place?: (position: { x: number; feetY: number }) => void
 }
 
 export function installHarnessControl(targets: HarnessTargets): () => void {
@@ -82,6 +94,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           const isPet = command.window === 'pet'
           const rect = isPet ? targets.spriteRect?.() : undefined
           const bubble = isPet ? targets.bubbleFloorY?.() : undefined
+          const floorLocked = isPet ? targets.floorLocked?.() : undefined
           emit({
             ev: 'capture-written',
             path: command.path,
@@ -93,6 +106,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
             ...(bubble === undefined
               ? {}
               : { bubbleFloorY: bubble.y, bubbleVisible: bubble.visible }),
+            ...(floorLocked === undefined ? {} : { floorLocked }),
           })
         } catch (error) {
           emit({
@@ -124,6 +138,15 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           ...(command.priority === undefined ? {} : { priority: command.priority }),
           ...(command.toast === undefined ? {} : { toast: command.toast }),
         })
+        return
+      }
+
+      case 'place': {
+        if (!targets.place) {
+          emit({ ev: 'error', where: 'harness:place', message: 'no place sink registered' })
+          return
+        }
+        targets.place({ x: command.x, feetY: command.feetY })
         return
       }
 

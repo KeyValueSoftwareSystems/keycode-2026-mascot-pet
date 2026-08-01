@@ -22,7 +22,7 @@ import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../motion/motion-confi
 import type { MotionState, MotionTrigger } from '../motion/types.js'
 import { resolveTrigger, type Trigger } from '../pet-animations.generated.js'
 import type { PetFrame, Tone } from '../pet-frame.js'
-import { floorForWorkArea } from './floor-placement.js'
+import { floorForWorkArea, clampToFloor, clampFeetY, isOnFloor } from './floor-placement.js'
 import type { DisplayManager, Floor } from './display-manager.js'
 import type { PetWindow } from './pet-window.js'
 import { emit, isHarnessEnabled } from './harness-handshake.js'
@@ -38,8 +38,11 @@ export interface PetControllerOptions {
   pet: PetWindow
   displays: DisplayManager
   getMovementEnabled: () => boolean
-  onPositionChanged: (displayKey: string, petCentreX: number) => void
+  /** `feetY` is null when the pet is floor-locked, meaning "re-derive it on launch". */
+  onPositionChanged: (displayKey: string, petCentreX: number, feetY: number | null) => void
   startPetCentreX: number
+  /** Restored free-placement height, or null for floor-locked. */
+  startFeetY?: number | null
   startFloor: Floor
   seed: number
   config?: MotionConfig
@@ -61,6 +64,22 @@ export interface PetController {
    * This is what makes a menu toggle take effect mid-stride rather than at the next tick boundary.
    */
   tickNow(): void
+  /**
+   * End a drag, deciding here whether the drop re-locks the pet to the floor.
+   *
+   * The rule lives with the state and the envelope rather than at the call site, so "how close to
+   * the bottom counts as on the floor" has exactly one answer.
+   */
+  endDrag(): void
+  /** Where the pet is, and whether it is floor-locked. */
+  position(): { x: number; feetY: number; floorLocked: boolean }
+  /**
+   * Place the pet at an absolute position, as a drop would — same clamping, same snap-to-floor rule.
+   *
+   * Exists for the harness, which has no cursor to drag with, and is the seam that makes free
+   * placement assertable from a screenshot instead of only by hand.
+   */
+  place(position: { x: number; feetY: number }): void
   setCallout(callout: ActiveCallout | null): void
   /** Pin an animation, for the smoke harness. */
   setForcedState(animation: string | null): void
@@ -79,6 +98,8 @@ export function createPetController(options: PetControllerOptions): PetControlle
     x: options.startPetCentreX,
     now: now(),
     movementEnabled: options.getMovementEnabled(),
+    feetY: options.startFeetY ?? null,
+    floor: options.startFloor,
     config,
   })
 
@@ -88,9 +109,13 @@ export function createPetController(options: PetControllerOptions): PetControlle
   let ticking = false
   let callout: ActiveCallout | null = null
   let forcedState: string | null = null
-  let dragOrigin: { cursorX: number; petCentreX: number } | null = null
+  let dragOrigin: { cursorX: number; cursorY: number; petCentreX: number; feetY: number } | null = null
   let lastSentFrame: string | null = null
-  let lastPositionReported = options.startPetCentreX
+  let lastPositionReported = {
+    x: options.startPetCentreX,
+    feetY: options.startFeetY ?? options.startFloor.y,
+    floorLocked: (options.startFeetY ?? null) === null,
+  }
 
   const buildFrame = (): PetFrame => {
     const animation = forcedState ?? state.animation
@@ -146,8 +171,16 @@ export function createPetController(options: PetControllerOptions): PetControlle
       // documented failure mode on both macOS and Windows.
       if (dragOrigin) {
         const cursor = screen.getCursorScreenPoint()
-        const dragged = dragOrigin.petCentreX + (cursor.x - dragOrigin.cursorX)
-        state = { ...state, x: Math.min(floor.maxX, Math.max(floor.minX, dragged)) }
+        const draggedX = dragOrigin.petCentreX + (cursor.x - dragOrigin.cursorX)
+        const draggedY = dragOrigin.feetY + (cursor.y - dragOrigin.cursorY)
+        state = {
+          ...state,
+          x: clampToFloor(draggedX, floor),
+          feetY: clampFeetY(draggedY, floor),
+          // Unlocked for the whole drag so the pet actually follows the cursor upwards; whether it
+          // re-locks is decided at drop time from where it landed.
+          floorLocked: false,
+        }
       }
 
       const drained = pending
@@ -164,14 +197,25 @@ export function createPetController(options: PetControllerOptions): PetControlle
         config,
       )
 
-      pet.moveTo(state.x, floor)
+      pet.moveTo(state.x, state.feetY)
       sendFrameIfChanged()
 
       // Persist position sparingly: the settings store debounces, but there is no reason to mark it
-      // dirty on every one of ~17 ticks a second when the pet has barely moved.
-      if (Math.abs(state.x - lastPositionReported) >= 8) {
-        lastPositionReported = state.x
-        options.onPositionChanged(floor.displayKey, state.x)
+      // dirty on every one of ~17 ticks a second when the pet has barely moved. `feetY` is included
+      // in the comparison because a purely vertical drag moves the pet without changing x at all.
+      const movedFar =
+        Math.abs(state.x - lastPositionReported.x) >= 8 ||
+        Math.abs(state.feetY - lastPositionReported.feetY) >= 8 ||
+        state.floorLocked !== lastPositionReported.floorLocked
+      if (movedFar) {
+        lastPositionReported = { x: state.x, feetY: state.feetY, floorLocked: state.floorLocked }
+        // A floor-locked pet persists no y: it is re-derived on launch, so storing it could only ever
+        // be a stale value fighting the correct one.
+        options.onPositionChanged(
+          floor.displayKey,
+          state.x,
+          state.floorLocked ? null : state.feetY,
+        )
       }
     } catch (error) {
       // A throw here would kill the interval and freeze the pet forever. Log and keep ticking.
@@ -198,12 +242,51 @@ export function createPetController(options: PetControllerOptions): PetControlle
     enqueue(trigger: MotionTrigger): void {
       pending.push(trigger)
       if (trigger.kind === 'drag-start') {
+        const cursor = screen.getCursorScreenPoint()
         dragOrigin = {
-          cursorX: screen.getCursorScreenPoint().x,
+          cursorX: cursor.x,
+          cursorY: cursor.y,
           petCentreX: state.x,
+          feetY: state.feetY,
         }
       }
       if (trigger.kind === 'drag-end') dragOrigin = null
+    },
+
+    endDrag(): void {
+      // Read the live cursor rather than `state`: the drop may land between ticks, and using the
+      // last tick's position drops the pet up to one tick's worth of travel away from the cursor.
+      const cursor = dragOrigin ? screen.getCursorScreenPoint() : null
+      const feetY =
+        dragOrigin && cursor
+          ? clampFeetY(dragOrigin.feetY + (cursor.y - dragOrigin.cursorY), floor)
+          : state.feetY
+      const petCentreX =
+        dragOrigin && cursor
+          ? clampToFloor(dragOrigin.petCentreX + (cursor.x - dragOrigin.cursorX), floor)
+          : state.x
+
+      this.enqueue({
+        kind: 'drag-end',
+        petCentreX,
+        feetY,
+        floorLocked: isOnFloor(feetY, floor),
+      })
+    },
+
+    position(): { x: number; feetY: number; floorLocked: boolean } {
+      return { x: state.x, feetY: state.feetY, floorLocked: state.floorLocked }
+    },
+
+    place(position: { x: number; feetY: number }): void {
+      const feetY = clampFeetY(position.feetY, floor)
+      pending.push({
+        kind: 'drag-end',
+        petCentreX: clampToFloor(position.x, floor),
+        feetY,
+        floorLocked: isOnFloor(feetY, floor),
+      })
+      tick()
     },
 
     react(trigger: Trigger): void {

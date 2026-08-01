@@ -102,6 +102,12 @@ export async function startApp(): Promise<AppShell> {
   const startX = saved
     ? Math.min(startFloor.maxX, Math.max(startFloor.minX, saved.x))
     : startFloor.minX + (startFloor.maxX - startFloor.minX) * 0.35
+  // A restored free placement is clamped into the envelope of the display it is landing on, which may
+  // not be the display it was saved from. null stays null: floor-locked is re-derived, never restored.
+  const startFeetY =
+    saved?.feetY == null
+      ? null
+      : Math.min(startFloor.maxFeetY, Math.max(startFloor.minFeetY, saved.feetY))
 
   let controller: PetController | null = null
 
@@ -129,11 +135,20 @@ export async function startApp(): Promise<AppShell> {
       },
       onDragEnd(): void {
         pet.setDragging(false)
-        const dropped = controller?.petCentreX() ?? startX
-        controller?.enqueue({ kind: 'drag-end', petCentreX: dropped })
+        // The controller owns the snap-to-floor rule, so it builds the trigger.
+        controller?.endDrag()
         controller?.tickNow()
-        const displayNow = displays.nearest({ x: dropped, y: startFloor.y - 1 })
-        settings.patch({ position: { displayKey: displayNow.key, x: dropped } })
+        const settled = controller?.position()
+        const dropped = settled?.x ?? startX
+        const displayNow = displays.nearest({ x: dropped, y: settled?.feetY ?? startFloor.y - 1 })
+        settings.patch({
+          position: {
+            displayKey: displayNow.key,
+            x: dropped,
+            // null means floor-locked: re-derived on launch rather than restored.
+            feetY: settled && !settled.floorLocked ? settled.feetY : null,
+          },
+        })
       },
       onOpenCalloutUrl(): void {
         // Main holds the URL and re-validates it here. The renderer only ever asked to open "the
@@ -147,10 +162,11 @@ export async function startApp(): Promise<AppShell> {
     pet,
     displays,
     getMovementEnabled: () => settings.get().movementEnabled,
-    onPositionChanged(displayKey, petCentreX) {
-      settings.patch({ position: { displayKey, x: petCentreX } })
+    onPositionChanged(displayKey, petCentreX, feetY) {
+      settings.patch({ position: { displayKey, x: petCentreX, feetY } })
     },
     startPetCentreX: startX,
+    startFeetY,
     startFloor,
     // Seeded from the clock so two launches do not produce an identical pet, while the engine
     // itself stays deterministic given a seed.
@@ -355,6 +371,10 @@ export async function startApp(): Promise<AppShell> {
     backdrop: () => backdrop,
     spriteRect: () => pet.spriteRect(),
     bubbleFloorY: () => pet.bubbleFloorY(),
+    floorLocked: () => controller?.position().floorLocked ?? true,
+    place(position): void {
+      controller?.place(position)
+    },
     setForcedState(state: string): void {
       if (!isAnimationState(state)) {
         log('harness asked for an unknown animation state', { state })

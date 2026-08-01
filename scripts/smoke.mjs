@@ -10,6 +10,7 @@
  *   node scripts/smoke.mjs --name m2-pet-over-dark [--backdrop] [--state waving]
  *                          [--all-states] [--timeout 20000] [--settle 400]
  *                          [--no-assert] [--keep-open] [--no-composite]
+ *                          [--place x,feetY] [--callout "text"] [--toast]
  *
  * TWO CAPTURES, deliberately, because they answer different questions:
  *
@@ -75,6 +76,7 @@ function parseArgs(argv) {
     composite: true,
     callout: null,
     toast: false,
+    place: null,
   }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -112,6 +114,16 @@ function parseArgs(argv) {
       case '--toast':
         opts.toast = true
         break
+      case '--place': {
+        // "x,feetY" in screen coordinates — the pet's body centre and the y of its feet.
+        const raw = String(argv[(i += 1)] ?? '')
+        const [x, feetY] = raw.split(',').map(Number)
+        if (!Number.isFinite(x) || !Number.isFinite(feetY)) {
+          throw new Error(`--place needs "x,feetY", got ${JSON.stringify(raw)}`)
+        }
+        opts.place = { x, feetY }
+        break
+      }
       default:
         if (arg.startsWith('--')) throw new Error(`Unknown flag ${arg}`)
     }
@@ -504,9 +516,25 @@ function assertPixelArtCrisp(png, region, scale, label) {
 }
 
 /** A4 — the pet's feet sit on the work-area floor, not floating and not clipped into the Dock. */
-function assertFeetOnFloor(spriteRect, display, label) {
+function assertFeetOnFloor(spriteRect, display, label, floorLocked = true) {
   const feet = spriteRect.y + spriteRect.height
   const floor = display.workArea.y + display.workArea.height
+
+  // A freely placed pet is *supposed* to be off the floor, so the floor check would fail on correct
+  // behaviour. What still has to hold is that it is inside the work area — a pet parked off-screen
+  // is the actual bug this guards against once free placement exists.
+  if (!floorLocked) {
+    const top = spriteRect.y
+    if (top < display.workArea.y || feet > floor) {
+      throw new SmokeFailure(
+        EXIT.assertion,
+        `${label}: freely placed, but the sprite (y=${top}..${feet}) is outside the work area ` +
+          `(${display.workArea.y}..${floor}). The vertical clamp is wrong.`,
+      )
+    }
+    return
+  }
+
   if (Math.abs(feet - floor) > 2) {
     throw new SmokeFailure(
       EXIT.assertion,
@@ -599,7 +627,9 @@ async function assertPass(session, opts, name) {
         ? Math.round((captured.bubbleFloorY - captured.bounds.y) * scale)
         : null,
     )
-    assertFeetOnFloor(spriteRect, pet.display, 'A4 feet-on-floor')
+    // `floorLocked` is absent on builds before free placement, where floor-locked was the only mode.
+    const floorLocked = captured.floorLocked ?? true
+    assertFeetOnFloor(spriteRect, pet.display, 'A4 feet-on-floor', floorLocked)
     const crisp = assertPixelArtCrisp(png, region, scale, 'A6 pixel-art-crisp')
     console.log(`  ✓ A1 sprite painted (${(fill * 100).toFixed(1)}% of the bbox has alpha)`)
     console.log(
@@ -607,7 +637,11 @@ async function assertPass(session, opts, name) {
         `${captured.bubbleVisible ? ', from the hair down — a bubble is up' : ''})`,
     )
     console.log(`  ✓ A3 image is not blank (${colours} distinct colours)`)
-    console.log('  ✓ A4 feet are on the work-area floor')
+    console.log(
+      floorLocked
+        ? '  ✓ A4 feet are on the work-area floor'
+        : '  ✓ A4 freely placed, and inside the work area',
+    )
     if (crisp !== null) {
       console.log(`  ✓ A6 pixel art is crisp (${(crisp * 100).toFixed(1)}% of blocks uniform)`)
     } else {
@@ -681,6 +715,12 @@ async function run() {
     // the compositor presented a frame" — has no portable signal, so this is an honest
     // heuristic. The not-blank assertion is what stops it silently passing on a blank window.
     await new Promise((r) => setTimeout(r, opts.settleMs))
+
+    if (opts.place) {
+      session.send({ cmd: 'place', x: opts.place.x, feetY: opts.place.feetY })
+      // One tick for the move, plus a moment for the compositor to present it.
+      await new Promise((r) => setTimeout(r, 400))
+    }
 
     if (opts.callout) {
       session.send({ cmd: 'show-callout', text: opts.callout, toast: opts.toast })

@@ -56,7 +56,12 @@ pnpm smoke --name debug --backdrop --keep-open  # leave the app up to poke at it
 pnpm smoke:states                               # one image per animation state
 pnpm smoke --name x --no-assert                 # capture without pixel checks
 pnpm smoke --name x --no-composite              # skip the composite entirely
+pnpm smoke --name x --place 900,420            # drop the pet at a screen position first
 ```
+
+`--place x,feetY` drives the same path a real drop ends at — the same clamping and the same
+snap-to-floor rule — so free placement is assertable from a screenshot. It is *not* a synthetic mouse
+drag: the harness has no cursor, so the pointer plumbing itself stays a manual check.
 
 `pnpm smoke` builds first, always. Evidence is of built code, never of a Vite dev server with
 HMR injected into the page.
@@ -80,7 +85,7 @@ shift.
 | **A1** sprite painted | ≥20% of the reported sprite rect has alpha > 32 | The sprite did not render, or rendered somewhere other than where main said it did. A single frame paints ~8360px into a 107×178 bbox ≈ 44%, so the 20% threshold is a 2× margin |
 | **A2** window transparent | ≥98% of a ring outside the sprite but inside the window has alpha ≤ 8 | **This is P1, automated.** A background colour, halo, drop shadow or rounded-corner artifact all fail. The ring is entirely window pixels, so passing proves the window itself is see-through. With `--callout`, the ring starts at the character's hair — see below |
 | **A3** not blank | ≥12 distinct quantised colours among opaque pixels | A denied-permission black frame, or a flat-fill regression |
-| **A4** feet on floor | Sprite bottom is within 2px of the work-area floor | `footInset` or the placement formula is wrong — the pet floats above the Dock or sinks into it |
+| **A4** placement | Floor-locked: sprite bottom within 2px of the work-area floor. Freely placed: the whole sprite is inside the work area | `footInset` or the placement formula is wrong — the pet floats above the Dock or sinks into it. For a freely placed pet the floor check would fail on *correct* behaviour, so main reports `floorLocked` and the assertion switches to the bound that still holds: a pet parked off-screen |
 | **A5** composite shows pet | ≥15% of the sprite rect differs from the backdrop colour | Composite only. The pet is behind the backdrop — the relative always-on-top levels inverted |
 
 ## Exit codes
@@ -137,6 +142,7 @@ Stated plainly because a green checklist that silently means "macOS only" is wor
 
 | Area | Status |
 |---|---|
+| macOS free placement | **Verified.** Placed at feet-y 420, captured there (`docs/demo/v12-free-placement.png`), and a relaunch with no arguments came back at exactly y=420 from the persisted settings. What is *not* covered is the pointer plumbing — that the mouse-down/move/up sequence tracks the cursor — because the harness cannot move the cursor |
 | macOS window transparency, always-on-top, sprite rendering, motion | **Verified.** Screenshots in `docs/demo/`, plus a 100%-transparent alpha ring around the sprite and a live position sample showing 440px of travel with a direction reversal |
 | macOS install from a **quarantined** `.dmg` | **Verified.** This is the step everyone skips: a locally built dmg carries no quarantine bit, so simply opening it proves nothing about ad-hoc signing. The attribute was applied by hand, inherited by the installed app, which then ran under App Translocation and rendered the pet over a real terminal window. `spctl` rejects it — expected without a Developer ID — but it launches rather than showing "damaged and can't be opened", which is exactly what `identity: '-'` buys |
 | macOS packaged build refusing loopback HTTP | **Verified** in the packaged app's own log — the `app.isPackaged` half of the two-condition broadcast gate |

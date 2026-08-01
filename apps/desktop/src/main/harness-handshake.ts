@@ -61,6 +61,11 @@ export type HandshakeEvent =
       bubbleFloorY?: number
       /** Whether a bubble was actually on screen for this capture. Pet window only. */
       bubbleVisible?: boolean
+      /**
+       * Whether the pet is sitting on the floor. False means it has been freely placed, in which
+       * case asserting feet-on-floor would fail on correct behaviour.
+       */
+      floorLocked?: boolean
     }
   | { ev: 'capture-failed'; path: string; reason: string }
   | { ev: 'error'; where: string; message: string }

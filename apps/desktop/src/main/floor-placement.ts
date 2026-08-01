@@ -93,9 +93,19 @@ export function computePlacement(
   }
 }
 
-/** Window y that puts the pet's lowest opaque pixel exactly on `floorY - 1`. */
-export function windowYForFloor(floorY: number, placement: Placement): number {
-  return Math.round(floorY - placement.spriteBottomOffset)
+/**
+ * Window y that puts the pet's lowest opaque pixel exactly on `feetY - 1`.
+ *
+ * Named for the floor because that is the only y the pet had before it became freely placeable; it
+ * takes any feet-y now, and the floor is simply the default one.
+ */
+export function windowYForFloor(feetY: number, placement: Placement): number {
+  return Math.round(feetY - placement.spriteBottomOffset)
+}
+
+/** Feet-y for a given window y. The inverse of the above. */
+export function feetYForWindowY(windowY: number, placement: Placement): number {
+  return windowY + placement.spriteBottomOffset
 }
 
 /** Window x for a given pet-centre x. */
@@ -116,12 +126,22 @@ export function floorForWorkArea(
   workArea: { x: number; y: number; width: number; height: number },
   displayKey: string,
   mask: AlphaMaskData = ALPHA_MASK,
+  placement: Placement = computePlacement(mask),
 ): Floor {
   const half = bodyHalfWidth(mask)
+  const floorY = workArea.y + workArea.height
+  // The highest the feet may go is set by the *window*, not the body: `spriteBottomOffset` is the
+  // distance from the window's top edge down to the feet, so keeping the window top at or below the
+  // work area's top means feetY >= workArea.y + spriteBottomOffset.
+  const minFeetY = workArea.y + placement.spriteBottomOffset
   return {
     minX: workArea.x + half,
     maxX: workArea.x + workArea.width - half,
-    y: workArea.y + workArea.height,
+    y: floorY,
+    // A work area shorter than the window (a tiny display, or a huge art pack) would invert these.
+    // Collapsing to the floor is the honest degradation: the pet stays where it can be seen.
+    minFeetY: Math.min(minFeetY, floorY),
+    maxFeetY: floorY,
     displayKey,
   }
 }
@@ -130,4 +150,23 @@ export function floorForWorkArea(
 export function clampToFloor(petCentreX: number, floor: Floor): number {
   if (floor.maxX <= floor.minX) return (floor.minX + floor.maxX) / 2
   return Math.min(floor.maxX, Math.max(floor.minX, petCentreX))
+}
+
+/** Clamp a feet-y into a floor's vertical envelope. Applied every tick, for the same reason. */
+export function clampFeetY(feetY: number, floor: Floor): number {
+  if (floor.maxFeetY <= floor.minFeetY) return floor.maxFeetY
+  return Math.min(floor.maxFeetY, Math.max(floor.minFeetY, feetY))
+}
+
+/**
+ * How close to the floor a drop counts as "on the floor".
+ *
+ * Dropping the pet near the bottom re-locks it to the floor, so dragging it back down is how you
+ * undo a free placement — no menu item needed. Without a threshold you could never re-lock by hand,
+ * because landing on the exact pixel is not a thing anyone can do with a mouse.
+ */
+export const FLOOR_SNAP_PX = 24
+
+export function isOnFloor(feetY: number, floor: Floor): boolean {
+  return feetY >= floor.maxFeetY - FLOOR_SNAP_PX
 }

@@ -28,6 +28,12 @@ export interface DisplaySnapshot {
 }
 
 /** The horizontal line the pet runs along, in screen coordinates. */
+/**
+ * The envelope the pet may occupy on one display.
+ *
+ * Still called `Floor` because the floor is still the default and the thing the pet returns to — but
+ * since the pet became freely placeable it also carries how far off the floor it may be lifted.
+ */
 export interface Floor {
   /** Leftmost permitted centre-x for the sprite's visible body. */
   minX: number
@@ -35,6 +41,15 @@ export interface Floor {
   maxX: number
   /** Screen y of the floor itself — the bottom of the work area. */
   y: number
+  /**
+   * Highest permitted feet-y. Bounded so the *window* top stays inside the work area, which is what
+   * guarantees a speech bubble is always fully visible: the bubble lives in the window above the
+   * sprite, and above the work area it would render behind the menu bar. The cost is that the pet's
+   * head cannot reach the top ~126px of the screen. Messages being readable wins.
+   */
+  minFeetY: number
+  /** Lowest permitted feet-y — the floor. The pet never sinks below it. */
+  maxFeetY: number
   /** Key of the display this floor belongs to. */
   displayKey: string
 }
@@ -60,8 +75,9 @@ export interface DisplayManager {
   primary(): DisplaySnapshot
   nearest(point: { x: number; y: number }): DisplaySnapshot
   byKey(key: string): DisplaySnapshot | null
-  /** The floor for a display, given how far the sprite's visible body extends from its centre. */
-  floorFor(display: DisplaySnapshot, bodyHalfWidth: number): Floor
+  // No `floorFor` here: `floorForWorkArea` in floor-placement.ts is the single definition of the
+  // envelope. There used to be a second one on this interface, never called, and adding the vertical
+  // bounds to only one of them is exactly how two definitions of the same thing start to disagree.
   /** Subscribe to debounced display changes. Returns an unsubscribe function. */
   onChanged(listener: () => void): () => void
   dispose(): void
@@ -111,19 +127,6 @@ export function createDisplayManager(): DisplayManager {
 
     byKey(key): DisplaySnapshot | null {
       return all().find((d) => d.key === key) ?? null
-    },
-
-    floorFor(display, bodyHalfWidth): Floor {
-      const { workArea } = display
-      return {
-        // Clamping the pet's *body* centre, not the window, is deliberate: the window is far
-        // wider than the visible character, so clamping window bounds would stop the pet
-        // ~126px short of the screen edge and the transparent margin would read as a bug.
-        minX: workArea.x + bodyHalfWidth,
-        maxX: workArea.x + workArea.width - bodyHalfWidth,
-        y: workArea.y + workArea.height,
-        displayKey: display.key,
-      }
     },
 
     onChanged(listener): () => void {

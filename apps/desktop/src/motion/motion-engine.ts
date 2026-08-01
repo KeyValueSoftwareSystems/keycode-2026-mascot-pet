@@ -33,12 +33,19 @@ export function initialState(options: {
   x: number
   now: number
   movementEnabled: boolean
+  /** Restored free-placement height. Omitted or null means floor-locked, which is the default. */
+  feetY?: number | null
+  floor?: { y: number }
   config?: MotionConfig
 }): MotionState {
   const config = options.config ?? DEFAULT_MOTION_CONFIG
   const animation = options.movementEnabled ? config.idleAnimation : config.sleepAnimation
+  const floorY = options.floor?.y ?? 0
+  const restored = options.feetY ?? null
   return {
     x: options.x,
+    feetY: restored ?? floorY,
+    floorLocked: restored === null,
     facing: 'right',
     animation,
     animationNonce: 0,
@@ -83,6 +90,20 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Settle the vertical position against the envelope that arrived this tick.
+ *
+ * Floor-locked is *re-derived*, not clamped: that is what makes a Dock resize or a resolution change
+ * move the pet automatically, the same self-correcting property `x` has. A freely placed pet is only
+ * clamped, because its height is the user's intent and recomputing it would throw that away.
+ */
+function settleFeetY(state: MotionState, input: MotionInput): MotionState {
+  const feetY = state.floorLocked
+    ? input.floor.maxFeetY
+    : clamp(state.feetY, input.floor.minFeetY, input.floor.maxFeetY)
+  return feetY === state.feetY ? state : { ...state, feetY }
+}
+
 /** Triggers are applied in order, so the last one in a batch wins where they conflict. */
 function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionInput, config: MotionConfig): MotionState {
   switch (trigger.kind) {
@@ -102,7 +123,14 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
     }
 
     case 'drag-end': {
-      const dropped = { ...state, dragging: false, x: trigger.petCentreX }
+      const dropped = {
+        ...state,
+        dragging: false,
+        x: trigger.petCentreX,
+        // A drop near the floor re-locks; anywhere else is a free placement the pet keeps.
+        feetY: trigger.floorLocked ? input.floor.maxFeetY : trigger.feetY,
+        floorLocked: trigger.floorLocked,
+      }
       const choice = planAct(dropped.rngSeed, input.now, dropped.facing, config.dropAnimation, {
         playful: true,
       })
@@ -126,7 +154,14 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
     }
 
     case 'reset-position': {
-      const moved = { ...state, x: clamp(trigger.petCentreX, input.floor.minX, input.floor.maxX) }
+      // Reset means the floor as well as the default x — otherwise a pet parked somewhere awkward
+      // stays awkward and the menu item appears not to work.
+      const moved = {
+        ...state,
+        x: clamp(trigger.petCentreX, input.floor.minX, input.floor.maxX),
+        feetY: input.floor.maxFeetY,
+        floorLocked: true,
+      }
       return adopt(moved, planDwell(moved.rngSeed, input.now, moved.facing, config, { range: { min: 300, max: 900 } }))
     }
   }
@@ -155,8 +190,9 @@ export function advance(
   }
 
   // While dragging, position is owned by main (it follows the cursor), so the engine holds still.
+  // Both axes are still clamped, so a drag cannot carry the pet outside the envelope.
   if (next.dragging) {
-    return { ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }
+    return settleFeetY({ ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }, input)
   }
 
   // Steady-state truth, separate from the one-shot trigger: settings may have changed without a
@@ -282,7 +318,7 @@ function advanceInPlace(
     }
   }
 
-  return { ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }
+  return settleFeetY({ ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }, input)
 }
 
 /**

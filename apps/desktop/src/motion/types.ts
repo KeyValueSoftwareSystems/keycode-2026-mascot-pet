@@ -19,7 +19,8 @@ export type MotionTrigger =
   /** Play an animation now, interrupting the current plan. */
   | { kind: 'reaction'; state: AnimationState; holdMs?: number }
   | { kind: 'drag-start' }
-  | { kind: 'drag-end'; petCentreX: number }
+  /** `floorLocked` is decided by the host from how close the drop was to the floor. */
+  | { kind: 'drag-end'; petCentreX: number; feetY: number; floorLocked: boolean }
   | { kind: 'movement-changed'; enabled: boolean }
   | { kind: 'reset-position'; petCentreX: number }
 
@@ -57,6 +58,23 @@ export interface MotionState {
    * bookkeeping, and rounding happens exactly once at the setPosition boundary.
    */
   x: number
+  /**
+   * Screen y of the pet's lowest opaque pixel — its feet.
+   *
+   * Only a drag changes it. There is no gravity: dropping the pet mid-screen leaves it there, and it
+   * patrols left/right at that height. Kept as absolute screen y rather than a height-above-floor so
+   * that a display change re-clamps it the same way `x` does, through the envelope arriving as input.
+   */
+  feetY: number
+  /**
+   * True while the pet sits on the floor, which is the default and the state a fresh install is in.
+   *
+   * The distinction is not cosmetic: while locked, `feetY` is *re-derived* from the floor every tick,
+   * so a Dock resize or a resolution change moves the pet automatically. Once freely placed, `feetY`
+   * is the user's intent and is only clamped, never recomputed. Dropping the pet back near the floor
+   * re-locks it.
+   */
+  floorLocked: boolean
   facing: Facing
   animation: AnimationState
   /** Flipped on every animation assignment so the renderer restarts even for the same state. */

@@ -82,7 +82,8 @@ export function createActions(deps: ActionDeps): MenuActions {
 
       controller.enqueue({ kind: 'reset-position', petCentreX: target })
       controller.tickNow()
-      settings.patch({ position: { displayKey: display.key, x: target } })
+      // Reset returns the pet to the floor, so no free-placement height is persisted.
+      settings.patch({ position: { displayKey: display.key, x: target, feetY: null } })
       log('position reset', { displayKey: display.key, x: Math.round(target) })
     },
 

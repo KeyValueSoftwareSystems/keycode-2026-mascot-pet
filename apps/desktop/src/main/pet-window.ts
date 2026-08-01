@@ -36,8 +36,8 @@ export interface PetWindowEvents {
 export interface PetWindow {
   readonly win: BrowserWindow
   readonly placement: Placement
-  /** Move so the pet's body centre sits at `petCentreX` on `floor`. */
-  moveTo(petCentreX: number, floor: Floor): void
+  /** Move so the pet's body centre sits at `petCentreX` and its feet at `feetY`. */
+  moveTo(petCentreX: number, feetY: number): void
   /** Current pet-body-centre x, derived from real window bounds. */
   petCentreX(): number
   /** Send a frame to the renderer. Validated here so a bad frame never reaches the view. */
@@ -177,10 +177,10 @@ export async function createPetWindow(options: {
     win,
     placement,
 
-    moveTo(petCentreX: number, floor: Floor): void {
+    moveTo(petCentreX: number, feetY: number): void {
       if (win.isDestroyed()) return
       const nextX = windowXForPetCentre(petCentreX, placement)
-      const nextY = windowYForFloor(floor.y, placement)
+      const nextY = windowYForFloor(feetY, placement)
       const bounds = win.getBounds()
       // Never issue a no-op: some compositors do real work per setPosition even when nothing moves.
       if (bounds.x === nextX && bounds.y === nextY) return

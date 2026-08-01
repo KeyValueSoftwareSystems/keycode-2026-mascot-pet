@@ -178,6 +178,32 @@ The window is sized to **end at the sprite's feet**. Sized to the full cell inst
 are transparent, so feet-on-floor would require hanging below the work area — which macOS clamps back
 inside the visible frame, silently lifting the pet by exactly `footInset`.
 
+### Free placement, and why `floorLocked` is a separate flag
+
+The pet can be dragged anywhere, not just along the floor. Two fields carry it: `feetY` (screen y of
+the lowest opaque pixel) and `floorLocked`.
+
+The flag is not redundant with `feetY === floor.y`, because the two states behave differently in a
+way that matters:
+
+| | `feetY` each tick |
+|---|---|
+| **Floor-locked** (default) | **Re-derived** from the floor, so a Dock resize or a resolution change moves the pet automatically — the same self-correcting property `x` has always had |
+| **Freely placed** | **Clamped** into the envelope, never recomputed, because the height is the user's intent and recomputing it would discard it |
+
+Dropping the pet within 24px of the floor re-locks it and snaps it flush, so dragging it back down is
+how you undo a free placement — no menu item, and no need to land on an exact pixel.
+
+There is no gravity: a dropped pet stays at that height and patrols left/right there. A simulation
+invariant asserts that ten minutes of unattended running never changes `feetY` or clears
+`floorLocked`, which is what would catch a plan quietly acquiring a vertical component.
+
+**How high it can go** is bounded by the *window*, not the body: `feetY >= workArea.y +
+spriteBottomOffset`, so the window's top edge stays inside the work area. That guarantees a speech
+bubble is always fully visible, since above the work area it would render behind the menu bar. The
+cost is that the pet's head cannot quite reach the top ~126px of the screen. Messages being readable
+won that trade.
+
 **Window bounds are not clamped to the work area; the pet's centre-x is.** The window is far wider than
 the character, so clamping the window would stop the body ~126px short of the screen edge, and that gap
 of nothing looks exactly like the bug it was meant to prevent. The window is allowed to hang partly

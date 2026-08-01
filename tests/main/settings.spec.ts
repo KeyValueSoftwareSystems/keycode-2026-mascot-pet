@@ -44,10 +44,58 @@ describe('settings schema', () => {
     expect(result.ok).toBe(false)
   })
 
-  it('treats a wrong schemaVersion as corrupt, not as a field error', () => {
-    const result = parseSettings({ ...DEFAULT_SETTINGS, schemaVersion: 2 })
+  it('treats a schemaVersion from the future as corrupt, not as a field error', () => {
+    // A *newer* version means the user ran a later build. Guessing at a shape from the future would
+    // corrupt it further, so this takes the back-up-and-continue path rather than attempting a parse.
+    const result = parseSettings({ ...DEFAULT_SETTINGS, schemaVersion: 99 })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toContain('schemaVersion')
+  })
+
+  it('migrates a v1 file forward instead of discarding it', () => {
+    // The failure this prevents: the schema is a strictObject, so a file written before `feetY`
+    // existed fails validation, is treated as corrupt, and gets replaced by defaults — silently
+    // resetting the user's toggles and their pet's position because a new field appeared.
+    const v1 = {
+      schemaVersion: 1,
+      movementEnabled: false,
+      waterReminderEnabled: false,
+      stretchReminderEnabled: true,
+      position: { displayKey: '0,0,1440x900', x: 812.5 },
+      reminders: { waterNextDueAt: 1_700_000_000_000, stretchNextDueAt: null },
+      seenBroadcastIds: ['kickoff-2026'],
+      lastKnownRelease: '1.0.0',
+    }
+
+    const result = parseSettings(v1)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    // Every user-visible choice survives.
+    expect(result.value.movementEnabled).toBe(false)
+    expect(result.value.waterReminderEnabled).toBe(false)
+    expect(result.value.stretchReminderEnabled).toBe(true)
+    expect(result.value.position?.x).toBe(812.5)
+    expect(result.value.seenBroadcastIds).toEqual(['kickoff-2026'])
+    expect(result.value.lastKnownRelease).toBe('1.0.0')
+    // And a v1 position was necessarily on the floor, which is what null feetY means.
+    expect(result.value.position?.feetY).toBeNull()
+    expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
+  })
+
+  it('migrates a v1 file that never had a saved position', () => {
+    const result = parseSettings({
+      schemaVersion: 1,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: true,
+      position: null,
+      reminders: { waterNextDueAt: null, stretchNextDueAt: null },
+      seenBroadcastIds: [],
+      lastKnownRelease: null,
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.position).toBeNull()
   })
 
   it('rejects a non-object', () => {
@@ -58,19 +106,35 @@ describe('settings schema', () => {
 
   it('rejects a position keyed by anything but a non-empty display key', () => {
     expect(
-      parseSettings({ ...DEFAULT_SETTINGS, position: { displayKey: '', x: 10 } }).ok,
+      parseSettings({ ...DEFAULT_SETTINGS, position: { displayKey: '', x: 10, feetY: null } }).ok,
     ).toBe(false)
     expect(
-      parseSettings({ ...DEFAULT_SETTINGS, position: { displayKey: 'k', x: Number.NaN } }).ok,
+      parseSettings({ ...DEFAULT_SETTINGS, position: { displayKey: 'k', x: Number.NaN, feetY: null } })
+        .ok,
     ).toBe(false)
   })
 
-  it('does not accept a persisted y — vertical placement is always derived', () => {
-    const result = parseSettings({
-      ...DEFAULT_SETTINGS,
-      position: { displayKey: '0,0,100x100', x: 10, y: 20 },
-    })
-    expect(result.ok).toBe(false)
+  it('accepts a free-placement feetY, and still rejects an unknown y field', () => {
+    // `feetY` is the user's intent and is stored. A bare `y` was the old, derived-only spelling and
+    // must stay rejected, or two fields would compete to mean the same thing.
+    expect(
+      parseSettings({
+        ...DEFAULT_SETTINGS,
+        position: { displayKey: '0,0,100x100', x: 10, feetY: 420 },
+      }).ok,
+    ).toBe(true)
+    expect(
+      parseSettings({
+        ...DEFAULT_SETTINGS,
+        position: { displayKey: '0,0,100x100', x: 10, feetY: null, y: 20 },
+      }).ok,
+    ).toBe(false)
+    expect(
+      parseSettings({
+        ...DEFAULT_SETTINGS,
+        position: { displayKey: '0,0,100x100', x: 10, feetY: Number.POSITIVE_INFINITY },
+      }).ok,
+    ).toBe(false)
   })
 
   it('rejects more seen ids than the cap allows', () => {

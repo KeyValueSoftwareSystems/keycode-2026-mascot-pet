@@ -16,7 +16,15 @@ import type { Floor, MotionState, MotionTrigger } from '../../apps/desktop/src/m
 const TICK = DEFAULT_MOTION_CONFIG.tickMs
 const TEN_MINUTES_TICKS = Math.round((10 * 60 * 1_000) / TICK)
 
-const floor: Floor = { minX: 100, maxX: 1_400, y: 900, displayKey: 'primary' }
+const floor: Floor = {
+  minX: 100,
+  maxX: 1_400,
+  y: 900,
+  // Mirrors a real envelope: the feet may rise until the window's top hits the work area.
+  minFeetY: 304,
+  maxFeetY: 900,
+  displayKey: 'primary',
+}
 
 interface SimOptions {
   seed?: number
@@ -89,6 +97,15 @@ describe('ten minutes of pet life', () => {
     for (const { tick, state } of result.frames) {
       expect(state.x, `tick ${tick}`).toBeGreaterThanOrEqual(floor.minX)
       expect(state.x, `tick ${tick}`).toBeLessThanOrEqual(floor.maxX)
+    }
+  })
+
+  it('never drifts off the floor on its own', () => {
+    // There is no gravity and nothing but a drag moves the pet vertically. If any plan ever starts
+    // touching `feetY`, ten minutes of unattended running is where it would show up.
+    for (const { tick, state } of result.frames) {
+      expect(state.floorLocked, `tick ${tick}`).toBe(true)
+      expect(state.feetY, `tick ${tick}`).toBe(floor.maxFeetY)
     }
   })
 
@@ -511,5 +528,103 @@ describe('reset position', () => {
       pending: [{ kind: 'reset-position', petCentreX: -5_000 }],
     })
     expect(state.x).toBe(floor.minX)
+  })
+})
+
+describe('free placement', () => {
+  const step = (state: MotionState, now: number, pending: readonly MotionTrigger[] = [], f = floor) =>
+    advance(state, { now, floor: f, settings: { movementEnabled: true }, pending })
+
+  const fresh = () => initialState({ seed: 7, x: 700, now: 0, movementEnabled: true, floor })
+
+  it('starts floor-locked, with the feet on the floor', () => {
+    const state = fresh()
+    expect(state.floorLocked).toBe(true)
+    expect(state.feetY).toBe(floor.y)
+  })
+
+  it('keeps the pet where it was dropped, and stops re-deriving y', () => {
+    let state = fresh()
+    state = step(state, 60, [{ kind: 'drag-end', petCentreX: 900, feetY: 400, floorLocked: false }])
+    expect(state.x).toBe(900)
+    expect(state.feetY).toBe(400)
+    expect(state.floorLocked).toBe(false)
+
+    // Ten seconds of ordinary life must not pull it back down: there is no gravity.
+    for (let t = 120; t <= 10_000; t += TICK) state = step(state, t)
+    expect(state.feetY).toBe(400)
+    expect(state.floorLocked).toBe(false)
+  })
+
+  it('patrols horizontally at the height it was left at', () => {
+    let state = fresh()
+    state = step(state, 60, [{ kind: 'drag-end', petCentreX: 900, feetY: 500, floorLocked: false }])
+    const xs = new Set<number>()
+    for (let t = 120; t <= 60_000; t += TICK) {
+      state = step(state, t)
+      xs.add(Math.round(state.x))
+      expect(state.feetY).toBe(500)
+    }
+    // It is still alive — it just does it up there.
+    expect(xs.size).toBeGreaterThan(50)
+  })
+
+  it('re-locks to the floor when dropped on it, snapping to the exact floor y', () => {
+    let state = fresh()
+    state = step(state, 60, [{ kind: 'drag-end', petCentreX: 900, feetY: 400, floorLocked: false }])
+    // The host decides `floorLocked` from the drop height; a near-floor drop lands exactly on it
+    // rather than a few pixels above, so "dragged it back down" does not leave a visible gap.
+    state = step(state, 120, [{ kind: 'drag-end', petCentreX: 900, feetY: 890, floorLocked: true }])
+    expect(state.floorLocked).toBe(true)
+    expect(state.feetY).toBe(floor.y)
+  })
+
+  it('re-derives y for a floor-locked pet when the work area changes', () => {
+    // The Dock-resize case. Floor-locked means the y is a derivation, so it must follow the floor.
+    let state = fresh()
+    const raised: Floor = { ...floor, y: 700, maxFeetY: 700 }
+    state = step(state, 60, [], raised)
+    expect(state.feetY).toBe(700)
+  })
+
+  it('clamps a freely placed pet into a shrunken envelope instead of following the floor', () => {
+    let state = fresh()
+    state = step(state, 60, [{ kind: 'drag-end', petCentreX: 900, feetY: 350, floorLocked: false }])
+    // A display whose envelope no longer contains 350: clamp to the closest legal height, and do not
+    // silently convert the pet back to floor-locked — the user's intent is "up high", not "on the floor".
+    const shorter: Floor = { ...floor, y: 600, minFeetY: 500, maxFeetY: 600 }
+    state = step(state, 120, [], shorter)
+    expect(state.feetY).toBe(500)
+    expect(state.floorLocked).toBe(false)
+  })
+
+  it('returns to the floor on reset-position', () => {
+    let state = fresh()
+    state = step(state, 60, [{ kind: 'drag-end', petCentreX: 900, feetY: 400, floorLocked: false }])
+    state = step(state, 120, [{ kind: 'reset-position', petCentreX: 500 }])
+    expect(state.floorLocked).toBe(true)
+    expect(state.feetY).toBe(floor.y)
+  })
+
+  it('restores a saved height, and ignores null as "on the floor"', () => {
+    expect(initialState({ seed: 1, x: 0, now: 0, movementEnabled: true, feetY: 450, floor }).feetY).toBe(450)
+    expect(
+      initialState({ seed: 1, x: 0, now: 0, movementEnabled: true, feetY: 450, floor }).floorLocked,
+    ).toBe(false)
+    expect(initialState({ seed: 1, x: 0, now: 0, movementEnabled: true, feetY: null, floor }).feetY).toBe(
+      floor.y,
+    )
+    expect(
+      initialState({ seed: 1, x: 0, now: 0, movementEnabled: true, feetY: null, floor }).floorLocked,
+    ).toBe(true)
+  })
+
+  it('never lets a drag carry the pet outside the envelope', () => {
+    let state = fresh()
+    for (const feetY of [-9_999, 0, 100, 9_999]) {
+      state = step(state, 60, [{ kind: 'drag-end', petCentreX: 900, feetY, floorLocked: false }])
+      expect(state.feetY).toBeGreaterThanOrEqual(floor.minFeetY)
+      expect(state.feetY).toBeLessThanOrEqual(floor.maxFeetY)
+    }
   })
 })
