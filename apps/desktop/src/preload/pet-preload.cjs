@@ -23,7 +23,7 @@ const IPC = {
   contextMenu: 'keycode-pet:context-menu',
   dragStart: 'keycode-pet:drag-start',
   dragEnd: 'keycode-pet:drag-end',
-  openCalloutUrl: 'keycode-pet:open-callout-url',
+  bubbleClicked: 'keycode-pet:bubble-clicked',
 }
 
 /** Last reported hover state, so only transitions cross the process boundary. */
@@ -74,7 +74,7 @@ contextBridge.exposeInMainWorld('keycodePet', {
   },
 
   /** Open the current callout's link. Main holds and re-validates the URL; the renderer never sees it. */
-  openCalloutUrl() {
-    ipcRenderer.send(IPC.openCalloutUrl)
+  bubbleClicked() {
+    ipcRenderer.send(IPC.bubbleClicked)
   },
 })

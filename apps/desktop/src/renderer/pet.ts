@@ -65,6 +65,7 @@ function applyFrame(frame: PetFrame): void {
     bubble.dataset.tone = frame.bubble.tone
     bubble.dataset.pinned = String(frame.bubble.pinned)
     bubble.dataset.clickable = String(frame.bubble.clickable)
+    bubble.dataset.dismissible = String(frame.bubble.dismissible)
     bubble.hidden = false
   } else {
     bubbleText.textContent = ''
@@ -132,10 +133,13 @@ document.addEventListener('contextmenu', (event) => {
 // A click on a linked bubble opens its link; anything else on the pet starts a drag. Routed by
 // DOM event targeting rather than by comparing rectangles, so there is no geometry to get wrong
 // and no behavioural branch in this file.
+// A left click on the bubble is *reported*, not interpreted. Main opens the link if there is one and
+// dismisses the callout; deciding what a click means is behaviour, and behaviour does not live here.
+// Previously this file gated the report on `data-clickable`, which was exactly such a decision.
 bubble.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || bubble.dataset.clickable !== 'true') return
+  if (event.button !== 0) return
   event.stopPropagation()
-  window.keycodePet.openCalloutUrl()
+  window.keycodePet.bubbleClicked()
 })
 
 document.addEventListener('pointerdown', (event) => {

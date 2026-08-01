@@ -3,11 +3,10 @@
   "notifications": [
     {
       "id": "second-ping-2026-08-02",
-      "text": "Second ping 🚀 If you are reading this, the pet picked it up on its own poll — no restart.",
+      "text": "Deploy freeze starts at 5pm 🔥 Click this bubble to dismiss it.",
       "tone": "info",
       "priority": "high",
       "animation": "jumping",
-      "durationMs": 12000,
       "startsAt": "2026-08-01T00:00:00Z",
       "expiresAt": "2026-08-09T00:00:00Z"
     },

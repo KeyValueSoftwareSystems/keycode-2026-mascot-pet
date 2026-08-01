@@ -64,10 +64,17 @@ export const petFrameSchema = z.strictObject({
        * Whether the bubble has a link behind it.
        *
        * A boolean rather than the URL: the renderer shows an affordance and calls
-       * `openCalloutUrl()`, and main looks up the URL it already validated. A renderer that
+       * `bubbleClicked()`, and main looks up the URL it already validated. A renderer that
        * cannot name a URL cannot be talked into opening a bad one.
        */
       clickable: z.boolean(),
+      /**
+       * Whether this bubble waits to be clicked rather than timing out.
+       *
+       * Drives a visible affordance. A notification that never disappears and gives no hint that
+       * clicking removes it is a trap, not a feature — the user is left assuming it is stuck.
+       */
+      dismissible: z.boolean(),
     })
     .nullable(),
 
@@ -95,5 +102,5 @@ export const IPC = {
   contextMenu: 'keycode-pet:context-menu',
   dragStart: 'keycode-pet:drag-start',
   dragEnd: 'keycode-pet:drag-end',
-  openCalloutUrl: 'keycode-pet:open-callout-url',
+  bubbleClicked: 'keycode-pet:bubble-clicked',
 } as const

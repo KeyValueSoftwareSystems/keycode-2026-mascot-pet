@@ -87,6 +87,25 @@ reading the JSON, since `expiresAt` in the past is the normal resting state rath
 }
 ```
 
+### Omitting `durationMs` means "wait to be clicked"
+
+An announcement worth sending to everybody is worth acknowledging, and a bubble that vanishes after six
+seconds is one you can miss entirely by looking away. So a notification with no `durationMs` has no
+expiry at all: it sits above the pet until clicked, and the bubble shows a small × so the gesture is
+discoverable rather than a trap.
+
+Clicking a notification that also has a `url` opens the link **and** dismisses it, in one action.
+
+Set `durationMs` to opt back into the old behaviour. Older clients (pre-v1.6.0) treat an absent value
+as 6000, so omitting it is safe to publish — they simply show it briefly instead of holding it.
+
+Two consequences worth knowing:
+
+- **Sticky notifications queue.** Only one bubble shows at a time, so a second one waits until the
+  first is dismissed. That is the intended reading — messages arrive in order rather than racing — but
+  it does mean an unattended machine holds the rest in the queue, and the queue evicts past 16.
+- **A higher-priority callout still displaces it.** Stickiness stops the *clock*, not the arbiter.
+
 ### `id` is a persistence key
 
 Each id is shown **exactly once per install, ever**. It is written to the client's settings file the
@@ -210,7 +229,7 @@ machine, so it is treated as hostile throughout.
 | `tone` | One of `info`/`success`/`warning`/`error`, default `info` |
 | `priority` | One of `low`/`normal`/`high`/`urgent`, default `normal` |
 | `animation` | Must be a state the current art provides; anything else falls back to `waving` |
-| `durationMs` | Clamped to **2000–30000**; absent means 6000 |
+| `durationMs` | Clamped to **2000–30000**. **Absent means the notification stays until the person clicks it** — not 6000. Set one only when the message genuinely should disappear on its own |
 | `startsAt` / `expiresAt` | ISO-8601 **with an explicit offset** (`Z` or `±HH:MM`). Without one the entry is dropped, because a window that shifts by the reader's timezone is not a schedule. `startsAt` must precede `expiresAt` |
 | `url` | HTTPS only. A bad URL costs the link, not the message — the callout is simply not clickable |
 | Poll | Every **5 min** with **±20%** jitter, plus once on launch. `KEYCODE_PET_POLL_MINUTES` overrides, clamped to 1–1440 |

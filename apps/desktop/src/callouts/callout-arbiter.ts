@@ -216,6 +216,21 @@ export function tick(state: ArbiterState, now: number): TickResult {
 }
 
 /** Drop everything. Used on quit and when the pet is hidden. */
+/**
+ * Dismiss whatever is on screen, letting the queue advance.
+ *
+ * The showing entry is `pinned ?? current`, matching `tick`, so this clears the one the person is
+ * actually looking at rather than whichever slot happens to be occupied.
+ *
+ * Pure and idempotent: dismissing with nothing showing returns the same state, so a stray click after
+ * the bubble has gone cannot eat the next message.
+ */
+export function dismissShowing(state: ArbiterState): ArbiterState {
+  if (state.pinned) return { ...state, pinned: null }
+  if (state.current) return { ...state, current: null }
+  return state
+}
+
 export function clearAll(state: ArbiterState): ArbiterState {
   return { ...state, current: null, pinned: null, queue: [] }
 }

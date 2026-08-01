@@ -26,6 +26,10 @@ pnpm dev
 The pet appears at the bottom of your primary display and starts moving. A tray icon gives you the
 settings menu; right-clicking the pet gives you the same menu.
 
+**Broadcast notifications wait to be clicked.** A message from the manifest has no timeout unless the
+publisher sets one — it sits above the pet with a small × until you click it, so an announcement cannot
+be missed by looking away. Clicking one that has a link opens the link and dismisses it together.
+
 **Reminders, with intervals.** Right-click → Drink water reminder / Stretch reminder → Off, or every
 5 / 15 / 30 / 45 / 60 / 90 minutes. Changing an interval clears the pending deadline, so the next
 reminder is one *new* interval away rather than inheriting the old one. **The 5-minute option is how you
@@ -94,7 +98,7 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 382 tests, no Electron required |
+| `pnpm test` | 387 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
@@ -204,7 +208,7 @@ available.
 ## Status
 
 All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
-releases from `v1.1.0`. 382 tests pass; typecheck is clean.
+releases from `v1.1.0`. 387 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.

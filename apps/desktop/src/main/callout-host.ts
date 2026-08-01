@@ -11,6 +11,7 @@ import {
   submit,
   tick,
   clearAll,
+  dismissShowing,
   type ActiveCallout,
   type ArbiterState,
   type CalloutRequest,
@@ -24,6 +25,13 @@ export interface CalloutHost {
   show(request: CalloutRequest & { url?: string | null }): void
   /** The URL behind the callout currently showing, if any. */
   currentUrl(): string | null
+  /**
+   * Dismiss the showing callout, as a click on the bubble does.
+   *
+   * Returns whether anything was actually dismissed, so the caller can tell a real dismissal from a
+   * click that landed after the bubble had already gone.
+   */
+  dismissShowing(): boolean
   /** What the pet is saying right now. */
   showing(): ActiveCallout | null
   clear(): void
@@ -117,6 +125,16 @@ export function createCalloutHost(options: CalloutHostOptions): CalloutHost {
     currentUrl(): string | null {
       const seq = state.pinned?.seq ?? state.current?.seq
       return seq === undefined ? null : urls.get(seq) ?? null
+    },
+
+    dismissShowing(): boolean {
+      const before = state.pinned ?? state.current
+      if (!before) return false
+      state = dismissShowing(state)
+      // Pump immediately rather than waiting for the host's timer: the bubble must vanish on the
+      // click, and the next queued message should take its place in the same beat.
+      pump()
+      return true
     },
 
     showing(): ActiveCallout | null {

@@ -129,7 +129,14 @@ export interface SafeNotification {
   tone: Tone
   priority: Priority
   animation: AnimationState
-  durationMs: number
+  /**
+   * Explicit display duration in ms, or **null when the entry did not set one**.
+   *
+   * Null is not "use the default" — it means the notification stays until the person clicks it. An
+   * announcement worth broadcasting to everybody is worth acknowledging, and a bubble that vanishes
+   * after six seconds is one you can miss entirely by looking away.
+   */
+  durationMs: number | null
   /** -Infinity when absent, so comparisons need no special case. */
   startsAtMs: number
   /** +Infinity when absent. */
@@ -197,11 +204,11 @@ export function parseNotification(raw: unknown): SafeNotification | { error: str
       ? entry.animation
       : FALLBACK_ANIMATION
 
-  const durationMs = clamp(
-    Number.isFinite(entry.durationMs) ? (entry.durationMs as number) : CALLOUT_DEFAULT_MS,
-    BROADCAST_DURATION_MS.min,
-    BROADCAST_DURATION_MS.max,
-  )
+  // Null when the entry set no duration, which means "stays until clicked" rather than "use the
+  // default". Set one only when the message genuinely should disappear on its own.
+  const durationMs = Number.isFinite(entry.durationMs)
+    ? clamp(entry.durationMs as number, BROADCAST_DURATION_MS.min, BROADCAST_DURATION_MS.max)
+    : null
 
   // A bad URL costs the link, not the message: the callout is simply not clickable.
   const url = entry.url === undefined ? null : (safeUrl(entry.url)?.toString() ?? null)

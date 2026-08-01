@@ -165,10 +165,15 @@ export async function startApp(): Promise<AppShell> {
           },
         })
       },
-      onOpenCalloutUrl(): void {
-        // Main holds the URL and re-validates it here. The renderer only ever asked to open "the
-        // current callout's link" and never saw a string.
-        openExternalChecked(callouts?.currentUrl(), { log })
+      onBubbleClicked(): void {
+        // Main holds the URL and re-validates it here. The renderer only ever reported "the bubble was
+        // clicked" and never saw a string — deciding what a click *means* is behaviour, so it lives
+        // here rather than in the view.
+        const url = callouts?.currentUrl()
+        if (url) openExternalChecked(url, { log })
+        // Dismiss either way. A sticky notification has no other way to go, and for a timed one this
+        // just means a click gets rid of it early.
+        callouts?.dismissShowing()
       },
     },
   })
@@ -208,6 +213,8 @@ export async function startApp(): Promise<AppShell> {
               tone: showing.tone,
               pinned: Boolean(showing.pin),
               clickable: Boolean(callouts.currentUrl()),
+              // Sticky entries have no expiry, so a click is the only way they go.
+              dismissible: Boolean(showing.sticky),
             }
           : null,
       )
@@ -318,7 +325,12 @@ export async function startApp(): Promise<AppShell> {
           text: entry.text,
           tone: entry.tone,
           priority: entry.priority,
-          durationMs: entry.durationMs,
+          // No duration in the manifest means the notification waits to be clicked. An announcement
+          // worth sending to everybody is worth acknowledging, and a bubble that disappears after six
+          // seconds is one you can miss by looking away. Set `durationMs` to opt back into a timeout.
+          ...(entry.durationMs === null
+            ? { sticky: true }
+            : { durationMs: entry.durationMs }),
           animation: entry.animation,
           ...(entry.url ? { url: entry.url } : {}),
         })
@@ -469,6 +481,7 @@ export async function startApp(): Promise<AppShell> {
         text: request.text,
         tone: tone ?? 'info',
         priority: priority ?? 'normal',
+        ...(request.sticky ? { sticky: true } : {}),
         ...(request.toast ? { durationMs: 8_000 } : {}),
       })
       if (request.toast) {

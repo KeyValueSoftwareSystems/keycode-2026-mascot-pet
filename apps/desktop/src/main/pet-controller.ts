@@ -32,6 +32,8 @@ export interface ActiveCallout {
   tone: Tone
   pinned: boolean
   clickable: boolean
+  /** Waits for a click rather than timing out, so the view shows a dismiss affordance. */
+  dismissible: boolean
 }
 
 export interface PetControllerOptions {
@@ -139,6 +141,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
             tone: callout.tone,
             pinned: callout.pinned,
             clickable: callout.clickable,
+            dismissible: callout.dismissible,
           }
         : null,
       overlay: animation === config.sleepAnimation ? 'sleep-z' : 'none',

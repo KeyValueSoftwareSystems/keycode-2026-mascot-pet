@@ -77,6 +77,8 @@ function parseArgs(argv) {
     composite: true,
     callout: null,
     toast: false,
+    sticky: false,
+    freshProfile: false,
     place: null,
     size: null,
   }
@@ -115,6 +117,12 @@ function parseArgs(argv) {
         break
       case '--toast':
         opts.toast = true
+        break
+      case '--sticky':
+        opts.sticky = true
+        break
+      case '--fresh-profile':
+        opts.freshProfile = true
         break
       case '--size':
         opts.size = argv[(i += 1)]
@@ -177,7 +185,7 @@ class AppSession {
     const existing = this.events.find(match)
     if (existing) return Promise.resolve(existing)
     return new Promise((resolvePromise, reject) => {
-      const waiter = { match, resolve: resolvePromise }
+      const waiter = { match, resolve: resolvePromise, reject, label }
       this.waiters.push(waiter)
       const timer = setTimeout(() => {
         const at = this.waiters.indexOf(waiter)
@@ -226,8 +234,28 @@ class AppSession {
   }
 }
 
+/**
+ * A profile directory of the harness's own.
+ *
+ * Two problems this solves at once. The single-instance lock lives in `userData`, so a packaged pet
+ * running on the same machine made every smoke run exit instantly — which matters because the app is
+ * dogfooded while it is developed. And evidence was being shaped by whatever state the last manual
+ * session left behind: a screenshot run once came out at `small` because a menu click earlier in the
+ * day had persisted, and a broadcast test consumed the very id it was meant to demonstrate.
+ *
+ * Persistent rather than per-run, because some checks are *about* persistence — "drag it, restart, is
+ * it still there". `--fresh-profile` wipes it for a clean first-run.
+ */
+const HARNESS_PROFILE = join(TMP_DIR, 'profile')
+
 function launch(opts) {
-  const child = spawn(electronBinary(), [join(ROOT, 'apps', 'desktop')], {
+  if (opts.freshProfile) rmSync(HARNESS_PROFILE, { recursive: true, force: true })
+  mkdirSync(HARNESS_PROFILE, { recursive: true })
+
+  const child = spawn(
+    electronBinary(),
+    [join(ROOT, 'apps', 'desktop'), `--user-data-dir=${HARNESS_PROFILE}`],
+    {
     cwd: ROOT,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: {
@@ -236,7 +264,8 @@ function launch(opts) {
       ...(opts.backdrop ? { KEYCODE_PET_BACKDROP: '1' } : {}),
       ...(opts.state ? { KEYCODE_PET_FORCE_STATE: opts.state } : {}),
     },
-  })
+  },
+  )
 
   const session = new AppSession(child)
   let stdoutRest = ''
@@ -272,8 +301,29 @@ function launch(opts) {
   child.on('exit', (code, signal) => {
     session.exited = true
     session.exitInfo = { code, signal }
+
+    // Reject anything still waiting, rather than dropping the waiters on the floor.
+    //
+    // They used to be discarded, and the `wait()` timeout is `unref`'d — so once the child was gone
+    // there was nothing left to keep the event loop alive and node exited 0 having printed only the
+    // banner. A run that did nothing looked like a run that passed. It cost two silent multi-minute
+    // waits before being tracked down, both times because another copy of the pet was already
+    // running: the harness's child lost the single-instance lock and exited immediately.
+    const sawNothing = session.events.length === 0
+    const hint = sawNothing
+      ? '\n\nThe app exited before saying anything. The usual cause is that another copy of ' +
+        'Keycode Pet is\nalready running and holding the single-instance lock, so this one exited ' +
+        'immediately.\nThe harness runs in its own profile now, so if you see this, check for a ' +
+        'packaged app:\n  pgrep -fl "Keycode Pet.app/Contents/MacOS"'
+      : ''
     for (const waiter of session.waiters.splice(0)) {
-      void waiter
+      waiter.reject?.(
+        new SmokeFailure(
+          EXIT.died,
+          `The app exited (code ${code}, signal ${signal}) while waiting for ${waiter.label}.` +
+            `${hint}\n\nstderr tail:\n${session.stderrTail.slice(-1500)}`,
+        ),
+      )
     }
   })
 
@@ -756,7 +806,12 @@ async function run() {
     }
 
     if (opts.callout) {
-      session.send({ cmd: 'show-callout', text: opts.callout, toast: opts.toast })
+      session.send({
+        cmd: 'show-callout',
+        text: opts.callout,
+        toast: opts.toast,
+        sticky: opts.sticky,
+      })
       // Let the bubble paint and the emoji font resolve before capturing.
       await new Promise((r) => setTimeout(r, 700))
     }

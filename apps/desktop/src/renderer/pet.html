@@ -25,6 +25,9 @@
     -->
     <div id="bubble" hidden>
       <span id="bubble-text"></span>
+      <!-- Shown only for bubbles that wait to be clicked. Signage, not a button: the whole bubble
+           is the hit target, so this must not swallow the pointer. -->
+      <span class="dismiss-hint" aria-hidden="true">×</span>
     </div>
     <div id="sprite" class="pet-sprite" data-state="idle" data-nonce="0" data-facing="right"></div>
     <!-- Pure-CSS sleep affordance. This is what lets `sleep` ship with no new art. -->

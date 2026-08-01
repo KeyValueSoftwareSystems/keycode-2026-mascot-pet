@@ -7,6 +7,7 @@ import {
   RANK,
   type ArbiterState,
   type CalloutRequest,
+  dismissShowing,
 } from '../../apps/desktop/src/callouts/callout-arbiter.js'
 import {
   sanitizeBubbleText,
@@ -380,5 +381,60 @@ describe('toast layout', () => {
     expect(hasToastCapacity(0)).toBe(true)
     expect(hasToastCapacity(TOAST.max - 1)).toBe(true)
     expect(hasToastCapacity(TOAST.max)).toBe(false)
+  })
+})
+
+describe('sticky notifications and dismissal', () => {
+  it('never expires a sticky entry on its own', () => {
+    let state = submit(initArbiter(), { sourceId: 'broadcast', text: 'hi', sticky: true }, 0)
+    // A year later, still showing. This is the whole point: it waits for a person.
+    const later = tick(state, 365 * 24 * 60 * 60 * 1000)
+    expect(later.showing?.text).toBe('hi')
+    // And there is no wake-up to schedule, so the host holds no timer for it.
+    expect(later.wakeAt).toBeNull()
+  })
+
+  it('an explicit duration still wins over stickiness', () => {
+    // `durationMs` is the opt-out: set it and the message goes on its own.
+    const state = submit(
+      initArbiter(),
+      { sourceId: 'broadcast', text: 'timed', sticky: true, durationMs: 5_000 },
+      0,
+    )
+    expect(tick(state, 4_999).showing?.text).toBe('timed')
+    expect(tick(state, 5_001).showing).toBeNull()
+  })
+
+  it('dismissShowing clears what is on screen and lets the queue advance', () => {
+    let state = submit(initArbiter(), { sourceId: 'broadcast', text: 'first', sticky: true }, 0)
+    state = submit(state, { sourceId: 'broadcast', text: 'second', sticky: true }, 1)
+    expect(tick(state, 2).showing?.text).toBe('first')
+
+    state = tick(state, 2).state
+    state = dismissShowing(state)
+    expect(tick(state, 3).showing?.text).toBe('second')
+  })
+
+  it('dismisses the pinned slot when one is showing, not the transient one underneath', () => {
+    let state = submit(initArbiter(), { sourceId: 'a', text: 'transient', sticky: true }, 0)
+    state = submit(state, { sourceId: 'b', text: 'pinned', sticky: true, pin: true }, 0)
+    expect(tick(state, 1).showing?.text).toBe('pinned')
+
+    state = dismissShowing(tick(state, 1).state)
+    // The transient one is revealed rather than destroyed — dismissing what you can see should not
+    // silently discard something you never saw.
+    expect(tick(state, 2).showing?.text).toBe('transient')
+  })
+
+  it('is a no-op when nothing is showing, so a late click cannot eat the next message', () => {
+    const empty = initArbiter()
+    expect(dismissShowing(empty)).toEqual(empty)
+
+    // Queued-but-not-yet-shown must survive a stray dismiss.
+    let state = submit(empty, { sourceId: 'a', text: 'queued', sticky: true }, 0)
+    state = tick(state, 1).state
+    state = dismissShowing(state)
+    state = dismissShowing(state)
+    expect(tick(state, 2).showing).toBeNull()
   })
 })

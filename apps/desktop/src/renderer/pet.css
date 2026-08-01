@@ -208,6 +208,34 @@ body {
   border-left-width: 9px;
 }
 
+/*
+ * A bubble that waits to be clicked says so.
+ *
+ * Without an affordance a notification that never leaves reads as stuck rather than as waiting, and
+ * the one gesture that clears it is invisible. The whole bubble is the hit target — the mark is
+ * signage, not a button, which is why it is `pointer-events: none`.
+ */
+#bubble[data-dismissible='true'] {
+  cursor: pointer;
+  padding-right: 26px;
+}
+
+#bubble[data-dismissible='true'] .dismiss-hint {
+  display: block;
+}
+
+.dismiss-hint {
+  display: none;
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  pointer-events: none;
+  font:
+    600 13px / 1 system-ui,
+    sans-serif;
+  color: rgba(20, 17, 17, 0.45);
+}
+
 #bubble[data-clickable='true'] {
   cursor: pointer;
   text-decoration: underline;

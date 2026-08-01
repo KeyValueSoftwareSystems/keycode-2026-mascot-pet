@@ -31,7 +31,7 @@ export interface PetWindowEvents {
   onContextMenu(): void
   onDragStart(): void
   onDragEnd(): void
-  onOpenCalloutUrl(): void
+  onBubbleClicked(): void
 }
 
 export interface PetWindow {
@@ -168,9 +168,9 @@ export async function createPetWindow(options: {
     options.events.onDragEnd()
   }
 
-  const onOpenCalloutUrl = (event: Electron.IpcMainEvent): void => {
+  const onBubbleClicked = (event: Electron.IpcMainEvent): void => {
     if (!isFromThisWindow(event)) return
-    options.events.onOpenCalloutUrl()
+    options.events.onBubbleClicked()
   }
 
   ipcMain.on(IPC.pointerOverPet, onPointerOverPet)
@@ -178,7 +178,7 @@ export async function createPetWindow(options: {
   ipcMain.on(IPC.contextMenu, onContextMenu)
   ipcMain.on(IPC.dragStart, onDragStart)
   ipcMain.on(IPC.dragEnd, onDragEnd)
-  ipcMain.on(IPC.openCalloutUrl, onOpenCalloutUrl)
+  ipcMain.on(IPC.bubbleClicked, onBubbleClicked)
 
   win.webContents.on('did-finish-load', () => {
     forwarding.afterNavigate()
@@ -308,7 +308,7 @@ export async function createPetWindow(options: {
       ipcMain.removeListener(IPC.contextMenu, onContextMenu)
       ipcMain.removeListener(IPC.dragStart, onDragStart)
       ipcMain.removeListener(IPC.dragEnd, onDragEnd)
-      ipcMain.removeListener(IPC.openCalloutUrl, onOpenCalloutUrl)
+      ipcMain.removeListener(IPC.bubbleClicked, onBubbleClicked)
       forwarding.dispose()
       keeper?.dispose()
       if (!win.isDestroyed()) win.destroy()

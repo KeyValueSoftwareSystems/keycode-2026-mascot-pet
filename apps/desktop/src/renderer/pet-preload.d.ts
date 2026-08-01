@@ -17,7 +17,7 @@ export interface KeycodePetBridge {
   requestContextMenu(): void
   beginDrag(): void
   endDrag(): void
-  openCalloutUrl(): void
+  bubbleClicked(): void
 }
 
 declare global {

@@ -57,6 +57,9 @@ pnpm smoke:states                               # one image per animation state
 pnpm smoke --name x --no-assert                 # capture without pixel checks
 pnpm smoke --name x --no-composite              # skip the composite entirely
 pnpm smoke --name x --place 900,420            # drop the pet at a screen position first
+pnpm smoke --name x --size small               # switch pet size first
+pnpm smoke --name x --sticky --callout "hi"    # a bubble that waits to be clicked
+pnpm smoke --name x --fresh-profile            # wipe the harness profile for a clean first run
 ```
 
 `--place x,feetY` drives the same path a real drop ends at — the same clamping and the same
@@ -117,6 +120,23 @@ geometry to drift.
 Every run *without* `--callout` — which is every standard evidence run, including
 `m2-pet-over-dark` — still checks the complete ring, so the unqualified transparency claim is still
 made and still measured at 100%.
+
+### The harness has its own profile
+
+Runs launch with `--user-data-dir` pointing at `docs/demo/tmp/profile`, for two reasons that both cost
+real time before it existed:
+
+- The single-instance lock lives in `userData`, so a packaged pet running on the same machine made
+  every smoke run **exit instantly and silently** — the child lost the lock, and because the wait
+  timeout was `unref`'d there was nothing left to keep node alive, so it printed the banner and exited
+  0. A run that did nothing looked like a run that passed. A child exit now rejects the pending waits
+  with exit code 2 and names the likely cause.
+- Evidence was being shaped by leftover manual state. One screenshot came out at `small` because a
+  menu click hours earlier had persisted, and a broadcast test consumed the very message id it was
+  meant to demonstrate.
+
+The profile persists between runs, because some checks are *about* persistence — drag the pet, restart,
+is it still there. `--fresh-profile` wipes it.
 
 ## Known heuristics and limits
 

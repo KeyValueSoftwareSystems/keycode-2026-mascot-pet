@@ -74,11 +74,22 @@ Giving every state its own `@keyframes` makes every state change a restart for f
 flips a nonce between them. Keeping the nonce in main keeps *"should this replay"* — which is
 behaviour — out of the view.
 
-### The URL the renderer never sees
+### The URL the renderer never sees, and the click it does not interpret
 
-A clickable bubble reports `clickable: true` and calls `openCalloutUrl()`. Main looks up the URL it
+A clickable bubble reports `clickable: true` and calls `bubbleClicked()`. Main looks up the URL it
 already validated and re-validates it at the moment of use. A renderer that cannot name a URL cannot
 be talked into opening a bad one.
+
+The renderer reports the click; it does not decide what one *means*. Main opens the link if there is
+one and dismisses the callout either way. This used to be gated in the view — it only reported the
+click when `data-clickable` was set — which was exactly the kind of behavioural `if` the seam exists
+to keep out. Now the view reports an event and main owns the policy.
+
+**A broadcast notification with no `durationMs` never expires.** It waits to be clicked, because a
+message sent to everybody is worth acknowledging and a six-second bubble is one you can miss by
+looking away. `sticky` in the arbiter means an expiry of `Infinity`, so the host schedules no timer at
+all for it — and the bubble renders a small × so that the one gesture which clears it is visible.
+Stickiness stops the clock, not the arbiter: a higher-priority callout still displaces it.
 
 ---
 

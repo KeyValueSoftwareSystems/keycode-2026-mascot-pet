@@ -31,7 +31,7 @@ export type HarnessCommand =
   | { cmd: 'capture-window'; path: string; window: 'pet' | 'backdrop' }
   | { cmd: 'set-state'; state: string }
   /** Show a callout, so the bubble and the emoji font can be screenshotted. */
-  | { cmd: 'show-callout'; text: string; tone?: string; priority?: string; toast?: boolean }
+  | { cmd: 'show-callout'; text: string; tone?: string; priority?: string; toast?: boolean; sticky?: boolean }
   /**
    * Place the pet, as a drag would.
    *
@@ -50,7 +50,7 @@ export interface HarnessTargets {
   /** Pin the pet to one animation state. Provided from M3 onward. */
   setForcedState?: (state: string) => void
   /** Show a callout. Provided from M5 onward. */
-  showCallout?: (request: { text: string; tone?: string; priority?: string; toast?: boolean }) => void
+  showCallout?: (request: { text: string; tone?: string; priority?: string; toast?: boolean; sticky?: boolean }) => void
   /**
    * The sprite's screen rect *right now*.
    *
@@ -145,6 +145,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           ...(command.tone === undefined ? {} : { tone: command.tone }),
           ...(command.priority === undefined ? {} : { priority: command.priority }),
           ...(command.toast === undefined ? {} : { toast: command.toast }),
+          ...(command.sticky === undefined ? {} : { sticky: command.sticky }),
         })
         return
       }
