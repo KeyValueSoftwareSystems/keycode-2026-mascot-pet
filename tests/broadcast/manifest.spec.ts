@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { safeUrl } from '../../apps/desktop/src/broadcast/url-guard.js'
 import {
   parseManifest,
   parseNotification,
@@ -506,5 +509,27 @@ describe('poll scheduling', () => {
     expect(resolveManifestUrl({ KEYCODE_PET_MANIFEST_URL: '' }, 'https://fallback')).toBe(
       'https://fallback',
     )
+  })
+
+  it('ships a default manifest URL that a packaged build can actually fetch', () => {
+    // The shipped default lives in app-shell.ts, which imports electron and so cannot be imported
+    // here — read the source instead, the same way tests/renderer/discipline.spec.ts does.
+    //
+    // Worth locking: a loopback or http:// default is refused outright by a packaged build, because
+    // `allowLoopbackHttp` requires `!app.isPackaged`. Nothing would crash and no test would fail —
+    // every install would just silently never receive an announcement, which is the failure mode
+    // that takes a week to notice.
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../../apps/desktop/src/main/app-shell.ts'),
+      'utf8',
+    )
+    const match = source.match(/resolveManifestUrl\(\s*process\.env,\s*'([^']+)'/)
+    expect(match, 'could not find the resolveManifestUrl fallback in app-shell.ts').not.toBeNull()
+
+    const fallback = match![1]!
+    expect(fallback).toMatch(/^https:\/\//)
+    expect(fallback).not.toMatch(/127\.0\.0\.1|localhost|\[::1\]/)
+    // And the guard the client applies at runtime must accept it with no dev flags set.
+    expect(safeUrl(fallback)).not.toBeNull()
   })
 })

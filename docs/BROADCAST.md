@@ -10,36 +10,58 @@ serves a file.
 
 ## Where it lives
 
-**Not decided yet.** The default is the local dev server, because no host has been chosen:
-
 ```
-http://127.0.0.1:8787/manifest.json
+https://demos.doylefermi.freeddns.org/keycode/manifest.json
 ```
 
-Switching to a real host is one environment variable — no rebuild:
+A static file on plain nginx. That is the whole hosting decision: **a client that only needs HTTPS
+and an ETag needs no application, no auth to administer, and no separate service** — publishing is
+`scp`, and nginx already serves `Content-Type: application/json`, an `ETag` and `Last-Modified`.
+
+Verified end to end against this host, not against loopback: a message published here appeared in
+the pet with no flags set, and a restart against the same file showed nothing — see
+`docs/demo/m6-broadcast-live-host.window.png`.
+
+> ⚠ **This host has no auth.** The manifest is world-readable to anyone who has or guesses the URL.
+> That does not weaken the client — the client treats the file as hostile either way — but it does
+> mean the warning at the top of this document is load-bearing rather than theoretical.
+
+`manifest/manifest.json` in this repo is the reviewed source of truth; the host serves a copy of it.
+Overriding the URL is one environment variable, no rebuild:
 
 ```bash
 KEYCODE_PET_MANIFEST_URL=https://your-host/keycode-pet/manifest.json
 ```
 
-`manifest/manifest.json` in this repo is the reviewed source of truth. Whatever host is chosen
-should serve that file's contents.
-
-Candidate hosts, with the trade-offs that actually matter:
+If the host ever moves, these were the alternatives considered:
 
 | Host | Works today | Notes |
 |---|---|---|
-| A **public** GitHub repo, raw URL | yes | Serves 200 directly with a strong ETag and ~5min CDN TTL, which lines up with the poll interval. **A private repo's raw URL 404s without a short-lived token, so it cannot be a baked-in default.** |
+| A **public** GitHub repo, raw URL | yes | Strong ETag and ~5min CDN TTL, which lines up with the poll interval. **A private repo's raw URL 404s without a short-lived token, so it cannot be a baked-in default.** |
 | GitHub Pages | yes | Lets a custom domain land later |
-| Cloudflare R2 / S3 + CloudFront | yes | Real cache-control, the right end state for an internal tool |
+| Cloudflare R2 / S3 + CloudFront | yes | Real cache-control, the right end state if this outgrows one box |
 | Public Gist raw | yes | Zero setup, but 302s — which the poller handles, having been built to re-validate every hop |
 
 A CDN TTL means "within one poll interval" can in the worst case be closer to two. That is a
-property of the host, not a bug in the client.
+property of the host, not a bug in the client. The current host has no CDN in front of it, so a
+publish is visible on the next poll.
 
 ## Publishing a message
 
-Add an entry to `notifications` and publish the file.
+Add an entry to `notifications`, then:
+
+```bash
+pnpm manifest:check      # validate and report what clients will show — uploads nothing
+pnpm manifest:publish    # validate, upload, then verify what the host actually serves
+```
+
+`manifest:publish` runs **the client's own parser** over the file before it can become reachable, and
+exits non-zero rather than uploading if it fails. That is not ceremony: per-entry parsing means one
+bad notification only costs itself, but a bad *envelope* means every client ignores the whole file,
+so the one mistake that silences every announcement for everyone is the one worth catching locally.
+
+It also reports which entries are live, scheduled, expired or dropped — none of which is obvious from
+reading the JSON, since `expiresAt` in the past is the normal resting state rather than a mistake.
 
 ```jsonc
 {
@@ -116,7 +138,10 @@ failing.
 Verified by running all nine cases against the dev server's fault injection: in every one the pet
 kept animating normally and no callout appeared.
 
-## Testing without a host
+## Testing locally, and the fault modes
+
+The real host serves a static file, so there is nothing there to make fail on purpose. The dev server
+exists for that: it injects the nine failure modes the client has to survive.
 
 ```bash
 pnpm manifest:serve                                  # serves manifest/manifest.json on :8787

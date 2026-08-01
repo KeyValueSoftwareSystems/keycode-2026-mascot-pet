@@ -209,11 +209,17 @@ export async function startApp(): Promise<AppShell> {
 
   // ---- Broadcast.
   //
-  // The default URL is the local dev server, because no host has been chosen yet. Switching to a real
-  // one is a single env var; see docs/BROADCAST.md.
+  // Static file on plain nginx: no application to run, no auth to administer, and a shipped build
+  // needs nothing but HTTPS and an ETag, both of which come for free. Publishing is `scp`.
+  //
+  // The manifest is world-readable — the host has no auth — so nothing goes in it that would not be
+  // fine on a public URL. See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
   let updates: UpdateService | null = null
 
-  const manifestUrl = resolveManifestUrl(process.env, 'http://127.0.0.1:8787/manifest.json')
+  const manifestUrl = resolveManifestUrl(
+    process.env,
+    'https://demos.doylefermi.freeddns.org/keycode/manifest.json',
+  )
 
   // TWO independent conditions. `app.isPackaged` is not env-overridable, so a shipped build cannot be
   // talked into accepting loopback HTTP even by someone who sets the flag.

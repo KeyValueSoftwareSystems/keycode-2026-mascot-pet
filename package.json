@@ -26,6 +26,8 @@
     "smoke": "pnpm build && node scripts/smoke.mjs",
     "smoke:states": "pnpm build && node scripts/smoke.mjs --all-states",
     "manifest:serve": "node scripts/dev-manifest-server.mjs",
+    "manifest:publish": "pnpm build && node scripts/publish-manifest.mjs",
+    "manifest:check": "pnpm build && node scripts/publish-manifest.mjs --dry-run",
     "package": "pnpm build && electron-builder --mac --config electron-builder.config.cjs",
     "icons": "node scripts/generate-icons.mjs",
     "package:linux-ci-only": "pnpm build && electron-builder --linux --config electron-builder.config.cjs",

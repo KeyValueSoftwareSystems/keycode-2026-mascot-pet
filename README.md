@@ -32,9 +32,29 @@ To watch it over a dark backdrop, which is how you see transparency problems:
 KEYCODE_PET_BACKDROP=1 pnpm dev
 ```
 
-### Broadcast messages, locally
+### Broadcast messages
 
-No manifest host has been chosen yet, so the default points at a local server:
+Every install polls one static JSON file over HTTPS:
+
+```
+https://demos.doylefermi.freeddns.org/keycode/manifest.json
+```
+
+To say something to everyone, edit `manifest/manifest.json` and publish it:
+
+```bash
+pnpm manifest:check      # validate with the client's own parser, report what will be shown
+pnpm manifest:publish    # validate, upload, then verify what the host actually serves
+```
+
+`manifest:publish` refuses to upload a file the client would reject, because a malformed envelope
+silences every announcement for every install. It also prints which entries are live, scheduled or
+expired, since that is not obvious from reading the JSON.
+
+**The host has no auth — the manifest is world-readable.** Nothing goes in it that would not be fine
+on a public page.
+
+To test against a local server instead, with fault injection:
 
 ```bash
 pnpm manifest:serve      # serves manifest/manifest.json on 127.0.0.1:8787
@@ -46,8 +66,7 @@ KEYCODE_PET_POLL_MINUTES=1 \
 pnpm dev
 ```
 
-Edit `manifest/manifest.json` and the running pet picks it up on its next poll. See
-[docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the fault-injection modes.
+See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the fault-injection modes.
 
 ---
 
@@ -66,6 +85,8 @@ Edit `manifest/manifest.json` and the running pet picks it up on its next poll. 
 | `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — see below |
 | `pnpm icons` | Regenerate app icons from the art (macOS only, output committed) |
 | `pnpm manifest:serve` | Local broadcast manifest server with fault injection |
+| `pnpm manifest:check` | Validate `manifest/manifest.json` and report what clients will show |
+| `pnpm manifest:publish` | Validate, upload to the host, verify what is served |
 
 `pnpm package` is deliberately restricted to `--mac`. Building `deb`/`rpm` on an Apple Silicon host
 produces broken packages, so Windows and Linux artifacts come from the CI matrix
@@ -140,13 +161,16 @@ Runtime dependencies: **`zod`**. That is the whole list.
 
 ## Status
 
-All nine milestones are built, tagged `v0.0.0`–`v0.8.0`. 335 tests pass; typecheck is clean.
+All nine milestones are built, tagged `v0.0.0`–`v0.8.0`. 339 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.
 
-**Not verified:** all Windows behaviour, all Linux behaviour, and the broadcast reaching real clients
-over the internet (proven against loopback instead). One reproducible macOS oddity is also open:
+**Broadcast is verified against the real host**, over the internet, with no flags: a published
+message appeared once and a restart against the same file showed nothing.
+
+**Not verified:** all Windows behaviour and all Linux behaviour. One reproducible macOS oddity is
+also open:
 launching from `/Applications` on the development machine does not start the main script, while the
 identical bundle works from `~/Applications` including quarantined. Details and the full untested list
 are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
