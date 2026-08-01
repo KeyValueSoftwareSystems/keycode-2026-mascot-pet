@@ -99,6 +99,7 @@ Grouped by whether the brief was **wrong**, **silent**, or simply **improved on*
 | ~~A real broadcast host~~ | **Done.** A static file on an existing nginx box, `https://demos.doylefermi.freeddns.org/keycode/manifest.json`. A client that needs only HTTPS and an ETag needs no application and no auth to administer, so this is `scp` rather than a service — see decision #49. |
 | A git remote | None, per the locked decision. The CI workflow is written and committed but has never run. |
 | Windows and Linux verification | Not possible from this machine. See `docs/VERIFICATION.md`. |
+| Developer ID signing and notarization | Not done — no certificate. This is what makes macOS refuse to open the app from an Applications folder, and it is the whole content of the `/Applications` failure originally logged as unexplained. Isolated to Gatekeeper by running a byte-identical `ditto` copy from three paths: build output runs, a scratch directory runs, an Applications folder is blocked. A human approves it once, or a certificate removes the step. |
 | `stretch` animation art | Aliased to `jumping`. The trigger path is complete and testable. |
 | `drink` animation art | Row 6 reclaimed; plays the idle frames until drawn. The reminder path is complete. |
 | Keycode-branded art | Ships on the `pixel-coder` placeholder. `docs/ASSETS.md` documents the zero-code-change swap. |

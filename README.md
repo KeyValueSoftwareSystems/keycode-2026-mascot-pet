@@ -211,8 +211,11 @@ watching the pet render over another application with a transparent window.
 **Broadcast is verified against the real host**, over the internet, with no flags: a published
 message appeared once and a restart against the same file showed nothing.
 
-**Not verified:** all Windows behaviour and all Linux behaviour. One reproducible macOS oddity is
-also open:
-launching from `/Applications` on the development machine does not start the main script, while the
-identical bundle works from `~/Applications` including quarantined. Details and the full untested list
+**Not verified:** all Windows behaviour and all Linux behaviour. Details and the full untested list
 are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+**macOS will refuse to open this app until you allow it once.** It is ad-hoc signed — no Developer ID,
+no notarization — so Gatekeeper shows *"Keycode Pet" Not Opened*. Right-click the app → **Open**, or
+System Settings › Privacy & Security › **Open Anyway**. This was originally logged as an unexplained
+`/Applications` launch failure; it is Gatekeeper, and it reproduces with a byte-identical bundle from
+any Applications folder while the same bundle runs fine from anywhere else.
