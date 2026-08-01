@@ -64,7 +64,13 @@ if (parsed === null) {
 
 // ---- Report what clients will do with it.
 const now = Date.now()
-const live = selectDue(parsed.notifications, now)
+// The empty set is "a fresh install has seen nothing", which is the right question here: this reports
+// what the manifest *offers*, not what any particular machine has already been shown.
+//
+// Omitting it threw `Cannot read properties of undefined (reading 'has')` — and only the first time a
+// notification was actually live, because until then the date filter short-circuited before `seen` was
+// ever touched. A latent crash in the tool, hidden by the tool never having a live entry to report.
+const live = selectDue(parsed.notifications, now, new Set())
 const liveIds = new Set(live.map((n) => n.id))
 
 console.log(`manifest: ${MANIFEST}`)

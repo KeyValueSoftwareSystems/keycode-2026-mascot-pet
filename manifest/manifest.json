@@ -2,6 +2,16 @@
   "version": 1,
   "notifications": [
     {
+      "id": "hello-from-the-team-2026-08-02-b",
+      "text": "Hello from the Keycode team 👋 Broadcast is live — this reached you from the manifest.",
+      "tone": "success",
+      "priority": "high",
+      "animation": "waving",
+      "durationMs": 12000,
+      "startsAt": "2026-08-01T00:00:00Z",
+      "expiresAt": "2026-08-09T00:00:00Z"
+    },
+    {
       "id": "example-expired",
       "text": "This example is already expired, so a fresh clone shows nothing. Edit this file to broadcast.",
       "tone": "info",
