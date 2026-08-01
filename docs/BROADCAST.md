@@ -102,6 +102,28 @@ Consequences:
 - Clients remember the most recent 500 ids, FIFO. A message older than 500 announcements *could*
   reappear on a long-lived install; in practice that is years away.
 
+### The `release` block is omitted on purpose
+
+`release` is optional, and the published manifest has none. There is no release page to point at yet,
+and a release block is the one entry that **dedupes per version rather than per install** — a wrong
+one re-announces to everybody on every fresh install, not once.
+
+That is not hypothetical: the example block declared `0.6.0` while `package.json` said `0.0.0`, so the
+moment the host became real, every install was handed a clickable "update available" bubble pointing
+at `example.invalid` — a domain reserved by RFC 2606 to never resolve. `pnpm manifest:publish` now
+refuses to upload a release announcement whose `notesUrl` is a placeholder.
+
+To announce a real release, add it back and keep `latestVersion` equal to the version actually
+downloadable from `notesUrl`:
+
+```jsonc
+"release": {
+  "latestVersion": "1.2.0",
+  "notesUrl": "https://real-host/keycode-pet/releases",
+  "mandatory": false
+}
+```
+
 ## Every limit, with its number
 
 The manifest is remote input rendered into a window that floats above everything on someone's

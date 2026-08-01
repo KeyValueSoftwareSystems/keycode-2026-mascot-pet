@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createRequire } from 'node:module'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
@@ -73,6 +73,22 @@ describe('files filter', () => {
   it('ships no source maps or TypeScript', () => {
     expect(globs).toContain('!**/*.map')
     expect(globs).toContain('!**/*.ts')
+  })
+
+  it('keeps the root and app versions in step, and off the 0.0.0 placeholder', () => {
+    // `app.getVersion()` reads this, and the update check compares the manifest's `latestVersion`
+    // against it. While it sat at the 0.0.0 placeholder, a manifest declaring 0.6.0 handed every
+    // install a clickable "update available" bubble pointing at a domain reserved to never resolve.
+    // Nothing crashed and no other test failed — the announcement was simply wrong for everybody.
+    const root = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')) as {
+      version?: string
+    }
+    const app = JSON.parse(readFileSync(resolve(REPO, 'apps/desktop/package.json'), 'utf8')) as {
+      version?: string
+    }
+    expect(root.version).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(root.version).not.toBe('0.0.0')
+    expect(app.version, 'apps/desktop/package.json drifted from the root version').toBe(root.version)
   })
 
   it('references neither reference/, docs/, scripts/ nor tests/', () => {

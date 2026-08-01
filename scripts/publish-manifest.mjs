@@ -91,6 +91,33 @@ for (const n of parsed.notifications) {
 
 if (parsed.release) {
   console.log(`  release: ${parsed.release.latestVersion}${parsed.release.mandatory ? ' (mandatory)' : ''}`)
+
+  // Guard against the mistake this file already shipped once: the example block declared 0.6.0
+  // while package.json said 0.0.0, so making the host real handed every install a clickable
+  // "update available" bubble pointing at example.invalid — a domain reserved to never resolve.
+  //
+  // An update announcement is the one manifest entry that is *not* deduped per install: it dedupes
+  // per version, so a wrong one re-announces to everybody on every fresh install rather than once.
+  const { isNewer } = await import(
+    `file://${join(ROOT, 'apps', 'desktop', 'dist', 'updates', 'version-compare.js')}`
+  )
+  const appVersion = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
+
+  if (isNewer(parsed.release.latestVersion, appVersion)) {
+    console.log(
+      `      ⚠ this ANNOUNCES AN UPDATE to every install (${appVersion} → ${parsed.release.latestVersion}).`,
+    )
+    if (/\.invalid\b|example\.com|localhost/.test(parsed.release.notesUrl)) {
+      fail(
+        `the release block announces ${parsed.release.latestVersion} but notesUrl is a placeholder:\n` +
+          `    ${parsed.release.notesUrl}\n` +
+          '  Every install would show a clickable update bubble that goes nowhere.\n' +
+          '  Point notesUrl at a real page, or remove the `release` block — it is optional.',
+      )
+    }
+  } else {
+    console.log(`      · not newer than this build (${appVersion}) — no update will be announced`)
+  }
 }
 
 if (live.length === 0) {

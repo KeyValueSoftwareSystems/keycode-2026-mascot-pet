@@ -145,6 +145,29 @@ Runtime dependencies: **`zod`**. That is the whole list.
 
 ---
 
+## Commits, tags and versions
+
+The build used one convention and then drifted out of it, so it is written down here.
+
+**Commits** are [Conventional Commits](https://www.conventionalcommits.org/) with a scope naming the
+directory the change lives in — `feat(motion):`, `fix(broadcast):`, `build(package):`, `docs:` — and a
+lowercase subject in the imperative. Scopes in use: `harness`, `infra`, `settings`, `sprite`, `window`,
+`motion`, `menu`, `reminders`, `callouts`, `broadcast`, `updates`, `package`.
+
+**Tags** are annotated, never lightweight, so `git tag -n1` reads as a changelog. `v0.0.0`–`v0.8.0`
+mark the nine build milestones; `v1.0.0` marks all of them green. From `v1.1.0` they are releases.
+
+**The version in `package.json` matches the tag at that commit** — both files, they are kept in step.
+This is not cosmetic: `app.getVersion()` reads it, and the update check compares the manifest's
+`latestVersion` against it. A stale `0.0.0` is what made every install think a phantom `0.6.0` was
+available.
+
+> Known artefact: `v0.8.0` is an *ancestor* of `v0.7.0`. M8 (the update check) was built before M7
+> (packaging), because packaging last means packaging everything. The tags name milestones, not a
+> release sequence, and rewriting them to look ordered would misreport when the work actually landed.
+
+---
+
 ## Documentation
 
 | | |
@@ -161,7 +184,8 @@ Runtime dependencies: **`zod`**. That is the whole list.
 
 ## Status
 
-All nine milestones are built, tagged `v0.0.0`–`v0.8.0`. 339 tests pass; typecheck is clean.
+All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
+releases from `v1.1.0`. 340 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.
