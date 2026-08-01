@@ -47,6 +47,22 @@ export const WATER_INTERVAL_MS = 45 * 60_000
 export const STRETCH_INTERVAL_MS = 60 * 60_000
 
 /**
+ * Intervals offered in the menu, in minutes.
+ *
+ * 5 is here for testing as much as for use: without it, checking that reminders work at all means
+ * waiting 45 minutes or hand-editing the settings file, which is how they had to be tested before.
+ */
+export const REMINDER_MINUTE_CHOICES = [5, 15, 30, 45, 60, 90] as const
+
+/** Bounds for any interval arriving from outside — the menu, or a manifest default. */
+export const REMINDER_MINUTES_MIN = 1
+export const REMINDER_MINUTES_MAX = 24 * 60
+
+export function clampReminderMinutes(minutes: number): number {
+  return Math.min(REMINDER_MINUTES_MAX, Math.max(REMINDER_MINUTES_MIN, Math.round(minutes)))
+}
+
+/**
  * How often deadlines are checked. Not the reminder interval — see reminder-scheduler.ts for why
  * durations are wall-clock deadlines rather than timers.
  */

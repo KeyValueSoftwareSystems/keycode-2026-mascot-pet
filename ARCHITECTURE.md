@@ -294,6 +294,12 @@ machine, so it is treated as hostile end to end:
   script injection but not spoofing: those characters are inert and reorder everything after them, so
   the visible text can differ from what the manifest says. U+200D and U+FE0F are kept, because
   stripping them breaks emoji.
+- **Defaults, never overrides.** The `defaults` block may suggest reminder intervals, and applies only
+  where the settings file says `null` — "never chosen here". It carries no `enabled` field, because
+  that would let remote text switch a reminder back on after someone turned it off. Defaults are kept
+  in memory and never written to disk, so nothing remote outlives the process that received it.
+  Adding the block to a published manifest breaks every client older than v1.4.0 outright — the strict
+  envelope rejects the whole file on an unknown key — which is why publishing it needs an explicit flag.
 - **Failure is silent.** Every error path is one log line: no dialog, no bubble, no interruption. The
   single exception is a user-initiated "Check for updates…", where silence would read as a broken menu.
 

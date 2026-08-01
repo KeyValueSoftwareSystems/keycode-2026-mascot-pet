@@ -13,6 +13,7 @@ import {
   type ReminderKind,
 } from '../reminders/reminder-scheduler.js'
 import { REMINDER_TICK_MS } from '../config/constants.js'
+import { REMINDER_INTERVALS } from '../reminders/reminder-scheduler.js'
 import type { SettingsStore } from './settings-store.js'
 
 export interface ReminderService {
@@ -28,6 +29,10 @@ export interface ReminderServiceOptions {
   onFire: (kind: ReminderKind, message: string) => void
   now?: () => number
   log?: (message: string, meta?: unknown) => void
+}
+
+function minutesToMs(minutes: number | null | undefined): number | null {
+  return minutes === null || minutes === undefined ? null : minutes * 60_000
 }
 
 export function createReminderService(options: ReminderServiceOptions): ReminderService {
@@ -48,6 +53,12 @@ export function createReminderService(options: ReminderServiceOptions): Reminder
       deadlines: current.reminders
         ? { water: current.reminders.waterNextDueAt, stretch: current.reminders.stretchNextDueAt }
         : { water: null, stretch: null },
+      intervals: {
+        // null means "never chosen", so the built-in interval applies — and the install stays
+        // eligible for a team default from the manifest.
+        water: minutesToMs(current.reminders?.waterMinutes) ?? REMINDER_INTERVALS.water,
+        stretch: minutesToMs(current.reminders?.stretchMinutes) ?? REMINDER_INTERVALS.stretch,
+      },
     })
 
     // Gate the write on `changed`. The tick runs 5,760 times a day; marking settings dirty every
@@ -55,6 +66,9 @@ export function createReminderService(options: ReminderServiceOptions): Reminder
     if (result.changed) {
       settings.patch({
         reminders: {
+          // Spread first: `reminders` is a whole object in the schema, so writing only the two
+          // deadlines would erase the chosen intervals every 15 seconds.
+          ...current.reminders,
           waterNextDueAt: result.deadlines.water,
           stretchNextDueAt: result.deadlines.stretch,
         },

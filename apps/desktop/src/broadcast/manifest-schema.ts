@@ -66,12 +66,40 @@ export const releaseSchema = z.strictObject({
   mandatory: z.boolean().default(false),
 })
 
+/**
+ * Team-wide *defaults*, never overrides.
+ *
+ * These apply only where the user has never made the choice locally, which is what `null` means in
+ * the settings file. Remote text must not be able to switch someone's reminders back on after they
+ * turned them off, or change a setting they deliberately picked — that turns an untrusted file into
+ * remote control of a machine.
+ *
+ * Deliberately intervals only. `petSize` was considered and left out: it is a cosmetic personal
+ * preference, so a team default for it has no reason to exist, and supporting one would mean adding a
+ * "never chosen" state to `petSize` purely to enable it.
+ *
+ * ⚠ **Adding this block to a published manifest breaks every client older than v1.4.0.** The envelope
+ * is strict, so an older build rejects the whole file on an unknown top-level key and silently shows
+ * nothing at all — not just the defaults. `pnpm manifest:publish` refuses to upload a manifest
+ * containing `defaults` without an explicit flag for exactly this reason.
+ */
+export const defaultsSchema = z.strictObject({
+  waterMinutes: z.number().int().min(1).max(1_440).optional(),
+  stretchMinutes: z.number().int().min(1).max(1_440).optional(),
+})
+
 export const envelopeSchema = z.strictObject({
   version: z.literal(1),
   // `unknown` so each element is parsed on its own — see the module comment.
   notifications: z.array(z.unknown()).max(256).default([]),
   release: releaseSchema.optional(),
+  defaults: defaultsSchema.optional(),
 })
+
+export interface SafeDefaults {
+  waterMinutes: number | null
+  stretchMinutes: number | null
+}
 
 export interface SafeNotification {
   id: string
@@ -96,6 +124,8 @@ export interface SafeRelease {
 export interface ParsedManifest {
   notifications: SafeNotification[]
   release: SafeRelease | null
+  /** Team defaults, or null when the manifest carries none. */
+  defaults: SafeDefaults | null
   /** Entries rejected individually, with reasons, so a bad manifest is diagnosable. */
   dropped: Array<{ index: number; reason: string }>
 }
@@ -217,7 +247,14 @@ export function parseManifest(body: string): ParsedManifest | null {
     }
   }
 
-  return { notifications, release, dropped }
+  const defaults: SafeDefaults | null = envelope.data.defaults
+    ? {
+        waterMinutes: envelope.data.defaults.waterMinutes ?? null,
+        stretchMinutes: envelope.data.defaults.stretchMinutes ?? null,
+      }
+    : null
+
+  return { notifications, release, defaults, dropped }
 }
 
 /**

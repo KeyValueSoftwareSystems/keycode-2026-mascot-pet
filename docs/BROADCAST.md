@@ -124,6 +124,40 @@ downloadable from `notesUrl`:
 }
 ```
 
+## Team defaults (`defaults`)
+
+Optional, and **applied only where the user never made that choice locally**:
+
+```jsonc
+"defaults": {
+  "waterMinutes": 30,
+  "stretchMinutes": 60
+}
+```
+
+The settings file stores a chosen interval as `null` until someone picks one, and that null is what a
+default fills in. Somebody who chose 15 minutes keeps 15; somebody who turned a reminder off stays
+off. The menu marks a default-provided interval as `(default)` rather than hiding it, so nobody has to
+guess why their reminder is every 30 minutes.
+
+**There is no way to force a reminder on.** Defaults may suggest *how often*, never *whether* — an
+`enabled` field here would let remote text switch a reminder back on after someone deliberately turned
+it off, which is remote control of a machine rather than a shared default. The schema rejects it.
+
+Defaults are held **in memory only** and never written to disk. Nothing the manifest says outlives the
+process that received it, so there is no stale remote policy after a restart. The built-in intervals
+apply for the second between launch and the first poll, which does not matter for a 45-minute reminder.
+
+`petSize` is deliberately *not* a default. It is a cosmetic personal preference, so a team default for
+it has no reason to exist, and supporting one would mean adding a "never chosen" state to `petSize`
+purely to enable it.
+
+> ⛔ **Publishing `defaults` breaks every client older than v1.4.0.** The envelope is strict, so an
+> older build rejects the *whole file* on an unknown top-level key — it does not ignore `defaults`, it
+> ignores every announcement in the manifest, silently. `pnpm manifest:publish` refuses to upload a
+> manifest containing `defaults` unless you pass `--allow-defaults`, so this cannot happen by accident.
+> Publish it only once everyone has updated.
+
 ## Every limit, with its number
 
 The manifest is remote input rendered into a window that floats above everything on someone's

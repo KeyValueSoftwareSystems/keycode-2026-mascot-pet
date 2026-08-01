@@ -22,7 +22,13 @@ import {
   POLL,
 } from '../config/constants.js'
 import { getCapped, type CappedFetch, type FetchDeps, type HttpResult } from './http-capped.js'
-import { parseManifest, selectDue, type SafeNotification, type SafeRelease } from './manifest-schema.js'
+import {
+  parseManifest,
+  selectDue,
+  type SafeDefaults,
+  type SafeNotification,
+  type SafeRelease,
+} from './manifest-schema.js'
 
 export type PollReason = 'launch' | 'timer' | 'user' | 'resume'
 
@@ -47,6 +53,8 @@ export interface PollerDeps {
   markSeen: (id: string) => Promise<void> | void
   onNotifications: (notifications: SafeNotification[]) => void
   onRelease: (release: SafeRelease | null) => void
+  /** Team defaults from the manifest, or null when it carries none. */
+  onDefaults?: (defaults: SafeDefaults | null) => void
   allowLoopbackHttp: boolean
   userAgent?: string
   log?: (message: string, meta?: unknown) => void
@@ -174,6 +182,7 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
       }
 
       deps.onRelease(parsed.release)
+      deps.onDefaults?.(parsed.defaults)
 
       const seen = new Set(deps.getSeenIds())
       const due = selectDue(parsed.notifications, now(), seen)

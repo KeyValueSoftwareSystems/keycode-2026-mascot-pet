@@ -7,6 +7,7 @@ import {
   parseNotification,
   selectDue,
   FALLBACK_ANIMATION,
+  defaultsSchema,
 } from '../../apps/desktop/src/broadcast/manifest-schema.js'
 import {
   createPoller,
@@ -531,5 +532,40 @@ describe('poll scheduling', () => {
     expect(fallback).not.toMatch(/127\.0\.0\.1|localhost|\[::1\]/)
     // And the guard the client applies at runtime must accept it with no dev flags set.
     expect(safeUrl(fallback)).not.toBeNull()
+  })
+})
+
+describe('manifest team defaults', () => {
+  const wrap = (defaults: unknown) =>
+    parseManifest(JSON.stringify({ version: 1, notifications: [], defaults }))
+
+  it('parses intervals when present', () => {
+    const parsed = wrap({ waterMinutes: 30, stretchMinutes: 90 })
+    expect(parsed?.defaults).toEqual({ waterMinutes: 30, stretchMinutes: 90 })
+  })
+
+  it('is null when the manifest carries none, so nothing is implied', () => {
+    expect(parseManifest(JSON.stringify({ version: 1, notifications: [] }))?.defaults).toBeNull()
+  })
+
+  it('allows either interval on its own', () => {
+    expect(wrap({ waterMinutes: 20 })?.defaults).toEqual({ waterMinutes: 20, stretchMinutes: null })
+  })
+
+  it('rejects the whole envelope for an out-of-range or unknown default', () => {
+    // Strict, like the rest of the envelope: a default that silently clamped would be a policy
+    // nobody chose, and a typo'd key that was ignored would look like it had applied.
+    expect(wrap({ waterMinutes: 0 })).toBeNull()
+    expect(wrap({ waterMinutes: 100_000 })).toBeNull()
+    expect(wrap({ waterMinutes: 30.5 })).toBeNull()
+    expect(wrap({ waterMinutez: 30 })).toBeNull()
+    expect(wrap({ petSize: 'small' })).toBeNull()
+  })
+
+  it('carries no way to force a reminder on', () => {
+    // The trust boundary: defaults may suggest *how often*, never *whether*. An `enabled` field here
+    // would let remote text switch a reminder back on after someone turned it off.
+    expect(wrap({ waterEnabled: true })).toBeNull()
+    expect(Object.keys(defaultsSchema.shape).sort()).toEqual(['stretchMinutes', 'waterMinutes'])
   })
 })

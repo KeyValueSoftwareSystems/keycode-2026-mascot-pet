@@ -19,7 +19,7 @@
 import { z } from 'zod'
 import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 3 as const
+export const SETTINGS_SCHEMA_VERSION = 4 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -54,6 +54,16 @@ export const settingsSchema = z.strictObject({
     /** Epoch ms deadlines. Wall-clock, not intervals — see reminders/reminder-scheduler.ts. */
     waterNextDueAt: z.number().int().nullable(),
     stretchNextDueAt: z.number().int().nullable(),
+    /**
+     * Chosen intervals in minutes, or **null meaning "never chosen"**.
+     *
+     * Null is load-bearing rather than lazy: it is what lets a manifest-provided team default apply
+     * without ever overriding a choice someone made locally. Storing the built-in default eagerly
+     * would make every install look like it had opted in to 45 minutes, and a team default could then
+     * never reach anybody.
+     */
+    waterMinutes: z.number().int().min(1).max(1_440).nullable(),
+    stretchMinutes: z.number().int().min(1).max(1_440).nullable(),
   }),
 
   /**
@@ -79,7 +89,12 @@ export const DEFAULT_SETTINGS: Settings = {
   stretchReminderEnabled: true,
   petSize: DEFAULT_PET_SIZE,
   position: null,
-  reminders: { waterNextDueAt: null, stretchNextDueAt: null },
+  reminders: {
+    waterNextDueAt: null,
+    stretchNextDueAt: null,
+    waterMinutes: null,
+    stretchMinutes: null,
+  },
   seenBroadcastIds: [],
   lastKnownRelease: null,
 }
@@ -120,6 +135,20 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   // it is what keeps a pet the same size across the upgrade.
   if (out['schemaVersion'] === 2) {
     out = { ...out, schemaVersion: 3, petSize: DEFAULT_PET_SIZE }
+  }
+
+  // v3 → v4: reminder intervals became configurable. Existing installs never chose one, which is
+  // exactly what null means — so they keep the built-in interval and stay eligible for a team default.
+  if (out['schemaVersion'] === 3) {
+    const reminders = out['reminders']
+    out = {
+      ...out,
+      schemaVersion: 4,
+      reminders:
+        reminders && typeof reminders === 'object'
+          ? { ...(reminders as Record<string, unknown>), waterMinutes: null, stretchMinutes: null }
+          : reminders,
+    }
   }
 
   return out

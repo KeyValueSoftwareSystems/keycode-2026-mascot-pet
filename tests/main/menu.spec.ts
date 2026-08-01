@@ -13,6 +13,7 @@ import { DEFAULT_SETTINGS } from '../../apps/desktop/src/main/settings-schema.js
 import {
   PET_SIZES,
   PET_SIZE_SCALES,
+  REMINDER_MINUTE_CHOICES,
   petScaleFor,
 } from '../../apps/desktop/src/config/constants.js'
 
@@ -20,8 +21,8 @@ function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
   return {
     movementEnabled: true,
     petSize: 'large',
-    waterReminderEnabled: true,
-    stretchReminderEnabled: true,
+    water: { enabled: true, minutes: 45, isDefault: true },
+    stretch: { enabled: true, minutes: 60, isDefault: true },
     update: { state: 'idle', latestVersion: null },
     ...overrides,
   }
@@ -31,8 +32,7 @@ function noopActions(): MenuActions {
   return {
     toggleMovement: () => {},
     setPetSize: () => {},
-    toggleWaterReminder: () => {},
-    toggleStretchReminder: () => {},
+    setReminder: () => {},
     resetPosition: () => {},
     checkForUpdates: () => {},
     showAbout: () => {},
@@ -65,19 +65,11 @@ describe('menu template', () => {
     ])
   })
 
-  it('renders the three toggles as checkboxes reflecting the view model', () => {
+  it('renders Movement as a checkbox reflecting the view model', () => {
     const on = buildMenuTemplate(view(), noopActions())
     expect(on[2]).toMatchObject({ type: 'checkbox', checked: true })
-    expect(on[3]).toMatchObject({ type: 'checkbox', checked: true })
-    expect(on[4]).toMatchObject({ type: 'checkbox', checked: true })
-
-    const off = buildMenuTemplate(
-      view({ movementEnabled: false, waterReminderEnabled: false, stretchReminderEnabled: false }),
-      noopActions(),
-    )
+    const off = buildMenuTemplate(view({ movementEnabled: false }), noopActions())
     expect(off[2]).toMatchObject({ checked: false })
-    expect(off[3]).toMatchObject({ checked: false })
-    expect(off[4]).toMatchObject({ checked: false })
   })
 
   it('disables the title so it reads as a header, not an action', () => {
@@ -105,8 +97,8 @@ describe('menu template', () => {
   it('routes every click to its action exactly once', () => {
     const actions = {
       toggleMovement: vi.fn(),
-      toggleWaterReminder: vi.fn(),
-      toggleStretchReminder: vi.fn(),
+      setPetSize: vi.fn(),
+      setReminder: vi.fn(),
       resetPosition: vi.fn(),
       checkForUpdates: vi.fn(),
       showAbout: vi.fn(),
@@ -117,8 +109,6 @@ describe('menu template', () => {
       if (typeof item.click === 'function') (item.click as () => void)()
     }
     expect(actions.toggleMovement).toHaveBeenCalledOnce()
-    expect(actions.toggleWaterReminder).toHaveBeenCalledOnce()
-    expect(actions.toggleStretchReminder).toHaveBeenCalledOnce()
     expect(actions.resetPosition).toHaveBeenCalledOnce()
     expect(actions.checkForUpdates).toHaveBeenCalledOnce()
     expect(actions.showAbout).toHaveBeenCalledOnce()
@@ -202,7 +192,10 @@ const displays = {
   }),
 }
 
+let evaluations = 0
+
 function makeActions(overrides: Partial<Parameters<typeof createActions>[0]> = {}) {
+  evaluations = 0
   const settings = fakeSettings()
   const controller = fakeController()
   const actions = createActions({
@@ -210,12 +203,15 @@ function makeActions(overrides: Partial<Parameters<typeof createActions>[0]> = {
     controller: controller.controller as never,
     displays: displays as never,
     getCursorPoint: () => ({ x: 700, y: 900 }),
+    evaluateReminders: () => {
+      evaluations += 1
+    },
     showAbout: () => {},
     checkForUpdates: () => {},
     quit: () => {},
     ...overrides,
   })
-  return { actions, settings, controller }
+  return { actions, settings, controller, evaluations: () => evaluations }
 }
 
 describe('actions', () => {
@@ -237,15 +233,44 @@ describe('actions', () => {
     expect(settings.patches).toEqual([{ movementEnabled: false }, { movementEnabled: true }])
   })
 
-  it('toggles the two reminders without touching motion', () => {
-    const { actions, settings, controller } = makeActions()
-    actions.toggleWaterReminder()
-    actions.toggleStretchReminder()
+  it('setting a reminder interval enables it, clears the deadline and re-evaluates', () => {
+    const { actions, settings, controller, evaluations } = makeActions()
+    actions.setReminder('water', 5)
+
     expect(settings.patches).toEqual([
-      { waterReminderEnabled: false },
-      { stretchReminderEnabled: false },
+      {
+        waterReminderEnabled: true,
+        reminders: {
+          ...DEFAULT_SETTINGS.reminders,
+          waterMinutes: 5,
+          // Cleared, so the new interval runs from now. Without this, picking "every 5 min" inherits
+          // the deadline computed from the old 45-minute interval and still waits 45.
+          waterNextDueAt: null,
+        },
+      },
     ])
+    // Immediately, not at the next 15s tick.
+    expect(evaluations()).toBe(1)
+    // Reminders are not motion.
     expect(controller.enqueued).toEqual([])
+  })
+
+  it('turning a reminder off keeps the interval the user picked', () => {
+    const { actions, settings } = makeActions()
+    actions.setReminder('stretch', 15)
+    actions.setReminder('stretch', null)
+
+    const last = settings.patches.at(-1)!
+    expect(last.stretchReminderEnabled).toBe(false)
+    // Turning it back on should restore 15, not silently revert to the default — so `off` must not
+    // erase the chosen interval.
+    expect(last.reminders).toMatchObject({ stretchMinutes: 15, stretchNextDueAt: null })
+  })
+
+  it('clamps a nonsense interval rather than storing it', () => {
+    const { actions, settings } = makeActions()
+    actions.setReminder('water', 99_999)
+    expect(settings.patches.at(-1)?.reminders).toMatchObject({ waterMinutes: 1_440 })
   })
 
   it('resets position onto the display under the cursor and persists it', () => {
@@ -326,5 +351,71 @@ describe('pet size menu', () => {
     // Documented as deliberately soft on a 2x display: 0.75 x 2 = 1.5 device pixels per source pixel.
     expect(PET_SIZE_SCALES.medium).toBe(0.75)
     expect(petScaleFor('small')).toBe(PET_SIZE_SCALES.small)
+  })
+})
+
+describe('reminder interval submenus', () => {
+  const submenu = (label: string, v: MenuViewModel = view()) => {
+    const item = buildMenuTemplate(v, noopActions()).find((entry) => entry.label === label)
+    return (item?.submenu ?? []) as Array<{ label?: string; type?: string; checked?: boolean }>
+  }
+
+  it('offers Off plus every declared interval', () => {
+    const items = submenu('Drink water reminder')
+    expect(items[0]).toMatchObject({ label: 'Off', type: 'radio' })
+    expect(items[1]).toMatchObject({ type: 'separator' })
+    // Only the interval currently in force is marked "(default)" — labelling all of them would say
+    // nothing about which one is actually active.
+    const intervals = items.slice(2).map((i) => i.label)
+    expect(intervals).toEqual(
+      REMINDER_MINUTE_CHOICES.map((m) => `Every ${m} min${m === 45 ? ' (default)' : ''}`),
+    )
+  })
+
+  it('ticks Off when the reminder is disabled, and nothing else', () => {
+    const items = submenu(
+      'Drink water reminder',
+      view({ water: { enabled: false, minutes: 45, isDefault: true } }),
+    )
+    expect(items.filter((i) => i.checked)).toHaveLength(1)
+    expect(items.find((i) => i.checked)?.label).toBe('Off')
+  })
+
+  it('ticks the chosen interval and does not label it a default', () => {
+    const items = submenu(
+      'Stretch reminder',
+      view({ stretch: { enabled: true, minutes: 30, isDefault: false } }),
+    )
+    const ticked = items.filter((i) => i.checked)
+    expect(ticked).toHaveLength(1)
+    // No "(default)" suffix: the user picked this, so labelling it a default would be a lie.
+    expect(ticked[0]?.label).toBe('Every 30 min')
+  })
+
+  it('marks a default rather than hiding it', () => {
+    // A team default that looked like a personal choice would be indistinguishable from one, which
+    // makes "why is my reminder every 30 minutes" unanswerable from the UI.
+    const items = submenu(
+      'Stretch reminder',
+      view({ stretch: { enabled: true, minutes: 30, isDefault: true } }),
+    )
+    expect(items.find((i) => i.checked)?.label).toBe('Every 30 min (default)')
+  })
+
+  it('offers a 5-minute interval, which is what makes reminders testable at all', () => {
+    // Without it, verifying reminders means waiting 45 minutes or hand-editing the settings file.
+    expect(REMINDER_MINUTE_CHOICES).toContain(5)
+  })
+
+  it('names the interval it wants instead of reading the item back', () => {
+    const setReminder = vi.fn()
+    const item = buildMenuTemplate(view(), { ...noopActions(), setReminder }).find(
+      (entry) => entry.label === 'Drink water reminder',
+    )
+    const items = item?.submenu as Array<{ label?: string; click?: () => void }>
+    items.find((i) => i.label?.startsWith('Every 15'))?.click?.()
+    items.find((i) => i.label === 'Off')?.click?.()
+    expect(setReminder).toHaveBeenNthCalledWith(1, 'water', 15)
+    expect(setReminder).toHaveBeenNthCalledWith(2, 'water', null)
   })
 })

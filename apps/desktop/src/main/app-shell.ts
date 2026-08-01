@@ -32,7 +32,13 @@ import {
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
 import { openExternalChecked } from './open-external.js'
-import { PRODUCT_NAME, isPetSize, petScaleFor } from '../config/constants.js'
+import {
+  PRODUCT_NAME,
+  STRETCH_INTERVAL_MS,
+  WATER_INTERVAL_MS,
+  isPetSize,
+  petScaleFor,
+} from '../config/constants.js'
 import { floorForWorkArea, placementForScale } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
@@ -241,6 +247,21 @@ export async function startApp(): Promise<AppShell> {
   // fine on a public URL. See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
   let updates: UpdateService | null = null
 
+  /**
+   * Team defaults from the last poll, in memory only.
+   *
+   * Deliberately not persisted: nothing the manifest says gets written to disk, so a bad or hostile
+   * default cannot outlive the process that received it, and there is no stale remote policy to reason
+   * about after a restart. The cost is that the built-in intervals apply for the second or so between
+   * launch and the first poll — irrelevant for a 45-minute reminder.
+   */
+  let manifestDefaults: { waterMinutes: number | null; stretchMinutes: number | null } | null = null
+
+  const effectiveDefaults = (): { waterMinutes: number; stretchMinutes: number } => ({
+    waterMinutes: manifestDefaults?.waterMinutes ?? WATER_INTERVAL_MS / 60_000,
+    stretchMinutes: manifestDefaults?.stretchMinutes ?? STRETCH_INTERVAL_MS / 60_000,
+  })
+
   const manifestUrl = resolveManifestUrl(
     process.env,
     'https://demos.doylefermi.freeddns.org/keycode/manifest.json',
@@ -262,6 +283,21 @@ export async function startApp(): Promise<AppShell> {
       await settings.patchNow({
         seenBroadcastIds: appendSeenId(settings.get().seenBroadcastIds, id),
       })
+    },
+    onDefaults(defaults) {
+      // Defaults only, never overrides: applied through `??` at read time against a local value of
+      // null, which is the settings file's way of saying "never chosen here". A user who picked an
+      // interval keeps it, and one who turned a reminder off stays off.
+      const changed =
+        defaults?.waterMinutes !== manifestDefaults?.waterMinutes ||
+        defaults?.stretchMinutes !== manifestDefaults?.stretchMinutes
+      manifestDefaults = defaults
+      if (changed) {
+        log('team defaults from manifest', { defaults })
+        // A changed default can move a deadline for anyone who never chose an interval.
+        reminders.evaluateNow()
+        menu?.refresh()
+      }
     },
     onNotifications(notifications) {
       for (const entry of notifications) {
@@ -323,8 +359,16 @@ export async function startApp(): Promise<AppShell> {
     return {
       movementEnabled: current.movementEnabled,
       petSize: current.petSize,
-      waterReminderEnabled: current.waterReminderEnabled,
-      stretchReminderEnabled: current.stretchReminderEnabled,
+      water: {
+        enabled: current.waterReminderEnabled,
+        minutes: current.reminders.waterMinutes ?? effectiveDefaults().waterMinutes,
+        isDefault: current.reminders.waterMinutes === null,
+      },
+      stretch: {
+        enabled: current.stretchReminderEnabled,
+        minutes: current.reminders.stretchMinutes ?? effectiveDefaults().stretchMinutes,
+        isDefault: current.reminders.stretchMinutes === null,
+      },
       update: updateState,
     }
   }
@@ -334,6 +378,7 @@ export async function startApp(): Promise<AppShell> {
     controller,
     displays,
     getCursorPoint: () => screen.getCursorScreenPoint(),
+    evaluateReminders: () => reminders.evaluateNow(),
     showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
     checkForUpdates: () => {
       // If an update is already known, the item opens its notes; otherwise it runs a real check.

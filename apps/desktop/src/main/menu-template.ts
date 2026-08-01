@@ -16,27 +16,71 @@
  */
 
 import type { MenuItemConstructorOptions } from 'electron'
-import { PET_SIZES, PRODUCT_NAME, type PetSize } from '../config/constants.js'
+import {
+  PET_SIZES,
+  PRODUCT_NAME,
+  REMINDER_MINUTE_CHOICES,
+  type PetSize,
+} from '../config/constants.js'
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'error'
+
+export interface ReminderView {
+  enabled: boolean
+  /** Effective interval in minutes — the chosen one, or the default in force if none was chosen. */
+  minutes: number
+  /** True when the interval came from a default rather than a local choice. */
+  isDefault: boolean
+}
 
 export interface MenuViewModel {
   movementEnabled: boolean
   petSize: PetSize
-  waterReminderEnabled: boolean
-  stretchReminderEnabled: boolean
+  water: ReminderView
+  stretch: ReminderView
   update: { state: UpdateState; latestVersion: string | null }
 }
 
 export interface MenuActions {
   toggleMovement(): void
   setPetSize(size: PetSize): void
-  toggleWaterReminder(): void
-  toggleStretchReminder(): void
+  /** `minutes: null` means off. Anything else enables the reminder at that interval. */
+  setReminder(kind: 'water' | 'stretch', minutes: number | null): void
   resetPosition(): void
   checkForUpdates(): void
   showAbout(): void
   quit(): void
+}
+
+/**
+ * One reminder's submenu: Off, then every offered interval.
+ *
+ * Off and the intervals are one radio group rather than a checkbox plus a separate interval list,
+ * because "enabled" and "how often" are one decision from the user's side — and because a checkbox
+ * cannot carry a submenu, so the alternative was two menu entries per reminder.
+ */
+function reminderSubmenu(
+  kind: 'water' | 'stretch',
+  view: ReminderView,
+  actions: MenuActions,
+): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: 'Off',
+      type: 'radio',
+      checked: !view.enabled,
+      click: () => actions.setReminder(kind, null),
+    },
+    { type: 'separator' },
+    ...REMINDER_MINUTE_CHOICES.map((minutes) => ({
+      // The default is marked rather than hidden, so a team default is visible as one instead of
+      // looking like something the user picked.
+      label: `Every ${minutes} min${view.isDefault && view.minutes === minutes ? ' (default)' : ''}`,
+      type: 'radio' as const,
+      checked: view.enabled && view.minutes === minutes,
+      click: () => actions.setReminder(kind, minutes),
+    })),
+  ]
 }
 
 /** Title-case a size key for display, so the labels are not a second hand-written list. */
@@ -86,15 +130,11 @@ export function buildMenuTemplate(
     },
     {
       label: 'Drink water reminder',
-      type: 'checkbox',
-      checked: view.waterReminderEnabled,
-      click: () => actions.toggleWaterReminder(),
+      submenu: reminderSubmenu('water', view.water, actions),
     },
     {
       label: 'Stretch reminder',
-      type: 'checkbox',
-      checked: view.stretchReminderEnabled,
-      click: () => actions.toggleStretchReminder(),
+      submenu: reminderSubmenu('stretch', view.stretch, actions),
     },
     {
       label: 'Size',

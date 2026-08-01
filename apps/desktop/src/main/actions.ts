@@ -22,7 +22,7 @@ import type { SettingsStore } from './settings-store.js'
 import type { PetController } from './pet-controller.js'
 import type { DisplayManager } from './display-manager.js'
 import { floorForWorkArea, placementForScale } from './floor-placement.js'
-import { petScaleFor } from '../config/constants.js'
+import { clampReminderMinutes, petScaleFor } from '../config/constants.js'
 import type { MenuActions } from './menu-template.js'
 
 export interface ActionDeps {
@@ -32,6 +32,8 @@ export interface ActionDeps {
   getCursorPoint: () => { x: number; y: number }
   showAbout: () => void
   checkForUpdates: () => void
+  /** Re-evaluate reminders now, so a changed interval takes effect immediately. */
+  evaluateReminders: () => void
   quit: () => void
   log?: (message: string, meta?: unknown) => void
 }
@@ -49,9 +51,7 @@ export function createActions(deps: ActionDeps): MenuActions {
    * Reads the store and writes the inverse — never trusts the menu item's own `checked`, which is a
    * rendering of state and can be stale if a menu rebuild raced a click.
    */
-  const toggle = (
-    key: 'movementEnabled' | 'waterReminderEnabled' | 'stretchReminderEnabled',
-  ): boolean => {
+  const toggle = (key: 'movementEnabled'): boolean => {
     const next = !settings.get()[key]
     settings.patch({ [key]: next })
     return next
@@ -73,12 +73,29 @@ export function createActions(deps: ActionDeps): MenuActions {
       log('pet size changed', { size })
     },
 
-    toggleWaterReminder(): void {
-      log('water reminder toggled', { enabled: toggle('waterReminderEnabled') })
-    },
+    setReminder(kind, minutes): void {
+      const current = settings.get()
+      const enabledKey = kind === 'water' ? 'waterReminderEnabled' : 'stretchReminderEnabled'
+      const minutesKey = kind === 'water' ? 'waterMinutes' : 'stretchMinutes'
+      const deadlineKey = kind === 'water' ? 'waterNextDueAt' : 'stretchNextDueAt'
 
-    toggleStretchReminder(): void {
-      log('stretch reminder toggled', { enabled: toggle('stretchReminderEnabled') })
+      settings.patch({
+        [enabledKey]: minutes !== null,
+        reminders: {
+          ...current.reminders,
+          // Off leaves the chosen interval alone, so turning a reminder back on restores the interval
+          // the user picked rather than silently reverting to the default.
+          ...(minutes === null ? {} : { [minutesKey]: clampReminderMinutes(minutes) }),
+          // Clear the deadline so the new interval takes effect from now rather than inheriting a
+          // deadline computed from the old one — otherwise picking "every 5 min" can still wait 45.
+          [deadlineKey]: null,
+        },
+      })
+
+      // Evaluate immediately: rule 2 reschedules from now, so the next reminder is one new interval
+      // away instead of arriving whenever the next 15s tick happens to notice.
+      deps.evaluateReminders()
+      log('reminder set', { kind, minutes })
     },
 
     resetPosition(): void {

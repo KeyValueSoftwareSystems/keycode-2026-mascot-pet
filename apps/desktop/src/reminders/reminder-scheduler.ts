@@ -40,6 +40,11 @@ export interface ReminderInput {
   now: number
   enabled: Readonly<Record<ReminderKind, boolean>>
   deadlines: Readonly<ReminderDeadlines>
+  /**
+   * Interval per kind in ms. Omitted falls back to the built-in defaults, which is what keeps every
+   * existing test and caller meaning the same thing.
+   */
+  intervals?: Readonly<Record<ReminderKind, number>>
 }
 
 export interface ReminderResult {
@@ -79,7 +84,10 @@ export function evaluateReminders(input: ReminderInput): ReminderResult {
   let changed = false
 
   for (const kind of REMINDER_KINDS) {
-    const interval = REMINDER_INTERVALS[kind]
+    const configured = input.intervals?.[kind]
+    // A non-finite or non-positive interval would make every deadline `now`, firing on every tick
+    // forever. Falling back is the only safe reading of nonsense here.
+    const interval = configured !== undefined && configured > 0 ? configured : REMINDER_INTERVALS[kind]
     const due = input.deadlines[kind]
 
     if (!input.enabled[kind]) {

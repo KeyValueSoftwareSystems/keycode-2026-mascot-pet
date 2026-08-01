@@ -1,6 +1,6 @@
 {
   "name": "@keycode/desktop",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Keycode Pet \u2014 Electron desktop companion",
   "license": "UNLICENSED",

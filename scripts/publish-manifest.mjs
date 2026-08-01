@@ -33,6 +33,7 @@ const REMOTE_DIR = 'demos/keycode'
 const PUBLIC_URL = 'https://demos.doylefermi.freeddns.org/keycode/manifest.json'
 
 const dryRun = process.argv.includes('--dry-run')
+const allowDefaults = process.argv.includes('--allow-defaults')
 
 function fail(message) {
   console.error(`✗ ${message}`)
@@ -118,6 +119,24 @@ if (parsed.release) {
   } else {
     console.log(`      · not newer than this build (${appVersion}) — no update will be announced`)
   }
+}
+
+// ---- The one change that breaks older clients.
+if (parsed.defaults) {
+  console.log(
+    `  defaults: ${JSON.stringify(parsed.defaults)} — applied only where a user never chose`,
+  )
+  if (!allowDefaults) {
+    fail(
+      'this manifest contains a `defaults` block, which BREAKS EVERY CLIENT OLDER THAN v1.4.0.\n' +
+        '  The envelope is strict, so an older build rejects the whole file on an unknown top-level\n' +
+        '  key — it does not ignore `defaults`, it ignores the entire manifest. Those installs would\n' +
+        '  silently stop receiving announcements altogether, with one debug log line each.\n' +
+        '\n' +
+        '  Publish this only once everyone is on v1.4.0 or later, then pass --allow-defaults.',
+    )
+  }
+  console.log('      ⚠ --allow-defaults given: clients older than v1.4.0 will ignore this whole file.')
 }
 
 if (live.length === 0) {

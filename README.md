@@ -26,6 +26,15 @@ pnpm dev
 The pet appears at the bottom of your primary display and starts moving. A tray icon gives you the
 settings menu; right-clicking the pet gives you the same menu.
 
+**Reminders, with intervals.** Right-click → Drink water reminder / Stretch reminder → Off, or every
+5 / 15 / 30 / 45 / 60 / 90 minutes. Changing an interval clears the pending deadline, so the next
+reminder is one *new* interval away rather than inheriting the old one. **The 5-minute option is how you
+test that reminders work** without waiting 45 minutes.
+
+The team can set default intervals for anyone who never picked one, via the manifest — see
+[docs/BROADCAST.md](docs/BROADCAST.md). Defaults never override a local choice, and there is no way for
+a manifest to switch a reminder back on.
+
 **Three sizes.** Right-click → Size → Small / Medium / Large. `Large` is the size it has always
 rendered at, so upgrading changes nothing; `Small` is half that. Only the sprite scales — bubble text
 stays readable at every size.
@@ -84,7 +93,7 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 367 tests, no Electron required |
+| `pnpm test` | 380 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
@@ -95,6 +104,7 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 | `pnpm manifest:serve` | Local broadcast manifest server with fault injection |
 | `pnpm manifest:check` | Validate `manifest/manifest.json` and report what clients will show |
 | `pnpm manifest:publish` | Validate, upload to the host, verify what is served |
+| `pnpm manifest:publish --allow-defaults` | Required to publish a `defaults` block — it breaks pre-v1.4.0 clients |
 
 `pnpm package` is deliberately restricted to `--mac`. Building `deb`/`rpm` on an Apple Silicon host
 produces broken packages, so Windows and Linux artifacts come from the CI matrix
@@ -193,7 +203,7 @@ available.
 ## Status
 
 All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
-releases from `v1.1.0`. 367 tests pass; typecheck is clean.
+releases from `v1.1.0`. 380 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.
