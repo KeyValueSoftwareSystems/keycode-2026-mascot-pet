@@ -59,6 +59,20 @@ body {
   /* The sheet itself, sized and stepped by the generated CSS. */
   background-image: url('./spritesheet.png');
   cursor: grab;
+  /*
+   * Pet size, as a transform rather than by resizing the element.
+   *
+   * The generated keyframes step `background-position` in absolute pixels off the unscaled sheet, so
+   * changing the element's width/height or background-size would invalidate every one of them. A
+   * transform leaves all that arithmetic untouched and scales the painted result. `top left` matches
+   * the origin main reports, so the cell's top-left stays put whatever the scale.
+   *
+   * `image-rendering: pixelated` still applies through the transform, which is what keeps 0.5× sharp.
+   * 0.75× lands on 1.5 device pixels per source pixel on a 2x display and is softer by arithmetic —
+   * see PET_SIZE_SCALES for why that size exists anyway.
+   */
+  transform: scale(var(--pet-scale, 1));
+  transform-origin: top left;
 }
 
 #sprite:active {
@@ -212,8 +226,9 @@ body {
  */
 #zzz {
   position: absolute;
-  left: calc(var(--sprite-x, 0px) + 118px);
-  top: calc(var(--sprite-y, 0px) + 6px);
+  /* Cell-space offsets, so they scale with the pet. */
+  left: calc(var(--sprite-x, 0px) + 118px * var(--pet-scale, 1));
+  top: calc(var(--sprite-y, 0px) + 6px * var(--pet-scale, 1));
   display: none;
   pointer-events: none;
   font:

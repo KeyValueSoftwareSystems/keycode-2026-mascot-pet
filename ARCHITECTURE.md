@@ -209,6 +209,28 @@ the character, so clamping the window would stop the body ~126px short of the sc
 of nothing looks exactly like the bug it was meant to prevent. The window is allowed to hang partly
 off-screen.
 
+### Pet size is a transform, not a resize
+
+Three sizes: `large` (1.0 — what the app always rendered at), `medium` (0.75), `small` (0.5).
+
+**Scaling had to be a CSS `transform`, not a change of width/height or `background-size`.** The
+generated keyframes step `background-position` in absolute pixels off the unscaled sheet, so resizing
+the element would invalidate every one of them. A transform from `top left` leaves that arithmetic
+untouched and scales the painted result, and `image-rendering: pixelated` still applies through it.
+
+Everything else derives from one number. The mask is measured once at native size and *never*
+rescaled — three masks could disagree — so the conversion happens at the two boundaries that touch
+the screen: a hit-test divides by the scale on the way in, a screen rect multiplies by it on the way
+out. Hit padding is divided too, which keeps the grab margin the same size on screen at every pet
+size; a small pet would otherwise be proportionally as easy to grab but absolutely much harder.
+
+The **window width does not scale.** Bubble text stays 13px at every size, because a bubble at half
+size is not readable and being read is its whole job. Only the height follows the sprite.
+
+`medium` is deliberately soft on a Retina display: 0.75 × 2 = 1.5 device pixels per source pixel, so
+it resamples. The alternative was 1.5/1.0/0.5 — all exact — but that renames today's size to "medium".
+Keeping the shipped size as `large` was the explicit choice.
+
 ### Hit-testing
 
 The character fills ~21% of its cell, and the empty space is overwhelmingly horizontal — 44% of each

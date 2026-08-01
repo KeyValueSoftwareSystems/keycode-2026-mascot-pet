@@ -81,6 +81,14 @@ export interface PetController {
    */
   place(position: { x: number; feetY: number }): void
   setCallout(callout: ActiveCallout | null): void
+  /**
+   * Change the pet's size, keeping it where it is.
+   *
+   * The floor is re-derived immediately rather than at the next tick, because a smaller pet has a
+   * *lower* `minFeetY` and a narrower body: without re-clamping first, a freely placed pet could sit
+   * outside the envelope for a frame, and `Reset position` would compute against stale bounds.
+   */
+  setScale(scale: number): void
   /** Pin an animation, for the smoke harness. */
   setForcedState(animation: string | null): void
   petCentreX(): number
@@ -124,6 +132,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
       animationNonce: state.animationNonce,
       facing: state.facing,
       sprite: pet.placement.spriteOrigin,
+      scale: pet.placement.scale,
       bubble: callout
         ? {
             text: callout.text,
@@ -164,7 +173,9 @@ export function createPetController(options: PetControllerOptions): PetControlle
       // cached) and it is what makes a monitor unplug or a Dock resize self-correcting rather than
       // needing its own recovery path.
       const display = displays.nearest({ x: state.x, y: floor.y - 1 })
-      floor = floorForWorkArea(display.workArea, display.key)
+      // The placement is passed in because it decides both how close to the edge the pet may go
+      // (body half-width) and how high it may be lifted (window height) — and both change with size.
+      floor = floorForWorkArea(display.workArea, display.key, undefined, pet.placement)
 
       // A drag is driven from the real cursor, not from renderer coordinates. Renderer
       // screenX/screenY dies the moment mouse forwarding does, and forwarding dying mid-drag is a
@@ -299,6 +310,22 @@ export function createPetController(options: PetControllerOptions): PetControlle
 
     setCallout(next: ActiveCallout | null): void {
       callout = next
+      sendFrameIfChanged()
+    },
+
+    setScale(scale: number): void {
+      pet.setScale(scale, state.x, state.feetY)
+
+      // Re-derive the envelope for the new window size, then re-settle the pet inside it.
+      const display = displays.nearest({ x: state.x, y: state.feetY - 1 })
+      floor = floorForWorkArea(display.workArea, display.key, undefined, pet.placement)
+      state = {
+        ...state,
+        x: clampToFloor(state.x, floor),
+        feetY: state.floorLocked ? floor.maxFeetY : clampFeetY(state.feetY, floor),
+      }
+
+      pet.moveTo(state.x, state.feetY)
       sendFrameIfChanged()
     },
 

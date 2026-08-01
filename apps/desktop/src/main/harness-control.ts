@@ -40,6 +40,8 @@ export type HarnessCommand =
    * it proves is the placement and clamping logic — not the pointer plumbing, which stays manual.
    */
   | { cmd: 'place'; x: number; feetY: number }
+  /** Change the pet's size, so each one can be screenshotted without relaunching. */
+  | { cmd: 'set-size'; size: string }
   | { cmd: 'quit' }
 
 export interface HarnessTargets {
@@ -64,6 +66,10 @@ export interface HarnessTargets {
   floorLocked?: () => boolean
   /** Place the pet at an absolute position, as a drop would. */
   place?: (position: { x: number; feetY: number }) => void
+  /** Change the pet's size. */
+  setSize?: (size: string) => void
+  /** The sprite's current CSS scale, which decides whether the crispness assertion is meaningful. */
+  petScale?: () => number
 }
 
 export function installHarnessControl(targets: HarnessTargets): () => void {
@@ -95,6 +101,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           const rect = isPet ? targets.spriteRect?.() : undefined
           const bubble = isPet ? targets.bubbleFloorY?.() : undefined
           const floorLocked = isPet ? targets.floorLocked?.() : undefined
+          const petScale = isPet ? targets.petScale?.() : undefined
           emit({
             ev: 'capture-written',
             path: command.path,
@@ -107,6 +114,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
               ? {}
               : { bubbleFloorY: bubble.y, bubbleVisible: bubble.visible }),
             ...(floorLocked === undefined ? {} : { floorLocked }),
+            ...(petScale === undefined ? {} : { petScale }),
           })
         } catch (error) {
           emit({
@@ -147,6 +155,15 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           return
         }
         targets.place({ x: command.x, feetY: command.feetY })
+        return
+      }
+
+      case 'set-size': {
+        if (!targets.setSize) {
+          emit({ ev: 'error', where: 'harness:set-size', message: 'no size sink registered' })
+          return
+        }
+        targets.setSize(command.size)
         return
       }
 

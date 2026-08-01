@@ -98,6 +98,49 @@ describe('settings schema', () => {
     if (result.ok) expect(result.value.position).toBeNull()
   })
 
+  it('migrates a v2 file forward, keeping the pet the size it already was', () => {
+    // `large` is 1.0 — the size the app rendered at before sizes existed — so an upgrade must not
+    // visibly resize anybody's pet.
+    const result = parseSettings({
+      schemaVersion: 2,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: false,
+      position: { displayKey: 'k', x: 100, feetY: 420 },
+      reminders: { waterNextDueAt: null, stretchNextDueAt: null },
+      seenBroadcastIds: [],
+      lastKnownRelease: null,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.petSize).toBe('large')
+    // And the v1→v2 work is not undone on the way through.
+    expect(result.value.position?.feetY).toBe(420)
+    expect(result.value.stretchReminderEnabled).toBe(false)
+  })
+
+  it('chains v1 all the way to the current version', () => {
+    const result = parseSettings({
+      schemaVersion: 1,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: true,
+      position: { displayKey: 'k', x: 100 },
+      reminders: { waterNextDueAt: null, stretchNextDueAt: null },
+      seenBroadcastIds: [],
+      lastKnownRelease: null,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
+    expect(result.value.position?.feetY).toBeNull()
+    expect(result.value.petSize).toBe('large')
+  })
+
+  it('rejects an unknown pet size', () => {
+    expect(parseSettings({ ...DEFAULT_SETTINGS, petSize: 'enormous' }).ok).toBe(false)
+  })
+
   it('rejects a non-object', () => {
     for (const bad of [null, 42, 'nope', [] as unknown]) {
       expect(parseSettings(bad).ok).toBe(false)

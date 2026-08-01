@@ -10,10 +10,16 @@ import { createActions, RESET_POSITION_FRACTION } from '../../apps/desktop/src/m
 import type { MotionTrigger } from '../../apps/desktop/src/motion/types.js'
 import type { Settings } from '../../apps/desktop/src/main/settings-schema.js'
 import { DEFAULT_SETTINGS } from '../../apps/desktop/src/main/settings-schema.js'
+import {
+  PET_SIZES,
+  PET_SIZE_SCALES,
+  petScaleFor,
+} from '../../apps/desktop/src/config/constants.js'
 
 function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
   return {
     movementEnabled: true,
+    petSize: 'large',
     waterReminderEnabled: true,
     stretchReminderEnabled: true,
     update: { state: 'idle', latestVersion: null },
@@ -24,6 +30,7 @@ function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
 function noopActions(): MenuActions {
   return {
     toggleMovement: () => {},
+    setPetSize: () => {},
     toggleWaterReminder: () => {},
     toggleStretchReminder: () => {},
     resetPosition: () => {},
@@ -48,6 +55,7 @@ describe('menu template', () => {
       'Movement',
       'Drink water reminder',
       'Stretch reminder',
+      'Size',
       'separator',
       'Reset position',
       'Check for updates…',
@@ -81,7 +89,9 @@ describe('menu template', () => {
     // settings. A silently unsaved position is exactly the bug that would cause.
     const quit = vi.fn()
     const template = buildMenuTemplate(view(), { ...noopActions(), quit })
-    const item = template[10]!
+    // Found by label, not by index: an index breaks every time an item is added above it, which is
+    // exactly what happened when the Size submenu landed.
+    const item = template.find((entry) => entry.label === 'Quit')!
     expect(item).not.toHaveProperty('role')
     ;(item.click as () => void)()
     expect(quit).toHaveBeenCalledOnce()
@@ -271,5 +281,50 @@ describe('actions', () => {
     expect(showAbout).toHaveBeenCalledOnce()
     expect(checkForUpdates).toHaveBeenCalledOnce()
     expect(quit).toHaveBeenCalledOnce()
+  })
+})
+
+describe('pet size menu', () => {
+  const sizeSubmenu = (v: MenuViewModel = view()) => {
+    const item = buildMenuTemplate(v, noopActions()).find((entry) => entry.label === 'Size')
+    return (item?.submenu ?? []) as Array<{ label?: string; type?: string; checked?: boolean }>
+  }
+
+  it('offers every declared size, as radio items', () => {
+    // Derived from PET_SIZES rather than a hand-written list, so adding a size cannot leave the menu
+    // silently missing it.
+    expect(sizeSubmenu().map((i) => i.label)).toEqual(['Small', 'Medium', 'Large'])
+    for (const item of sizeSubmenu()) expect(item.type).toBe('radio')
+  })
+
+  it('ticks exactly the current size', () => {
+    for (const size of PET_SIZES) {
+      const ticked = sizeSubmenu(view({ petSize: size })).filter((i) => i.checked)
+      expect(ticked).toHaveLength(1)
+      expect(ticked[0]?.label?.toLowerCase()).toBe(size)
+    }
+  })
+
+  it('names the size it wants instead of reading the item back', () => {
+    // Same rule as the toggles: a handler that trusted `menuItem.checked` would act on a rendering
+    // of state that can be stale if a rebuild raced the click.
+    const setPetSize = vi.fn()
+    const item = buildMenuTemplate(view(), { ...noopActions(), setPetSize }).find(
+      (entry) => entry.label === 'Size',
+    )
+    const small = (item?.submenu as Array<{ label?: string; click?: () => void }>).find(
+      (i) => i.label === 'Small',
+    )
+    small?.click?.()
+    expect(setPetSize).toHaveBeenCalledWith('small')
+  })
+
+  it('scales are what the sprite can render sharply, with large unchanged from before sizes existed', () => {
+    // `large` must stay 1.0 or every existing install's pet changes size on upgrade.
+    expect(PET_SIZE_SCALES.large).toBe(1)
+    expect(PET_SIZE_SCALES.small).toBe(0.5)
+    // Documented as deliberately soft on a 2x display: 0.75 x 2 = 1.5 device pixels per source pixel.
+    expect(PET_SIZE_SCALES.medium).toBe(0.75)
+    expect(petScaleFor('small')).toBe(PET_SIZE_SCALES.small)
   })
 })

@@ -66,6 +66,8 @@ export type HandshakeEvent =
        * case asserting feet-on-floor would fail on correct behaviour.
        */
       floorLocked?: boolean
+      /** Sprite CSS scale, so the crispness assertion knows its own block size. */
+      petScale?: number
     }
   | { ev: 'capture-failed'; path: string; reason: string }
   | { ev: 'error'; where: string; message: string }

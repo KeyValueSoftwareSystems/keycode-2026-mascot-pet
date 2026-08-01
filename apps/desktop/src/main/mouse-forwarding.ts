@@ -63,6 +63,13 @@ export interface ForwardingController {
   onShown(): void
   /** Re-apply after a page load; `setShape` and forwarding both reset on navigation. */
   afterNavigate(): void
+  /**
+   * Replace the Linux input region, e.g. after a pet-size change.
+   *
+   * The rects are window-local, so resizing the window without updating them leaves the grabbable
+   * area in the wrong place — and on Linux that is the *only* thing making the pet grabbable.
+   */
+  setShapeRects(rects: readonly Rectangle[]): void
   dispose(): void
 }
 
@@ -89,13 +96,14 @@ export function createForwardingController(
   let watchTimer: NodeJS.Timeout | null = null
   let rearmTimers: NodeJS.Timeout[] = []
   let shapeWarned = false
+  let shapeRects: readonly Rectangle[] = options.shapeRects
 
   const applyLinuxShape = (): void => {
     if (platform !== 'linux' || win.isDestroyed()) return
     try {
       // Restricting the input region is Linux's only route to click-through, since ignored
       // windows there cannot receive the events needed to detect hover or start a drag.
-      win.setShape([...options.shapeRects])
+      win.setShape([...shapeRects])
     } catch (error) {
       if (!shapeWarned) {
         shapeWarned = true
@@ -226,6 +234,11 @@ export function createForwardingController(
     onShown(): void {
       applyPassthrough()
       scheduleWatch('shown')
+    },
+
+    setShapeRects(rects: readonly Rectangle[]): void {
+      shapeRects = rects
+      applyLinuxShape()
     },
 
     afterNavigate(): void {

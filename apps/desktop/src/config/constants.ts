@@ -7,6 +7,39 @@
  */
 
 // ---------------------------------------------------------------------------------------
+// Pet size
+// ---------------------------------------------------------------------------------------
+
+/**
+ * Scale factors, applied to the sprite only — the speech bubble's text does not shrink with the pet,
+ * because 13px at half size is not readable and the bubble's whole job is to be read.
+ *
+ * `large` is 1.0: the size the app shipped at before sizes existed, so nobody's pet changes size on
+ * upgrade.
+ *
+ * **`medium` is deliberately soft on a 2× display.** Pixel art stays sharp only at whole-device-pixel
+ * scales, and 0.75 × 2 = 1.5 device pixels per source pixel, which resamples. The alternative was to
+ * pick 1.5/1.0/0.5 so all three are exact — but that renames the current size to "medium" and makes
+ * "large" bigger than anything shipped so far. Keeping the existing size as `large` was the explicit
+ * choice; the crispness assertion measures lower for `medium` alone and that is expected, not a bug.
+ */
+export const PET_SIZE_SCALES = { small: 0.5, medium: 0.75, large: 1 } as const
+
+export type PetSize = keyof typeof PET_SIZE_SCALES
+
+export const PET_SIZES = Object.keys(PET_SIZE_SCALES) as readonly PetSize[]
+
+export const DEFAULT_PET_SIZE: PetSize = 'large'
+
+export function isPetSize(value: unknown): value is PetSize {
+  return typeof value === 'string' && value in PET_SIZE_SCALES
+}
+
+export function petScaleFor(size: PetSize): number {
+  return PET_SIZE_SCALES[size]
+}
+
+// ---------------------------------------------------------------------------------------
 // Reminders
 // ---------------------------------------------------------------------------------------
 

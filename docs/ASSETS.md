@@ -103,6 +103,17 @@ To extend instead, add rows and update `sheet.rows` and `sheet.height` together.
 geometry check will reject a mismatch. An extended 12-row sheet with a real `stretch` at row 9 is
 covered by a test, so that path is known to work.
 
+## Sizes and the mask
+
+The pet renders at 0.5x, 0.75x or 1x (`small`/`medium`/`large`). **The mask is not regenerated per
+size** — it is measured once at native size, and the scale is applied at the two boundaries that touch
+the screen. So swapping art needs no thought about sizes: regenerate the mask as usual and all three
+follow.
+
+Whether a size looks sharp depends on the art's pixel grid, not on the code: a scale that lands on a
+whole number of device pixels stays exact, and 0.75 on a 2x display does not. If a replacement pack
+wants three exact sizes, the scales to pick are 1.5/1.0/0.5 — see `PET_SIZE_SCALES`.
+
 ## Known state of the current art
 
 | Row | State | Frames | Note |

@@ -45,6 +45,15 @@ export const petFrameSchema = z.strictObject({
   /** Sprite cell's top-left inside the window, so the renderer never hardcodes layout. */
   sprite: z.strictObject({ x: z.number().int(), y: z.number().int() }),
 
+  /**
+   * Sprite scale — 0.5, 0.75 or 1. Applied as a CSS transform from the cell's top-left.
+   *
+   * Bounded rather than a free number: the renderer sets it as a custom property that multiplies
+   * every geometric offset in the stylesheet, so a nonsense value there paints the pet somewhere
+   * unrecoverable. Main is the only thing that picks it, and the seam re-validates it anyway.
+   */
+  scale: z.number().gt(0).lte(4),
+
   bubble: z
     .strictObject({
       /** Already sanitised and clamped by main. The renderer only ever `textContent`s it. */

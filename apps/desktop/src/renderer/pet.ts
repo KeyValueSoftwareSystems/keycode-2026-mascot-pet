@@ -25,15 +25,20 @@ const root = document.documentElement
 
 /** Where the sprite cell sits in the window. Main tells us; we never assume. */
 let spriteOrigin = { x: 0, y: 0 }
+/** Rendered scale, needed to map a screen-space hit back into unscaled mask coordinates. */
+let petScale = 1
 
 function applyFrame(frame: PetFrame): void {
   spriteOrigin = frame.sprite
+  petScale = frame.scale
 
   // Set on the root, not on #sprite. Custom properties inherit *downwards*, and #zzz is a sibling
   // of #sprite — setting them on the sprite left the sleep overlay falling back to 0px and drifting
   // from the top-left corner of the window instead of from the pet's head.
   root.style.setProperty('--sprite-x', `${frame.sprite.x}px`)
   root.style.setProperty('--sprite-y', `${frame.sprite.y}px`)
+  // Unitless: the stylesheet both scales the sprite by it and multiplies cell-space offsets with it.
+  root.style.setProperty('--pet-scale', String(frame.scale))
 
   // Where the *character* is, as opposed to where its cell is. The cell is 44% empty space
   // horizontally and has transparent padding above the hair, so anchoring the bubble to the cell
@@ -41,8 +46,9 @@ function applyFrame(frame: PetFrame): void {
   // stay out of the hand-written CSS, which is asserted to contain no sheet geometry.
   const bbox = ALPHA_MASK.bbox
   const headTop = ALPHA_MASK.headTopByState[frame.animation] ?? bbox.y
-  root.style.setProperty('--body-cx', `${frame.sprite.x + bbox.x + bbox.width / 2}px`)
-  root.style.setProperty('--body-top', `${frame.sprite.y + headTop}px`)
+  // Cell-space offsets scaled here rather than in CSS, so the bubble tracks the head at every size.
+  root.style.setProperty('--body-cx', `${frame.sprite.x + (bbox.x + bbox.width / 2) * frame.scale}px`)
+  root.style.setProperty('--body-top', `${frame.sprite.y + headTop * frame.scale}px`)
 
   // Setting data-state and data-nonce is the whole animation mechanism: the generated CSS keys
   // its keyframes off this pair, and a changed nonce is what makes the same state replay.
@@ -84,7 +90,13 @@ function isOverPet(clientX: number, clientY: number): boolean {
       return true
     }
   }
-  return isOpaqueAt(ALPHA_MASK, clientX - spriteOrigin.x, clientY - spriteOrigin.y)
+  return isOpaqueAt(
+    ALPHA_MASK,
+    clientX - spriteOrigin.x,
+    clientY - spriteOrigin.y,
+    undefined,
+    petScale,
+  )
 }
 
 function report(clientX: number, clientY: number): void {

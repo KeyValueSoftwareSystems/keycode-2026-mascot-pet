@@ -10,7 +10,8 @@
  *   node scripts/smoke.mjs --name m2-pet-over-dark [--backdrop] [--state waving]
  *                          [--all-states] [--timeout 20000] [--settle 400]
  *                          [--no-assert] [--keep-open] [--no-composite]
- *                          [--place x,feetY] [--callout "text"] [--toast]
+ *                          [--place x,feetY] [--size small|medium|large]
+ *                          [--callout "text"] [--toast]
  *
  * TWO CAPTURES, deliberately, because they answer different questions:
  *
@@ -77,6 +78,7 @@ function parseArgs(argv) {
     callout: null,
     toast: false,
     place: null,
+    size: null,
   }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -113,6 +115,9 @@ function parseArgs(argv) {
         break
       case '--toast':
         opts.toast = true
+        break
+      case '--size':
+        opts.size = argv[(i += 1)]
         break
       case '--place': {
         // "x,feetY" in screen coordinates — the pet's body centre and the y of its feet.
@@ -473,9 +478,23 @@ function assertNotBlank(png, region, label) {
  *
  * Skipped at scale 1, where there is no upscaling and therefore nothing to smooth.
  */
-function assertPixelArtCrisp(png, region, scale, label) {
-  const block = Math.round(scale)
-  if (block < 2) return null
+function assertPixelArtCrisp(png, region, scale, label, petScale = 1) {
+  // How many *device* pixels one source pixel covers: the display's scale factor times the pet's own
+  // CSS scale. This is the number that decides whether the assertion means anything.
+  //
+  //   large  1.00 x 2 = 2    → each source pixel is a 2x2 device block; smoothing is detectable
+  //   medium 0.75 x 2 = 1.5  → not an integer, so there are no uniform blocks to look for. This size
+  //                            is documented as deliberately soft; asserting here would be asserting
+  //                            that resampling did not happen when it necessarily did
+  //   small  0.50 x 2 = 1    → one device pixel per source pixel: nothing is scaled, so crispness is
+  //                            exact by construction and there is nothing to measure
+  //
+  // Before pet sizes existed this was always 2, so `Math.round(scale)` happened to be right. Left as
+  // it was, `small` reported 18% uniform and looked like a smoothing regression when in fact the
+  // sprite was pixel-exact — the assertion's model had stopped matching the rendering.
+  const devicePerSource = scale * petScale
+  const block = Math.round(devicePerSource)
+  if (block < 2 || Math.abs(devicePerSource - block) > 1e-6) return null
 
   let checked = 0
   let uniform = 0
@@ -630,7 +649,13 @@ async function assertPass(session, opts, name) {
     // `floorLocked` is absent on builds before free placement, where floor-locked was the only mode.
     const floorLocked = captured.floorLocked ?? true
     assertFeetOnFloor(spriteRect, pet.display, 'A4 feet-on-floor', floorLocked)
-    const crisp = assertPixelArtCrisp(png, region, scale, 'A6 pixel-art-crisp')
+    const crisp = assertPixelArtCrisp(
+      png,
+      region,
+      scale,
+      'A6 pixel-art-crisp',
+      captured.petScale ?? 1,
+    )
     console.log(`  ✓ A1 sprite painted (${(fill * 100).toFixed(1)}% of the bbox has alpha)`)
     console.log(
       `  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring` +
@@ -645,7 +670,10 @@ async function assertPass(session, opts, name) {
     if (crisp !== null) {
       console.log(`  ✓ A6 pixel art is crisp (${(crisp * 100).toFixed(1)}% of blocks uniform)`)
     } else {
-      console.log('  · A6 skipped (scale 1: no upscaling to smooth)')
+      console.log(
+        `  · A6 skipped — ${(scale * (captured.petScale ?? 1)).toFixed(2)} device pixels per source ` +
+          'pixel, so there are no whole blocks to check (see assertPixelArtCrisp)',
+      )
     }
     results.push('A1', 'A2', 'A3', 'A4', 'A6')
   } else {
@@ -715,6 +743,11 @@ async function run() {
     // the compositor presented a frame" — has no portable signal, so this is an honest
     // heuristic. The not-blank assertion is what stops it silently passing on a blank window.
     await new Promise((r) => setTimeout(r, opts.settleMs))
+
+    if (opts.size) {
+      session.send({ cmd: 'set-size', size: opts.size })
+      await new Promise((r) => setTimeout(r, 400))
+    }
 
     if (opts.place) {
       session.send({ cmd: 'place', x: opts.place.x, feetY: opts.place.feetY })

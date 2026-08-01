@@ -17,8 +17,9 @@
  */
 
 import { z } from 'zod'
+import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 2 as const
+export const SETTINGS_SCHEMA_VERSION = 3 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -29,6 +30,9 @@ export const settingsSchema = z.strictObject({
   movementEnabled: z.boolean(),
   waterReminderEnabled: z.boolean(),
   stretchReminderEnabled: z.boolean(),
+
+  /** Sprite scale. The bubble does not scale with it — see PET_SIZE_SCALES. */
+  petSize: z.enum(PET_SIZES as unknown as [PetSize, ...PetSize[]]),
 
   position: z
     .strictObject({
@@ -73,6 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   movementEnabled: true,
   waterReminderEnabled: true,
   stretchReminderEnabled: true,
+  petSize: DEFAULT_PET_SIZE,
   position: null,
   reminders: { waterNextDueAt: null, stretchNextDueAt: null },
   seenBroadcastIds: [],
@@ -109,6 +114,12 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
           ? { ...(position as Record<string, unknown>), feetY: null }
           : position,
     }
+  }
+
+  // v2 → v3: `petSize` arrived. Existing installs were all at what is now `large`, so defaulting to
+  // it is what keeps a pet the same size across the upgrade.
+  if (out['schemaVersion'] === 2) {
+    out = { ...out, schemaVersion: 3, petSize: DEFAULT_PET_SIZE }
   }
 
   return out

@@ -8,9 +8,19 @@ import {
   clampToFloor,
   PET_WINDOW,
   PET_WINDOW_HEIGHT,
+  PET_WINDOW_WIDTH,
   BUBBLE_AREA_HEIGHT,
+  petWindowFor,
+  placementForScale,
 } from '../../apps/desktop/src/main/floor-placement.js'
-import { ALPHA_MASK, type AlphaMaskData } from '../../apps/desktop/src/sprite/alpha-mask.js'
+import {
+  ALPHA_MASK,
+  isOpaqueAt,
+  shapeRectsForWindow,
+  spriteScreenRect,
+  type AlphaMaskData,
+} from '../../apps/desktop/src/sprite/alpha-mask.js'
+import { PET_SIZES, petScaleFor } from '../../apps/desktop/src/config/constants.js'
 import { SHEET } from '../../apps/desktop/src/pet-animations.generated.js'
 
 /** A mask with different padding, to prove the formulas are derived rather than hardcoded. */
@@ -169,5 +179,93 @@ describe('clampToFloor', () => {
     // returning NaN or an inverted clamp.
     const narrow = { minX: 500, maxX: 400, y: 0, displayKey: 'k' }
     expect(clampToFloor(450, narrow)).toBe(450)
+  })
+})
+
+describe('pet size scaling', () => {
+  it('keeps the window as wide as the bubble needs at every size', () => {
+    // The bubble's text does not scale, so the window must not shrink horizontally with the pet or a
+    // small pet's messages would wrap to a column.
+    for (const size of PET_SIZES) {
+      expect(petWindowFor(petScaleFor(size)).width).toBe(PET_WINDOW_WIDTH)
+    }
+  })
+
+  it('shrinks only the sprite half of the window height', () => {
+    const large = petWindowFor(1).height
+    const small = petWindowFor(0.5).height
+    // The bubble area is a fixed reservation; only the sprite's contribution halves.
+    expect(large - BUBBLE_AREA_HEIGHT).toBe(ALPHA_MASK.frameHeight - ALPHA_MASK.footInset)
+    expect(small - BUBBLE_AREA_HEIGHT).toBe(
+      Math.round((ALPHA_MASK.frameHeight - ALPHA_MASK.footInset) * 0.5),
+    )
+    expect(small).toBeLessThan(large)
+  })
+
+  it('still lands the feet exactly on the floor at every size', () => {
+    // The regression that would otherwise arrive with scaling: the window shrinks but the offset used
+    // to place it does not, so the pet floats or sinks by the difference.
+    for (const size of PET_SIZES) {
+      const placement = placementForScale(petScaleFor(size))
+      const windowY = windowYForFloor(900, placement)
+      expect(windowY + placement.spriteBottomOffset).toBeCloseTo(900, 6)
+    }
+  })
+
+  it('centres the body horizontally at every size', () => {
+    for (const size of PET_SIZES) {
+      const placement = placementForScale(petScaleFor(size))
+      const windowX = windowXForPetCentre(500, placement)
+      // Within a pixel, not exact: window positions are integers, so a body centre that lands on a
+      // half pixel cannot be hit exactly. That rounding predates sizes and is the reason `x` is a
+      // float in the engine and only rounded at this boundary.
+      expect(Math.abs(windowX + placement.spriteCentreOffset - 500)).toBeLessThanOrEqual(1)
+      // And the body's centre stays near the window's centre, so the bubble (which is centred on the
+      // body) still fits inside a window that never changes width.
+      expect(placement.spriteCentreOffset).toBeGreaterThan(PET_WINDOW_WIDTH * 0.4)
+      expect(placement.spriteCentreOffset).toBeLessThan(PET_WINDOW_WIDTH * 0.6)
+    }
+  })
+
+  it('lets a smaller pet stand closer to the screen edge and be lifted higher', () => {
+    const area = { x: 0, y: 0, width: 1_440, height: 900 }
+    const big = floorForWorkArea(area, 'k', undefined, placementForScale(1))
+    const small = floorForWorkArea(area, 'k', undefined, placementForScale(0.5))
+
+    expect(small.minX).toBeLessThan(big.minX)
+    expect(small.maxX).toBeGreaterThan(big.maxX)
+    // A shorter window can have its top edge lower down before the bubble would leave the screen.
+    expect(small.minFeetY).toBeLessThan(big.minFeetY)
+    expect(small.maxFeetY).toBe(big.maxFeetY)
+  })
+
+  it('scales the hit-test so the grab margin stays constant on screen', () => {
+    // A point 1px outside the body: a hit at 1x must stay a hit at 0.5x, because the padding is
+    // converted into cell space rather than applied to already-shrunken geometry.
+    const bbox = ALPHA_MASK.bbox
+    const justOutside = { x: bbox.x - 1, y: bbox.y + bbox.height / 2 }
+    expect(isOpaqueAt(ALPHA_MASK, justOutside.x, justOutside.y)).toBe(true)
+    expect(
+      isOpaqueAt(ALPHA_MASK, justOutside.x * 0.5, justOutside.y * 0.5, undefined, 0.5),
+    ).toBe(true)
+  })
+
+  it('scales the screen rect and the setShape rects together', () => {
+    const bounds = { x: 100, y: 200 }
+    const p1 = placementForScale(1)
+    const pHalf = placementForScale(0.5)
+
+    const r1 = spriteScreenRect(ALPHA_MASK, bounds, p1.spriteOrigin, p1.scale)
+    const rHalf = spriteScreenRect(ALPHA_MASK, bounds, pHalf.spriteOrigin, pHalf.scale)
+    expect(rHalf.width).toBe(Math.round(r1.width * 0.5))
+    expect(rHalf.height).toBe(Math.round(r1.height * 0.5))
+
+    // The Linux input region must shrink with the pet or the pet stays grabbable in thin air.
+    const shape1 = shapeRectsForWindow(ALPHA_MASK, p1.spriteOrigin, { scale: 1 })
+    const shapeHalf = shapeRectsForWindow(ALPHA_MASK, pHalf.spriteOrigin, { scale: 0.5 })
+    expect(shapeHalf).toHaveLength(shape1.length)
+    const area = (rects: readonly { width: number; height: number }[]) =>
+      rects.reduce((sum, r) => sum + r.width * r.height, 0)
+    expect(area(shapeHalf)).toBeLessThan(area(shape1))
   })
 })

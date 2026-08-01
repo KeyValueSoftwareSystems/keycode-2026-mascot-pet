@@ -58,8 +58,25 @@ export const PET_WINDOW_HEIGHT = BUBBLE_AREA_HEIGHT + SHEET.frameHeight - ALPHA_
 
 export const PET_WINDOW = { width: PET_WINDOW_WIDTH, height: PET_WINDOW_HEIGHT } as const
 
+/**
+ * Window size for a given pet scale.
+ *
+ * The **width does not scale**: the speech bubble's text stays 13px at every pet size, because a
+ * bubble at half size is not readable and being read is the bubble's entire job. So the window stays
+ * wide enough for a bubble and only its height follows the sprite.
+ */
+export function petWindowFor(scale: number, mask: AlphaMaskData = ALPHA_MASK): { width: number; height: number } {
+  const s = scale > 0 ? scale : 1
+  return {
+    width: PET_WINDOW_WIDTH,
+    height: Math.round(BUBBLE_AREA_HEIGHT + (mask.frameHeight - mask.footInset) * s),
+  }
+}
+
 export interface Placement {
   windowSize: { width: number; height: number }
+  /** Sprite scale this placement was computed for. */
+  scale: number
   /** Sprite cell's top-left inside the window. */
   spriteOrigin: { x: number; y: number }
   /**
@@ -76,21 +93,33 @@ export function computePlacement(
   mask: AlphaMaskData = ALPHA_MASK,
   window: { width: number; height: number } = PET_WINDOW,
   bubbleAreaHeight: number = BUBBLE_AREA_HEIGHT,
+  scale = 1,
 ): Placement {
-  // Centre the sprite cell horizontally; hang it below the bubble area. The cell's bottom rows
-  // may fall outside the window — see PET_WINDOW_HEIGHT — and that is deliberate.
+  const s = scale > 0 ? scale : 1
+  // Centre the *rendered* sprite cell horizontally; hang it below the bubble area. The cell's bottom
+  // rows may fall outside the window — see PET_WINDOW_HEIGHT — and that is deliberate.
+  //
+  // The sprite is scaled with a CSS transform from its top-left, so the element still occupies a full
+  // unscaled cell in layout while painting at `s` — which is why every offset past the origin is
+  // multiplied here rather than the origin being derived from a scaled cell size.
   const spriteOrigin = {
-    x: Math.round((window.width - mask.frameWidth) / 2),
+    x: Math.round((window.width - mask.frameWidth * s) / 2),
     y: bubbleAreaHeight,
   }
 
   return {
     windowSize: { width: window.width, height: window.height },
+    scale: s,
     spriteOrigin,
-    spriteCentreOffset: spriteOrigin.x + mask.bbox.x + mask.bbox.width / 2,
-    footInset: mask.footInset,
-    spriteBottomOffset: spriteOrigin.y + mask.frameHeight - mask.footInset,
+    spriteCentreOffset: spriteOrigin.x + (mask.bbox.x + mask.bbox.width / 2) * s,
+    footInset: mask.footInset * s,
+    spriteBottomOffset: spriteOrigin.y + (mask.frameHeight - mask.footInset) * s,
   }
+}
+
+/** Placement for a pet scale, sizing the window to match. */
+export function placementForScale(scale: number, mask: AlphaMaskData = ALPHA_MASK): Placement {
+  return computePlacement(mask, petWindowFor(scale, mask), BUBBLE_AREA_HEIGHT, scale)
 }
 
 /**
@@ -128,7 +157,7 @@ export function floorForWorkArea(
   mask: AlphaMaskData = ALPHA_MASK,
   placement: Placement = computePlacement(mask),
 ): Floor {
-  const half = bodyHalfWidth(mask)
+  const half = bodyHalfWidth(mask, placement.scale)
   const floorY = workArea.y + workArea.height
   // The highest the feet may go is set by the *window*, not the body: `spriteBottomOffset` is the
   // distance from the window's top edge down to the feet, so keeping the window top at or below the

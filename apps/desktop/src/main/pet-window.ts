@@ -13,6 +13,7 @@ import { startAlwaysOnTopKeeper, type AlwaysOnTopKeeper } from './always-on-top.
 import { createForwardingController, type ForwardingController } from './mouse-forwarding.js'
 import {
   computePlacement,
+  placementForScale,
   windowXForPetCentre,
   windowYForFloor,
   petCentreForWindowX,
@@ -59,6 +60,17 @@ export interface PetWindow {
    * assertion would then measure the bubble and report a transparency failure.
    */
   bubbleFloorY(): { y: number; visible: boolean }
+  /**
+   * Change the pet's size.
+   *
+   * Resizes the window and re-derives the placement, then keeps the pet where it was: the body's
+   * centre-x and its feet stay put, because a size change that also teleports the pet reads as a bug.
+   * Returns the new placement so the caller can push a frame carrying the new scale.
+   *
+   * `setShape` is re-applied because the input region is in window coordinates and the window just
+   * changed size — on Linux a stale shape leaves the pet grabbable in the wrong place.
+   */
+  setScale(scale: number, petCentreX: number, feetY: number): Placement
   reassertAlwaysOnTop(): void
   setDragging(active: boolean): void
   emitWindowReady(display: DisplaySnapshot): void
@@ -68,14 +80,18 @@ export interface PetWindow {
 export async function createPetWindow(options: {
   initialFloor: Floor
   initialPetCentreX: number
+  /** Restored free-placement height, or null to start on the floor. */
+  initialFeetY?: number | null
+  initialScale?: number
   events: PetWindowEvents
   log?: (message: string, meta?: unknown) => void
 }): Promise<PetWindow> {
   const log = options.log ?? (() => {})
-  const placement = computePlacement()
+  // Mutable: changing the pet's size re-derives the whole placement and resizes the window.
+  let placement = placementForScale(options.initialScale ?? 1)
 
   const x = windowXForPetCentre(options.initialPetCentreX, placement)
-  const y = windowYForFloor(options.initialFloor.y, placement)
+  const y = windowYForFloor(options.initialFeetY ?? options.initialFloor.y, placement)
 
   const win = new BrowserWindow({
     x,
@@ -108,8 +124,10 @@ export async function createPetWindow(options: {
 
   applyWindowSecurity(win, 'pet')
 
-  const shapeRects = shapeRectsForWindow(ALPHA_MASK, placement.spriteOrigin)
-  const forwarding = createForwardingController(win, { shapeRects, log })
+  const forwarding = createForwardingController(win, {
+    shapeRects: shapeRectsForWindow(ALPHA_MASK, placement.spriteOrigin, { scale: placement.scale }),
+    log,
+  })
   let keeper: AlwaysOnTopKeeper | null = null
   /** Last animation sent, so `bubbleFloorY()` can pick the right per-state head top. */
   let lastAnimation: string | null = null
@@ -175,7 +193,16 @@ export async function createPetWindow(options: {
 
   const petWindow: PetWindow = {
     win,
-    placement,
+
+    // A GETTER, not `placement,`. Writing the property once copies the reference that existed at
+    // construction, so `setScale` reassigning the local `placement` would leave every consumer —
+    // the controller's frame, the sprite rect, the floor envelope — reading the original scale
+    // forever. That is not theoretical: it shipped for the length of one screenshot run, where the
+    // renderer painted a resized pet while main still described the old one, and A1 caught it as
+    // "only 10.8% of the sprite rect has alpha".
+    get placement(): Placement {
+      return placement
+    },
 
     moveTo(petCentreX: number, feetY: number): void {
       if (win.isDestroyed()) return
@@ -212,7 +239,7 @@ export async function createPetWindow(options: {
 
     spriteRect(): Rectangle {
       const bounds = win.isDestroyed() ? { x, y } : win.getBounds()
-      return spriteScreenRect(ALPHA_MASK, bounds, placement.spriteOrigin) as Rectangle
+      return spriteScreenRect(ALPHA_MASK, bounds, placement.spriteOrigin, placement.scale) as Rectangle
     },
 
     bubbleFloorY(): { y: number; visible: boolean } {
@@ -220,7 +247,34 @@ export async function createPetWindow(options: {
       const headTop =
         (lastAnimation === null ? undefined : ALPHA_MASK.headTopByState[lastAnimation]) ??
         ALPHA_MASK.bbox.y
-      return { y: bounds.y + placement.spriteOrigin.y + headTop, visible: lastBubbleVisible }
+      return {
+        y: bounds.y + placement.spriteOrigin.y + headTop * placement.scale,
+        visible: lastBubbleVisible,
+      }
+    },
+
+    setScale(scale: number, petCentreX: number, feetY: number): Placement {
+      if (win.isDestroyed()) return placement
+      if (scale === placement.scale) return placement
+
+      placement = placementForScale(scale)
+      const nextX = windowXForPetCentre(petCentreX, placement)
+      const nextY = windowYForFloor(feetY, placement)
+
+      // setBounds in one call rather than setSize + setPosition: two calls make the window visibly
+      // jump through an intermediate rectangle at the old position.
+      win.setBounds({
+        x: nextX,
+        y: nextY,
+        width: placement.windowSize.width,
+        height: placement.windowSize.height,
+      })
+
+      forwarding.setShapeRects(
+        shapeRectsForWindow(ALPHA_MASK, placement.spriteOrigin, { scale: placement.scale }),
+      )
+      log('pet size changed', { scale, height: placement.windowSize.height })
+      return placement
     },
 
     reassertAlwaysOnTop(): void {

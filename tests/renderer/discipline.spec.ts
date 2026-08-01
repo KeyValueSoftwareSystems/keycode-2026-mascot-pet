@@ -136,6 +136,15 @@ describe('hand-written CSS carries no generated geometry', () => {
     expect(css).toMatch(/var\(--body-cx/)
     expect(css).toMatch(/var\(--body-top/)
   })
+
+  it('scales the sprite by transform, and publishes the scale', () => {
+    // The generated keyframes step `background-position` in absolute pixels off the unscaled sheet.
+    // Resizing the element or its background-size to change the pet's size would invalidate every one
+    // of them, so the scale must stay a transform.
+    const css = read(join(RENDERER_DIR, 'pet.css'))
+    expect(css).toMatch(/transform:\s*scale\(var\(--pet-scale/)
+    expect(read(join(RENDERER_DIR, 'pet.ts'))).toContain('--pet-scale')
+  })
 })
 
 describe('anti-proofs from docs/PROMPT.md §2', () => {

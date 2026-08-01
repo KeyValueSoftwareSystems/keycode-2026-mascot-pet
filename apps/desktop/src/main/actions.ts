@@ -21,7 +21,8 @@
 import type { SettingsStore } from './settings-store.js'
 import type { PetController } from './pet-controller.js'
 import type { DisplayManager } from './display-manager.js'
-import { floorForWorkArea } from './floor-placement.js'
+import { floorForWorkArea, placementForScale } from './floor-placement.js'
+import { petScaleFor } from '../config/constants.js'
 import type { MenuActions } from './menu-template.js'
 
 export interface ActionDeps {
@@ -65,6 +66,13 @@ export function createActions(deps: ActionDeps): MenuActions {
       log('movement toggled', { enabled })
     },
 
+    setPetSize(size): void {
+      if (settings.get().petSize === size) return
+      settings.patch({ petSize: size })
+      controller.setScale(petScaleFor(size))
+      log('pet size changed', { size })
+    },
+
     toggleWaterReminder(): void {
       log('water reminder toggled', { enabled: toggle('waterReminderEnabled') })
     },
@@ -77,7 +85,14 @@ export function createActions(deps: ActionDeps): MenuActions {
       // The display under the cursor, not the primary one: "reset" means "bring it back to me", and
       // on a multi-monitor desk the primary display may not be the one being looked at.
       const display = displays.nearest(deps.getCursorPoint())
-      const floor = floorForWorkArea(display.workArea, display.key)
+      // The current placement, so the reset target respects the pet's size — a small pet may stand
+      // closer to the screen edge than a large one.
+      const floor = floorForWorkArea(
+        display.workArea,
+        display.key,
+        undefined,
+        placementForScale(petScaleFor(settings.get().petSize)),
+      )
       const target = floor.minX + (floor.maxX - floor.minX) * RESET_POSITION_FRACTION
 
       controller.enqueue({ kind: 'reset-position', petCentreX: target })

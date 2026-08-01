@@ -32,8 +32,8 @@ import {
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
 import { openExternalChecked } from './open-external.js'
-import { PRODUCT_NAME } from '../config/constants.js'
-import { floorForWorkArea } from './floor-placement.js'
+import { PRODUCT_NAME, isPetSize, petScaleFor } from '../config/constants.js'
+import { floorForWorkArea, placementForScale } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { env } from '../config/env.js'
@@ -98,7 +98,14 @@ export async function startApp(): Promise<AppShell> {
   // display. `byKey` returning null is the normal case after a monitor change, not an error.
   const saved = settings.get().position
   const startDisplay = (saved && displays.byKey(saved.displayKey)) || displays.primary()
-  const startFloor = floorForWorkArea(startDisplay.workArea, startDisplay.key)
+  const startScale = petScaleFor(settings.get().petSize)
+  // The envelope depends on the pet's size, so the placement for the saved size is derived first.
+  const startFloor = floorForWorkArea(
+    startDisplay.workArea,
+    startDisplay.key,
+    undefined,
+    placementForScale(startScale),
+  )
   const startX = saved
     ? Math.min(startFloor.maxX, Math.max(startFloor.minX, saved.x))
     : startFloor.minX + (startFloor.maxX - startFloor.minX) * 0.35
@@ -114,6 +121,8 @@ export async function startApp(): Promise<AppShell> {
   const pet = await createPetWindow({
     initialFloor: startFloor,
     initialPetCentreX: startX,
+    initialFeetY: startFeetY,
+    initialScale: startScale,
     log,
     events: {
       onReady(): void {
@@ -313,6 +322,7 @@ export async function startApp(): Promise<AppShell> {
     const current = settings.get()
     return {
       movementEnabled: current.movementEnabled,
+      petSize: current.petSize,
       waterReminderEnabled: current.waterReminderEnabled,
       stretchReminderEnabled: current.stretchReminderEnabled,
       update: updateState,
@@ -372,8 +382,18 @@ export async function startApp(): Promise<AppShell> {
     spriteRect: () => pet.spriteRect(),
     bubbleFloorY: () => pet.bubbleFloorY(),
     floorLocked: () => controller?.position().floorLocked ?? true,
+    petScale: () => pet.placement.scale,
     place(position): void {
       controller?.place(position)
+    },
+    setSize(size): void {
+      if (!isPetSize(size)) {
+        log('harness asked for an unknown pet size', { size })
+        return
+      }
+      // Through the real action, so the harness exercises the same path the menu does — including
+      // the settings write, which is what makes the size survive a relaunch.
+      actions.setPetSize(size)
     },
     setForcedState(state: string): void {
       if (!isAnimationState(state)) {

@@ -16,12 +16,13 @@
  */
 
 import type { MenuItemConstructorOptions } from 'electron'
-import { PRODUCT_NAME } from '../config/constants.js'
+import { PET_SIZES, PRODUCT_NAME, type PetSize } from '../config/constants.js'
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'error'
 
 export interface MenuViewModel {
   movementEnabled: boolean
+  petSize: PetSize
   waterReminderEnabled: boolean
   stretchReminderEnabled: boolean
   update: { state: UpdateState; latestVersion: string | null }
@@ -29,12 +30,18 @@ export interface MenuViewModel {
 
 export interface MenuActions {
   toggleMovement(): void
+  setPetSize(size: PetSize): void
   toggleWaterReminder(): void
   toggleStretchReminder(): void
   resetPosition(): void
   checkForUpdates(): void
   showAbout(): void
   quit(): void
+}
+
+/** Title-case a size key for display, so the labels are not a second hand-written list. */
+export function petSizeLabel(size: PetSize): string {
+  return size.charAt(0).toUpperCase() + size.slice(1)
 }
 
 /** Label and enabled-ness for the update item, which is the only item that varies. */
@@ -89,6 +96,19 @@ export function buildMenuTemplate(
       checked: view.stretchReminderEnabled,
       click: () => actions.toggleStretchReminder(),
     },
+    {
+      label: 'Size',
+      submenu: PET_SIZES.map((size) => ({
+        label: petSizeLabel(size),
+        // `radio`, not `checkbox`: exactly one size is active, and Electron then handles the
+        // mutual exclusion display for us.
+        type: 'radio' as const,
+        checked: view.petSize === size,
+        // Same rule as the toggles: the handler names the size it wants rather than reading
+        // `menuItem.checked`, so the tick is a display of state and never a second source of truth.
+        click: () => actions.setPetSize(size),
+      })),
+    },
     { type: 'separator' },
     { label: 'Reset position', click: () => actions.resetPosition() },
     { label: update.label, enabled: update.enabled, click: () => actions.checkForUpdates() },
@@ -107,6 +127,7 @@ export const MENU_ITEM_ORDER = [
   'movement',
   'water',
   'stretch',
+  'size',
   'separator',
   'reset',
   'update',
