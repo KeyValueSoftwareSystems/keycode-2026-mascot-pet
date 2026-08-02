@@ -2,6 +2,15 @@
   "version": 1,
   "notifications": [
     {
+      "id": "hey-how-are-you-doing-20260802T1615",
+      "text": "Hey, how are you doing",
+      "tone": "warning",
+      "priority": "high",
+      "animation": "jumping",
+      "startsAt": "2026-08-02T16:14:24Z",
+      "expiresAt": "2026-08-02T17:15:24Z"
+    },
+    {
       "id": "keycode-on-fire-20260802T0851",
       "text": "Keycode on Fire 🔥",
       "tone": "warning",
