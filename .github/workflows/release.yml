@@ -137,13 +137,42 @@ jobs:
       # For an unsigned app this is the *only* integrity check a user has — there is no signature to
       # verify against, so a published digest is the difference between "trust the download" and
       # "check the download".
+      # For an unsigned app the digest is the *only* integrity check a user has — there is no signature
+      # for the OS to verify against. So this step must fail loudly rather than produce nothing:
+      # `shasum` is a Perl script and is **absent from Git for Windows**, so the original
+      # `shasum … 2>/dev/null | sed … || true` swallowed a "command not found", wrote an empty file, and
+      # the release upload rejected it with `size must be greater than or equal to 1` — failing the
+      # whole Windows leg, and with it the `announce` job, on a missing checksum nobody had noticed.
       - name: Checksums
         shell: bash
         run: |
           cd release
-          shasum -a 256 *.dmg *.zip *.exe *.AppImage *.deb *.rpm *.tar.gz 2>/dev/null \
-            | sed 's|\*||' > "SHA256SUMS-${{ matrix.name }}.txt" || true
-          cat "SHA256SUMS-${{ matrix.name }}.txt"
+          # Unmatched globs vanish instead of being passed through as literal `*.dmg` arguments, which
+          # is what made the old command exit non-zero on every platform.
+          shopt -s nullglob
+          files=(*.dmg *.zip *.exe *.AppImage *.deb *.rpm *.tar.gz)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no artifacts in release/ — packaging produced nothing to check" >&2
+            exit 1
+          fi
+
+          out="SHA256SUMS-${{ matrix.name }}.txt"
+          # `sha256sum` is coreutils: present on Linux and in Git for Windows, absent on macOS.
+          # `shasum` is Perl: present on macOS and Linux, absent on Windows. Between them every runner
+          # is covered, and neither being found is an error rather than an empty file.
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${files[@]}" > "$out"
+          elif command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "${files[@]}" > "$out"
+          else
+            echo "::error::neither sha256sum nor shasum is available on this runner" >&2
+            exit 1
+          fi
+
+          # Strip the binary-mode marker some implementations prefix the filename with.
+          sed -i.bak 's|^\([0-9a-f]\{64\}\) \*|\1  |' "$out" && rm -f "$out.bak"
+          cat "$out"
+          [ -s "$out" ] || { echo "::error::$out is empty" >&2; exit 1; }
 
       # Attach to the tag's Release. The app is UNSIGNED, so the body leads with the macOS approval
       # step — most people never open a docs file, and without it the first thing a new user sees is
