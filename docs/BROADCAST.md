@@ -11,12 +11,17 @@ serves a file.
 ## Where it lives
 
 ```
-https://demos.doylefermi.freeddns.org/keycode/manifest.json
+https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json
 ```
 
-A static file on plain nginx. That is the whole hosting decision: **a client that only needs HTTPS
-and an ETag needs no application, no auth to administer, and no separate service** — publishing is
-`scp`, and nginx already serves `Content-Type: application/json`, an `ETag` and `Last-Modified`.
+A static file on GitHub Pages, deployed from `site/` in this repository. That is the whole hosting
+decision: **a client that only needs HTTPS and an ETag needs no application, no auth to administer and
+no server to own** — and Pages already serves the right content type, an `ETag` and a CDN.
+
+**Publishing is a commit** (`pnpm notify`), which is the point rather than an inconvenience: remote text
+that appears above everything on a colleague's screen goes through the same review path as code. The
+cost is a CDN cache of up to ~10 minutes, which is why the default poll interval is 10 rather than 1 —
+a shorter poll cannot deliver faster than the cache.
 
 Verified end to end against this host, not against loopback: a message published here appeared in
 the pet with no flags set, and a restart against the same file showed nothing — see
@@ -51,12 +56,13 @@ publish is visible on the next poll.
 Add an entry to `notifications`, then:
 
 ```bash
-pnpm manifest:check      # validate and report what clients will show — uploads nothing
-pnpm manifest:publish    # validate, upload, then verify what the host actually serves
+pnpm notify "Keycode on Fire 🔥" --tone warning --animation jumping --expires 24h
+pnpm notify:list          # what is live, scheduled, expired — uploads nothing
+pnpm notify "…" --dry-run # validate and print, commit nothing
 ```
 
-`manifest:publish` runs **the client's own parser** over the file before it can become reachable, and
-exits non-zero rather than uploading if it fails. That is not ceremony: per-entry parsing means one
+`notify` runs **the client's own parser** over the file before it can become reachable, and exits
+non-zero rather than committing if it fails. That is not ceremony: per-entry parsing means one
 bad notification only costs itself, but a bad *envelope* means every client ignores the whole file,
 so the one mistake that silences every announcement for everyone is the one worth catching locally.
 
@@ -129,8 +135,8 @@ one re-announces to everybody on every fresh install, not once.
 
 That is not hypothetical: the example block declared `0.6.0` while `package.json` said `0.0.0`, so the
 moment the host became real, every install was handed a clickable "update available" bubble pointing
-at `example.invalid` — a domain reserved by RFC 2606 to never resolve. `pnpm manifest:publish` now
-refuses to upload a release announcement whose `notesUrl` is a placeholder.
+at `example.invalid` — a domain reserved by RFC 2606 to never resolve. Releases are now announced by CI
+from the tag itself, so the version cannot be wrong by hand — which is how it broke the first time.
 
 To announce a real release, add it back and keep `latestVersion` equal to the version actually
 downloadable from `notesUrl`:
@@ -222,9 +228,9 @@ switch a reminder back on, because it is not merely rejected, it does nothing at
 > addition here that needs a coordinated rollout. **Install v1.5.0 everywhere before publishing
 > `pollMinutes`.** The envelope is strict, so an
 > older build rejects the *whole file* on an unknown top-level key — it does not ignore `defaults`, it
-> ignores every announcement in the manifest, silently. `pnpm manifest:publish` refuses to upload a
-> manifest containing `defaults` unless you pass `--allow-defaults`, so this cannot happen by accident.
-> Publish it only once everyone has updated.
+> ignores every announcement in the manifest, silently. v1.5.0 made `defaults` tolerant of unknown keys,
+> so this was the last addition there that needed a coordinated rollout — every future default is safe
+> to publish immediately.
 
 ## Every limit, with its number
 

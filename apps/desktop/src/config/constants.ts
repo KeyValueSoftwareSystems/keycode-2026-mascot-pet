@@ -116,6 +116,16 @@ export const MANIFEST_MAX_BYTES = 64 * 1024
 export const MANIFEST_MAX_REDIRECTS = 3
 export const MANIFEST_MAX_NOTIFICATIONS = 32
 
+/**
+ * How many *new* notifications may be surfaced by one poll.
+ *
+ * Every live entry is shown once per install, so a fresh install fetches all of them at once — and
+ * since a notification with no `durationMs` waits to be clicked, ten live entries would mean ten
+ * stacked bubbles each needing a click before the next appears. Capping per poll spreads them over
+ * successive polls instead. The remainder are simply not marked seen, so nothing is lost.
+ */
+export const MANIFEST_MAX_PER_POLL = 3
+
 export const BROADCAST_DURATION_MS = { min: 2_000, max: 30_000 } as const
 
 export const POLL = {
@@ -131,4 +141,8 @@ export const POLL = {
 // ---------------------------------------------------------------------------------------
 
 export const PRODUCT_NAME = 'Keycode Pet'
+
+/** Where the code lives, and where a problem report goes. */
+export const REPO_URL = 'https://github.com/doylefermi-kv/keycode-2026-mascot-pet'
+export const ISSUES_URL = `${REPO_URL}/issues/new`
 export const APP_ID = 'systems.keyvalue.keycodepet'

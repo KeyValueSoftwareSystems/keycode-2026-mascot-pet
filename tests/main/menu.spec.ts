@@ -36,6 +36,7 @@ function noopActions(): MenuActions {
     resetPosition: () => {},
     checkForUpdates: () => {},
     showAbout: () => {},
+    reportProblem: () => {},
     quit: () => {},
   }
 }
@@ -60,6 +61,7 @@ describe('menu template', () => {
       'Reset position',
       'Check for updates…',
       'About',
+      'Report a problem…',
       'separator',
       'Quit',
     ])
@@ -102,6 +104,7 @@ describe('menu template', () => {
       resetPosition: vi.fn(),
       checkForUpdates: vi.fn(),
       showAbout: vi.fn(),
+      reportProblem: vi.fn(),
       quit: vi.fn(),
     }
     const template = buildMenuTemplate(view(), actions)
@@ -112,6 +115,7 @@ describe('menu template', () => {
     expect(actions.resetPosition).toHaveBeenCalledOnce()
     expect(actions.checkForUpdates).toHaveBeenCalledOnce()
     expect(actions.showAbout).toHaveBeenCalledOnce()
+    expect(actions.reportProblem).toHaveBeenCalledOnce()
     expect(actions.quit).toHaveBeenCalledOnce()
   })
 })

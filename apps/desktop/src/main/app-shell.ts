@@ -8,7 +8,16 @@
  * M3 the controller, M4–M8 the rest.
  */
 
-import { app, dialog, net, screen, type BrowserWindow } from 'electron'
+// `shell` is aliased: this module already has a local `shell` (the AppShell it returns).
+import {
+  app,
+  clipboard,
+  dialog,
+  net,
+  screen,
+  shell as electronShell,
+  type BrowserWindow,
+} from 'electron'
 import { createDisplayManager, type DisplayManager } from './display-manager.js'
 import { createBackdropWindow, shouldShowBackdrop } from './backdrop-window.js'
 import { installHarnessControl } from './harness-control.js'
@@ -33,6 +42,7 @@ import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
 import { openExternalChecked } from './open-external.js'
 import {
+  ISSUES_URL,
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
   WATER_INTERVAL_MS,
@@ -247,11 +257,15 @@ export async function startApp(): Promise<AppShell> {
 
   // ---- Broadcast.
   //
-  // Static file on plain nginx: no application to run, no auth to administer, and a shipped build
-  // needs nothing but HTTPS and an ETag, both of which come for free. Publishing is `scp`.
+  // A static file on GitHub Pages: no application to run, no auth to administer, and a shipped build
+  // needs nothing but HTTPS and an ETag, both of which come for free.
   //
-  // The manifest is world-readable — the host has no auth — so nothing goes in it that would not be
-  // fine on a public URL. See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
+  // Publishing is a *commit* (`pnpm notify`), which is the point — remote text that lands above
+  // everything on a colleague's screen goes through the same review as code. The cost is a CDN cache
+  // of up to ~10 minutes, which is why the default poll interval is 10 rather than 1.
+  //
+  // The manifest is world-readable, so nothing goes in it that would not be fine on a public page.
+  // See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
   let updates: UpdateService | null = null
 
   /**
@@ -275,7 +289,7 @@ export async function startApp(): Promise<AppShell> {
 
   const manifestUrl = resolveManifestUrl(
     process.env,
-    'https://demos.doylefermi.freeddns.org/keycode/manifest.json',
+    'https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json',
   )
 
   // TWO independent conditions. `app.isPackaged` is not env-overridable, so a shipped build cannot be
@@ -400,6 +414,45 @@ export async function startApp(): Promise<AppShell> {
     }
   }
 
+  /**
+   * The whole of crash reporting: nothing is uploaded, ever.
+   *
+   * The app already keeps a log; the gap was that a user had to know where it lives and what to say.
+   * This copies a filled-in report to the clipboard, reveals the log file so it can be attached, and
+   * opens a fresh issue — three things nobody does reliably by hand. A toast confirms it, because a
+   * clipboard write is otherwise completely invisible.
+   */
+  function reportProblem(): void {
+    const path = logFilePath()
+    const body = [
+      '**What happened?**',
+      '',
+      '',
+      '---',
+      `Version: ${app.getVersion()}`,
+      `Platform: ${process.platform} ${process.arch}`,
+      `Log: ${path ?? '(unavailable)'}`,
+      '',
+      'Please attach the log file above if you can — the app never uploads anything by itself.',
+    ].join('\n')
+
+    try {
+      clipboard.writeText(body)
+      if (path) electronShell.showItemInFolder(path)
+    } catch (error) {
+      // Never let the reporting path be the thing that breaks.
+      log('report a problem: could not prepare the report', { error: String(error) })
+    }
+
+    openExternalChecked(ISSUES_URL, { log })
+    toasts.show({
+      text: 'Report details copied. Paste them into the issue, and attach the log.',
+      tone: 'info',
+      durationMs: 8_000,
+    })
+    log('report a problem opened')
+  }
+
   const actions = createActions({
     settings,
     controller,
@@ -407,6 +460,7 @@ export async function startApp(): Promise<AppShell> {
     getCursorPoint: () => screen.getCursorScreenPoint(),
     evaluateReminders: () => reminders.evaluateNow(),
     showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
+    reportProblem,
     checkForUpdates: () => {
       // If an update is already known, the item opens its notes; otherwise it runs a real check.
       if (updateState.state === 'available') {

@@ -1,0 +1,54 @@
+name: Pages
+
+# Deploys `site/` — the broadcast manifest and the landing page.
+#
+# Publishing a notification is therefore a commit to main, which is the point: remote text that appears
+# above everything on a colleague's screen goes through the same review path as code. `pnpm notify`
+# makes the commit; this deploys it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never two deploys at once, and do not cancel one midway: a half-applied deploy would leave the
+# manifest in an unknown state for every client polling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Validate before publishing, with the client's own parser. A malformed envelope does not degrade
+      # gracefully — every install ignores the entire file and shows nothing, silently.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Manifest is valid
+        run: pnpm build && node scripts/notify.mjs --list
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

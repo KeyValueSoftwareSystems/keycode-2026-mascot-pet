@@ -56,30 +56,34 @@ KEYCODE_PET_BACKDROP=1 pnpm dev
 
 ### Broadcast messages
 
-Every install polls one static JSON file over HTTPS:
+Every install polls one static JSON file over HTTPS, served from GitHub Pages out of `site/`:
 
 ```
-https://demos.doylefermi.freeddns.org/keycode/manifest.json
+https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json
 ```
 
-To say something to everyone, edit `manifest/manifest.json` and publish it:
+To say something to everyone:
 
 ```bash
-pnpm manifest:check      # validate with the client's own parser, report what will be shown
-pnpm manifest:publish    # validate, upload, then verify what the host actually serves
+pnpm notify "Keycode on Fire 🔥" --tone warning --animation jumping --expires 24h
+pnpm notify:list                                  # what is live, scheduled, expired
+pnpm notify "…" --dry-run                         # validate and print, change nothing
 ```
 
-`manifest:publish` refuses to upload a file the client would reject, because a malformed envelope
-silences every announcement for every install. It also prints which entries are live, scheduled or
-expired, since that is not obvious from reading the JSON.
+**Publishing is a commit.** `notify` writes `site/manifest.json`, validates it with the client's own
+parser, commits and pushes; CI deploys Pages. That is deliberate — remote text that lands above
+everything on a colleague's screen goes through the same review path as code.
 
-**The host has no auth — the manifest is world-readable.** Nothing goes in it that would not be fine
-on a public page.
+It also generates the id (they are permanent dedupe keys, and reusing one silently shows nothing to
+anyone who saw it before) and requires an expiry, defaulting to 24h — every message phrased relative to
+"now" is wrong for whoever installs next week.
+
+**The manifest is world-readable.** Nothing goes in it that would not be fine on a public page.
 
 To test against a local server instead, with fault injection:
 
 ```bash
-pnpm manifest:serve      # serves manifest/manifest.json on 127.0.0.1:8787
+pnpm manifest:serve      # serves site/manifest.json on 127.0.0.1:8787
 
 # in another terminal
 KEYCODE_PET_MANIFEST_URL=http://127.0.0.1:8787/manifest.json \
@@ -98,7 +102,7 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 387 tests, no Electron required |
+| `pnpm test` | 397 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
@@ -107,9 +111,8 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 | `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — see below |
 | `pnpm icons` | Regenerate app icons from the art (macOS only, output committed) |
 | `pnpm manifest:serve` | Local broadcast manifest server with fault injection |
-| `pnpm manifest:check` | Validate `manifest/manifest.json` and report what clients will show |
-| `pnpm manifest:publish` | Validate, upload to the host, verify what is served |
-| `pnpm manifest:publish --allow-defaults` | Required to publish a `defaults` block — it breaks pre-v1.4.0 clients |
+| `pnpm notify "…"` | Publish a broadcast: validate, commit, push |
+| `pnpm notify:list` | What is live, scheduled and expired |
 
 `pnpm package` is deliberately restricted to `--mac`. Building `deb`/`rpm` on an Apple Silicon host
 produces broken packages, so Windows and Linux artifacts come from the CI matrix
@@ -195,6 +198,7 @@ available.
 
 | | |
 |---|---|
+| [docs/INSTALL.md](docs/INSTALL.md) | How users install it, including the unsigned-app warnings |
 | [docs/PROMPT.md](docs/PROMPT.md) | The implementation brief this was built from, with its errors corrected in place |
 | [DECISIONS.md](DECISIONS.md) | Every deviation from the brief, the issue, or openpets — with reasons |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The seams, the two clocks, and what would break at scale |
@@ -208,7 +212,7 @@ available.
 ## Status
 
 All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
-releases from `v1.1.0`. 387 tests pass; typecheck is clean.
+releases from `v1.1.0`. 397 tests pass; typecheck is clean.
 
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.
@@ -219,8 +223,10 @@ message appeared once and a restart against the same file showed nothing.
 **Not verified:** all Windows behaviour and all Linux behaviour. Details and the full untested list
 are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
-**macOS will refuse to open this app until you allow it once.** It is ad-hoc signed — no Developer ID,
-no notarization — so Gatekeeper shows *"Keycode Pet" Not Opened*. Right-click the app → **Open**, or
-System Settings › Privacy & Security › **Open Anyway**. This was originally logged as an unexplained
-`/Applications` launch failure; it is Gatekeeper, and it reproduces with a byte-identical bundle from
-any Applications folder while the same bundle runs fine from anywhere else.
+**The app is not code-signed**, so macOS and Windows both warn on first open. On macOS, right-click →
+**Open** rather than double-clicking. See [docs/INSTALL.md](docs/INSTALL.md) — this is the single
+biggest support cost of the current setup, and buying an Apple Developer certificate is what removes it.
+
+**No telemetry.** One network request (the manifest), no analytics, no identifiers, no accounts. The
+"Report a problem…" menu item copies a report and reveals the log for you to attach; nothing is ever
+uploaded by the app itself.

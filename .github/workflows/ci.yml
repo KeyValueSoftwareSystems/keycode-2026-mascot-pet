@@ -1,0 +1,58 @@
+name: CI
+
+# Every push and every PR. Deliberately *not* a release: publishing on each push would announce a new
+# version to every install several times a day. Releases happen on tags — see release.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push makes an in-flight run of the same ref pointless.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Generated artifacts are committed so a fresh clone builds without a generate step. This is the
+      # check that stops them silently drifting from pet/spritesheet.json.
+      - name: Generated files are fresh
+        run: |
+          pnpm generate
+          git diff --exit-code -- \
+            apps/desktop/src/renderer/pet.generated.css \
+            apps/desktop/src/pet-animations.generated.ts \
+            apps/desktop/src/sprite/alpha-mask.generated.ts \
+            apps/desktop/assets/pet/alpha-mask.json
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      # The manifest is remote text that lands above everything on a colleague's screen, and an unknown
+      # top-level key makes every client reject the whole file. So it is validated on every push, by the
+      # client's own parser, before it can reach Pages.
+      - name: Manifest is valid
+        run: pnpm build && node scripts/notify.mjs --list

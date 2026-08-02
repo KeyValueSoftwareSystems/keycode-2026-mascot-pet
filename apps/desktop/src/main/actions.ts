@@ -32,6 +32,7 @@ export interface ActionDeps {
   getCursorPoint: () => { x: number; y: number }
   showAbout: () => void
   checkForUpdates: () => void
+  reportProblem: () => void
   /** Re-evaluate reminders now, so a changed interval takes effect immediately. */
   evaluateReminders: () => void
   quit: () => void
@@ -125,6 +126,10 @@ export function createActions(deps: ActionDeps): MenuActions {
 
     showAbout(): void {
       deps.showAbout()
+    },
+
+    reportProblem(): void {
+      deps.reportProblem()
     },
 
     quit(): void {

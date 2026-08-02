@@ -49,6 +49,7 @@ export interface MenuActions {
   resetPosition(): void
   checkForUpdates(): void
   showAbout(): void
+  reportProblem(): void
   quit(): void
 }
 
@@ -153,6 +154,9 @@ export function buildMenuTemplate(
     { label: 'Reset position', click: () => actions.resetPosition() },
     { label: update.label, enabled: update.enabled, click: () => actions.checkForUpdates() },
     { label: 'About', click: () => actions.showAbout() },
+    // The whole of "crash reporting": nothing is uploaded automatically, so a problem only reaches us
+    // if a person chooses to send it. This makes that one click instead of finding a log by hand.
+    { label: 'Report a problem…', click: () => actions.reportProblem() },
     { type: 'separator' },
     // No `role: 'quit'`. The role quits immediately, skipping our before-quit handler — which is
     // what flushes the settings file. An explicit click keeps the flush in the path.
@@ -172,6 +176,7 @@ export const MENU_ITEM_ORDER = [
   'reset',
   'update',
   'about',
+  'report',
   'separator',
   'quit',
 ] as const

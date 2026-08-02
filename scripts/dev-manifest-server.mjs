@@ -2,7 +2,7 @@
 /**
  * Local broadcast manifest server, for developing and proving P4 without a hosted file.
  *
- *   pnpm manifest:serve            # serves manifest/manifest.json on http://127.0.0.1:8787
+ *   pnpm manifest:serve            # serves site/manifest.json on http://127.0.0.1:8787
  *   pnpm manifest:serve --port 9000
  *
  * Then run the app with:
@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
-const MANIFEST = join(ROOT, 'manifest', 'manifest.json')
+const MANIFEST = join(ROOT, 'site', 'manifest.json')
 
 function port() {
   const at = process.argv.indexOf('--port')
@@ -132,7 +132,7 @@ const server = createServer((request, response) => {
     return
   }
 
-  log(missing ? '200 (empty fallback: manifest/manifest.json is missing)' : '200')
+  log(missing ? '200 (empty fallback: site/manifest.json is missing)' : '200')
   response
     .writeHead(200, {
       'content-type': 'application/json; charset=utf-8',

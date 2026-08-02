@@ -20,6 +20,7 @@ import {
   BROADCAST_DURATION_MS,
   CALLOUT_TEXT_MAX,
   MANIFEST_MAX_NOTIFICATIONS,
+  MANIFEST_MAX_PER_POLL,
   POLL,
 } from '../../apps/desktop/src/config/constants.js'
 
@@ -601,5 +602,47 @@ describe('manifest team defaults', () => {
     // Clamped like everything else arriving from outside.
     expect(resolvePollMinutes({}, 99_999)).toBe(POLL.maxMinutes)
     expect(resolvePollMinutes({}, 0)).toBe(POLL.baseMinutes)
+  })
+})
+
+describe('per-poll cap on new notifications', () => {
+  const entry = (id: string, priority = 'normal') => ({
+    id,
+    text: id,
+    priority,
+    startsAt: '2020-01-01T00:00:00Z',
+    expiresAt: '2099-01-01T00:00:00Z',
+  })
+
+  it('holds the surplus for the next poll instead of dropping it', async () => {
+    // A fresh install with many live entries would otherwise get one stacked bubble per entry, each
+    // waiting to be clicked. The held ones must NOT be marked seen, or they are lost for good.
+    const many = Array.from({ length: 8 }, (_, i) => entry(`e${i}`))
+    const body = JSON.stringify({ version: 1, notifications: many })
+    // A changing ETag each call, so the body-hash short-circuit does not treat the second poll as
+    // unchanged and skip surfacing entirely.
+    const h = harness((call) => jsonResponse(body, { headers: { etag: `"v${call}"` } }))
+
+    await h.poller.pollNow('user')
+    expect(h.surfaced[0]).toHaveLength(MANIFEST_MAX_PER_POLL)
+    expect(h.seen).toHaveLength(MANIFEST_MAX_PER_POLL)
+
+    // Successive polls pick up where the last left off, and everything eventually arrives.
+    await h.poller.pollNow('user')
+    await h.poller.pollNow('user')
+    await h.poller.pollNow('user')
+    expect(new Set(h.seen).size).toBe(many.length)
+  })
+
+  it('keeps the highest priority first when it has to choose', () => {
+    // `selectDue` sorts by rank then id, so slicing keeps the ones that matter most.
+    const parsed = parseManifest(
+      JSON.stringify({
+        version: 1,
+        notifications: [entry('low-one', 'low'), entry('urgent-one', 'urgent'), entry('mid', 'normal')],
+      }),
+    )
+    const due = selectDue(parsed!.notifications, Date.parse('2026-01-01T00:00:00Z'), new Set())
+    expect(due.slice(0, 1).map((d) => d.id)).toEqual(['urgent-one'])
   })
 })

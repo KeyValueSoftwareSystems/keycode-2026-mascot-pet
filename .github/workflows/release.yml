@@ -1,15 +1,15 @@
 name: Release
 
-# Written and committed but never run: this repository has no remote yet (a locked decision for this
-# build). It exists so that adding a remote is the only step needed to get Windows and Linux
-# artifacts, which cannot be produced on the macOS development machine.
+# Tags only. Publishing on every push would announce a new version to every install several times a
+# day; the per-push gate is ci.yml.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
+# `write` because this job creates the Release the update announcement points at.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -65,6 +65,34 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # The first real evidence for Windows and Linux. The harness was built for this: `capturePage()`
+      # needs no screen-recording permission, it runs in its own `--user-data-dir` so nothing on the
+      # runner can collide with it, and its exit codes are distinct enough to diagnose from a log alone.
+      # Linux has no display server on a runner, hence xvfb.
+      #
+      # `continue-on-error` on purpose, for now: these two platforms have never been run, so the first
+      # failures are expected to be about the *harness* on a new OS rather than about the app. The
+      # screenshots are the deliverable — look at them, then tighten this to a hard gate.
+      - name: Smoke (macOS, Windows)
+        if: matrix.name != 'linux'
+        continue-on-error: true
+        run: pnpm smoke --name ci-${{ matrix.name }} --no-composite
+
+      - name: Smoke (Linux, under xvfb)
+        if: matrix.name == 'linux'
+        continue-on-error: true
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          xvfb-run --auto-servernum pnpm smoke --name ci-linux --no-composite
+
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ matrix.name }}
+          path: docs/demo/ci-*.png
+          if-no-files-found: warn
+
       - name: Package
         run: pnpm build && pnpm exec electron-builder ${{ matrix.flag }} --publish never
         env:
@@ -96,3 +124,32 @@ jobs:
             release/*.tar.gz
           if-no-files-found: error
           retention-days: 14
+
+      # Attach to the tag's Release. The app is UNSIGNED, so the body leads with the macOS approval
+      # step — most people never open a docs file, and without it the first thing a new user sees is
+      # "Apple could not verify this app".
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          fail_on_unmatched_files: false
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/*.tar.gz
+          body: |
+            ## Install
+
+            **macOS — this app is not signed by Apple, so macOS will refuse to open it the first time.**
+            Right-click the app in Applications and choose **Open**, then confirm. Or:
+            System Settings › Privacy & Security › **Open Anyway**. You only do this once.
+
+            **Windows** — SmartScreen will warn about an unrecognised app: **More info** → **Run anyway**.
+
+            **Linux** — the AppImage needs `chmod +x`; `.deb`/`.rpm` install normally.
+
+            Full instructions, including what each warning looks like: [docs/INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/INSTALL.md)

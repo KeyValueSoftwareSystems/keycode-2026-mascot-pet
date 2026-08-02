@@ -18,6 +18,7 @@
 import {
   HTTP_TIMEOUT_MS,
   MANIFEST_MAX_BYTES,
+  MANIFEST_MAX_PER_POLL,
   MANIFEST_MAX_REDIRECTS,
   POLL,
 } from '../config/constants.js'
@@ -130,6 +131,13 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
    * correctness comes from comparing the body itself.
    */
   let lastBodyHash: string | null = null
+  /**
+   * The last body successfully fetched, kept only so held-back entries can be reconsidered after a
+   * 304 — which carries no body of its own.
+   */
+  let lastBody: string | null = null
+  /** True when the last poll capped the number it surfaced, so the next must look again. */
+  let heldBack = false
   let status: PollerStatus = { state: 'idle', lastAt: null, lastError: null }
 
   /** Last interval reported, so a change is logged once rather than on every reschedule. */
@@ -197,27 +205,41 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
         return { kind: 'error', reason: detail }
       }
 
-      if (result.kind === 'not-modified') {
+      /*
+       * The unchanged short-circuits are skipped while entries are held back.
+       *
+       * Without this, the per-poll cap does not defer the surplus — it discards it. Change detection
+       * is on the body, and a manifest nobody has edited hashes the same forever, so the held entries
+       * would never be reconsidered and would simply never arrive. Found by the test that asserts all
+       * eight of eight eventually show up; it saw three.
+       */
+      // A 304 carries no body, so re-reading the manifest means re-using the last one fetched.
+      const body = result.kind === 'not-modified' ? lastBody : result.body
+      const unchanged =
+        body === null ||
+        (result.kind === 'not-modified' ? true : hashString(body) === lastBodyHash)
+
+      if (result.kind !== 'not-modified') etag = result.etag
+
+      if (unchanged && !heldBack) {
+        status = { state: 'ok', lastAt: now(), lastError: null }
+        return { kind: 'unchanged' }
+      }
+      if (body === null) {
+        // Held back, but a 304 arrived before any body was ever fetched. Nothing to reconsider.
         status = { state: 'ok', lastAt: now(), lastError: null }
         return { kind: 'unchanged' }
       }
 
-      etag = result.etag
-
-      const hash = hashString(result.body)
-      if (hash === lastBodyHash) {
-        status = { state: 'ok', lastAt: now(), lastError: null }
-        return { kind: 'unchanged' }
-      }
-
-      const parsed = parseManifest(result.body)
+      const parsed = parseManifest(body)
       if (!parsed) {
         log('broadcast manifest was unusable', { reason })
         status = { state: 'error', lastAt: now(), lastError: 'unparseable manifest' }
         return { kind: 'error', reason: 'unparseable manifest' }
       }
 
-      lastBodyHash = hash
+      lastBody = body
+      lastBodyHash = hashString(body)
 
       if (parsed.dropped.length > 0) {
         // Individually dropped entries are logged rather than swallowed: a typo in one announcement
@@ -229,7 +251,17 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
       deps.onDefaults?.(parsed.defaults)
 
       const seen = new Set(deps.getSeenIds())
-      const due = selectDue(parsed.notifications, now(), seen)
+      const allDue = selectDue(parsed.notifications, now(), seen)
+      // Cap per poll. `selectDue` sorts by priority then id, so the cap keeps the most important ones
+      // and the rest arrive next poll — they are left unseen rather than dropped.
+      const due = allDue.slice(0, MANIFEST_MAX_PER_POLL)
+      heldBack = allDue.length > due.length
+      if (heldBack) {
+        log('holding notifications for the next poll', {
+          surfacing: due.length,
+          held: allDue.length - due.length,
+        })
+      }
 
       for (const entry of due) {
         // Persist *before* surfacing. "Shown exactly once, ever" is a durability claim, and a crash
