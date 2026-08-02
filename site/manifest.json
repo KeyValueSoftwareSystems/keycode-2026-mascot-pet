@@ -14,5 +14,10 @@
   ],
   "defaults": {
     "pollMinutes": 1
+  },
+  "release": {
+    "latestVersion": "1.7.1",
+    "notesUrl": "https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/tag/v1.7.1",
+    "mandatory": false
   }
 }
