@@ -13,6 +13,6 @@
     }
   ],
   "defaults": {
-    "pollMinutes": 10
+    "pollMinutes": 1
   }
 }

@@ -221,7 +221,8 @@ console.log(
     `\n  Existing installs see only ids they have never seen.`,
 )
 if (parsed.defaults?.pollMinutes) {
-  console.log(`  Poll interval: ${parsed.defaults.pollMinutes} min (plus up to ~10 min of CDN cache).`)
+  console.log(`  Poll interval: ${parsed.defaults.pollMinutes} min. Pages purges its CDN on deploy,`)
+  console.log('  so a publish is visible immediately rather than after the max-age window.')
 }
 console.log('\n  This file is world-readable. Nothing goes in it that would not be fine on a public page.')
 

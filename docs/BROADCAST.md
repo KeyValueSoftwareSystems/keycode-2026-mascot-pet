@@ -19,9 +19,11 @@ decision: **a client that only needs HTTPS and an ETag needs no application, no 
 no server to own** — and Pages already serves the right content type, an `ETag` and a CDN.
 
 **Publishing is a commit** (`pnpm notify`), which is the point rather than an inconvenience: remote text
-that appears above everything on a colleague's screen goes through the same review path as code. The
-cost is a CDN cache of up to ~10 minutes, which is why the default poll interval is 10 rather than 1 —
-a shorter poll cannot deliver faster than the cache.
+that appears above everything on a colleague's screen goes through the same review path as code. Pages
+advertises `max-age=600`, but **it purges its CDN on deploy** — measured, not assumed: `x-cache: MISS`
+and `age: 0` immediately after a deploy, with the new content served without a cache-buster. So the
+max-age only governs how long an *unchanged* file is served from the edge, and a 1-minute poll really
+does deliver within about a minute.
 
 Verified end to end against this host, not against loopback: a message published here appeared in
 the pet with no flags set, and a restart against the same file showed nothing — see
@@ -184,10 +186,10 @@ Changing it takes effect on the **next** poll, and a client that receives a new 
 pending wait immediately — so shortening the interval does not first require the old, longer wait to
 elapse.
 
-**But the first poll of a session always uses the built-in 5 minutes.** A client has to fetch the file
+**But the first poll of a session always uses the built-in interval, not the published one.** A client has to fetch the file
 to learn the interval, so a freshly launched app waits up to 5 minutes for its first fetch however
-short `pollMinutes` is. That is not a bug and cannot be fixed from the manifest — it is what
-"self-referential" costs. The launch-time log line is named `startingEveryMinutes` to say exactly that,
+short `pollMinutes` is — though with the built-in now also 1 minute, that gap is a minute rather than
+five. It cannot be fixed from the manifest at all: it is what "self-referential" costs. The launch-time log line is named `startingEveryMinutes` to say exactly that,
 and the interval is logged again as `poll interval` whenever it actually changes, with where the value
 came from:
 

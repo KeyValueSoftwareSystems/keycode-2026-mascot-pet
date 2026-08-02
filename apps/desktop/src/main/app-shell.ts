@@ -261,8 +261,11 @@ export async function startApp(): Promise<AppShell> {
   // needs nothing but HTTPS and an ETag, both of which come for free.
   //
   // Publishing is a *commit* (`pnpm notify`), which is the point — remote text that lands above
-  // everything on a colleague's screen goes through the same review as code. The cost is a CDN cache
-  // of up to ~10 minutes, which is why the default poll interval is 10 rather than 1.
+  // everything on a colleague's screen goes through the same review as code.
+  //
+  // Pages advertises `max-age=600`, but it purges its CDN on deploy (measured: `x-cache: MISS`,
+  // `age: 0`, new content served immediately), so that only governs how long an *unchanged* file is
+  // served from the edge. A short poll interval therefore does deliver quickly.
   //
   // The manifest is world-readable, so nothing goes in it that would not be fine on a public page.
   // See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.

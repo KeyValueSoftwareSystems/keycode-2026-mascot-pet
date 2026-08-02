@@ -129,7 +129,19 @@ export const MANIFEST_MAX_PER_POLL = 3
 export const BROADCAST_DURATION_MS = { min: 2_000, max: 30_000 } as const
 
 export const POLL = {
-  baseMinutes: 5,
+  /*
+   * 1 minute.
+   *
+   * This was 5, and the manifest was set to 10 on the assumption that GitHub Pages' `max-age=600`
+   * would serve stale content for ten minutes and make anything shorter pure waste. Measured instead
+   * of assumed: Pages **purges its CDN on deploy** (`x-cache: MISS`, `age: 0`, new content visible
+   * with no cache-buster immediately after a deploy), so `max-age` only governs how long an
+   * *unchanged* file is served from the edge. A short poll therefore does deliver quickly.
+   *
+   * The bandwidth is negligible: the manifest is ~500 bytes and most polls answer 304, so a client
+   * costs under a megabyte a day.
+   */
+  baseMinutes: 1,
   /** ±20%, so a fleet of clients does not synchronise into a thundering herd. */
   jitter: 0.2,
   minMinutes: 1,
