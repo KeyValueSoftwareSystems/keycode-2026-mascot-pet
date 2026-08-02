@@ -28,7 +28,8 @@ From `v1.1.0` onward these are real releases:
 | `v1.6.1` | Made the effective poll interval visible in the log |
 | `v1.7.0` | Public repo, GitHub Pages manifest, `pnpm notify`, CI on three OSes |
 | `v1.7.1` | Release announcements from CI, 1-minute polling |
-| `v1.8.0` | **Linux: the speech bubble is drawn at all.** An "Always on top" toggle. The pet reaches the top of the screen, and the bubble flips below it |
+| `v1.8.0` | **Linux: the speech bubble is drawn at all.** An "Always on top" toggle. The pet reaches the top of the screen, and the bubble flips below it. *Incomplete — the Windows leg failed on a host-dependent test, so it carries no Windows artifacts; superseded by `v1.8.1`* |
+| `v1.8.1` | The same release, complete on all three platforms, plus coverage for the Windows re-assert workaround the failure exposed |
 
 Why each decision was made — including the ones that were wrong first — is in
 [DECISIONS.md](DECISIONS.md).
