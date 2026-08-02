@@ -1,0 +1,14 @@
+# LF in the repository on every platform.
+#
+# Without this, a Windows checkout converts committed files to CRLF, the generators write LF, and the
+# "generated files are fresh" check fails on Windows only — with a diff that looks like a real change
+# but is entirely line endings.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.png binary
+*.icns binary
+*.ico binary
+*.ttf binary
+*.dmg binary
+*.zip binary

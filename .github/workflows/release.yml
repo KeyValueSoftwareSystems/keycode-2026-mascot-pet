@@ -20,16 +20,16 @@ jobs:
         include:
           # macOS 14 is an arm64 runner and builds both architectures.
           - os: macos-14
-            flag: --mac
+            script: package
             name: mac
           - os: windows-latest
-            flag: --win
+            script: 'package:win-ci-only'
             name: win
           # Ubuntu 22.04 deliberately, not `latest`: the older glibc produces deb/rpm/AppImage
           # artifacts that install on a wider range of distributions. This is also the ONLY leg that
           # may build deb/rpm — see the note in docs/VERIFICATION.md about fpm on Apple Silicon.
           - os: ubuntu-22.04
-            flag: --linux
+            script: 'package:linux-ci-only'
             name: linux
     runs-on: ${{ matrix.os }}
 
@@ -51,6 +51,10 @@ jobs:
       # Generated artifacts are committed so a fresh clone builds without a generate step. This is the
       # check that stops them silently drifting from the generator.
       - name: Generated files are fresh
+        # `shell: bash` is required, not stylistic: Windows runners default to PowerShell, where the
+        # line-continuation backslashes below are read as literal arguments — `fatal: '\' is outside
+        # repository`. It failed only on Windows, and only on the first run of this workflow.
+        shell: bash
         run: |
           pnpm generate
           git diff --exit-code -- \
@@ -93,8 +97,13 @@ jobs:
           path: docs/demo/ci-*.png
           if-no-files-found: warn
 
+      # Runs the *same* script a developer runs locally. The first attempt invoked electron-builder
+      # directly and omitted `--config electron-builder.config.cjs`, so every setting was ignored: the
+      # output went to `dist/` instead of `release/`, and the artifacts were named after the workspace
+      # package (`keycode-pet-workspace-1.7.0-arm64.dmg`). Calling the script removes the whole class of
+      # CI-versus-local drift.
       - name: Package
-        run: pnpm build && pnpm exec electron-builder ${{ matrix.flag }} --publish never
+        run: pnpm ${{ matrix.script }}
         env:
           # Without this electron-builder tries to auto-discover a Developer ID on a runner that has
           # none and fails the build — a CI-only failure that never reproduces locally.
