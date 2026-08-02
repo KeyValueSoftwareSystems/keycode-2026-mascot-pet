@@ -19,7 +19,13 @@ import {
   petCentreForWindowX,
   type Placement,
 } from './floor-placement.js'
-import { ALPHA_MASK, shapeRectsForWindow, spriteScreenRect } from '../sprite/alpha-mask.js'
+import {
+  ALPHA_MASK,
+  bubbleBandRect,
+  shapeRectsForFrame,
+  spriteScreenRect,
+  type BubbleSide,
+} from '../sprite/alpha-mask.js'
 import { IPC, petFrameSchema, type PetFrame } from '../pet-frame.js'
 import { rendererFile, paths } from './paths.js'
 import { emit } from './harness-handshake.js'
@@ -46,20 +52,23 @@ export interface PetWindow {
   /** Screen rect of the pet's visible pixels — what the harness asserts against. */
   spriteRect(): Rectangle
   /**
-   * Screen y of the current pose's topmost opaque pixel — the line at and below which the speech
-   * bubble can never paint, since it is anchored above the head with a tail pointing down at it.
+   * The screen y bounding where the speech bubble may paint, and which side of it that is.
+   *
+   * For `above` it is the current pose's topmost opaque pixel: the bubble hangs over the head with a
+   * tail pointing down at it, so it can never paint at or below that line. For `below` it is the
+   * pose's lowest opaque pixel and the bubble is under the feet, so it can never paint at or above it.
    *
    * Exists for the harness: the transparency assertion samples a ring around the sprite, and once
    * the bubble became a speech bubble it legitimately paints inside that ring. Without a bound the
    * assertion either fails on a run that is behaving correctly, or gets loosened into meaning
-   * nothing. Derived from the same generated per-state head top the renderer uses, so there is no
+   * nothing. Derived from the same generated per-state mask entries the renderer uses, so there is no
    * second copy of the geometry to drift.
    *
    * `visible` is whether a bubble is actually on screen. The harness must not infer that from its
    * own `--callout` flag: a broadcast or a reminder puts a bubble up with no flag involved, and the
    * assertion would then measure the bubble and report a transparency failure.
    */
-  bubbleFloorY(): { y: number; visible: boolean }
+  bubbleBand(): { y: number; side: BubbleSide; visible: boolean }
   /**
    * Change the pet's size.
    *
@@ -71,7 +80,21 @@ export interface PetWindow {
    * changed size — on Linux a stale shape leaves the pet grabbable in the wrong place.
    */
   setScale(scale: number, petCentreX: number, feetY: number): Placement
+  /**
+   * Move the bubble's reserved band to the other end of the window, keeping the pet where it is.
+   *
+   * Visually silent when nothing is on screen but the pet: the window keeps its size and the sprite
+   * keeps its screen pixels, so only the invisible window rect moves. Returns the placement in force
+   * so the caller can push a frame carrying the new sprite origin.
+   */
+  setBubbleSide(side: BubbleSide, petCentreX: number, feetY: number): Placement
   reassertAlwaysOnTop(): void
+  /**
+   * Turn the on-top behaviour on or off. Off is a real "behind other windows", not a weaker level.
+   *
+   * A callout still raises the pet for as long as it is on screen — see `sendFrame`.
+   */
+  setAlwaysOnTopEnabled(enabled: boolean): void
   setDragging(active: boolean): void
   emitWindowReady(display: DisplaySnapshot): void
   dispose(): void
@@ -83,12 +106,28 @@ export async function createPetWindow(options: {
   /** Restored free-placement height, or null to start on the floor. */
   initialFeetY?: number | null
   initialScale?: number
+  /**
+   * Which side the bubble starts on. Passed in rather than derived, because deciding it needs the
+   * work area and the caller already has the display.
+   *
+   * It matters at launch and not only later: a pet restored to a free placement near the top of the
+   * screen would otherwise be created with the band above it, and the first controller tick would
+   * move the window — a visible jump on startup for the one placement that most needs to look
+   * deliberate.
+   */
+  initialBubbleSide?: BubbleSide
+  /** Whether the pet starts in front of everything. Default true. */
+  alwaysOnTop?: boolean
   events: PetWindowEvents
   log?: (message: string, meta?: unknown) => void
 }): Promise<PetWindow> {
   const log = options.log ?? (() => {})
-  // Mutable: changing the pet's size re-derives the whole placement and resizes the window.
-  let placement = placementForScale(options.initialScale ?? 1)
+  // Mutable: changing the pet's size or the bubble's side re-derives the whole placement.
+  let placement = placementForScale(
+    options.initialScale ?? 1,
+    ALPHA_MASK,
+    options.initialBubbleSide ?? 'above',
+  )
 
   const x = windowXForPetCentre(options.initialPetCentreX, placement)
   const y = windowYForFloor(options.initialFeetY ?? options.initialFloor.y, placement)
@@ -109,7 +148,7 @@ export async function createPetWindow(options: {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: true,
+    alwaysOnTop: options.alwaysOnTop ?? true,
     // Linux compositors otherwise treat the overlay as a normal focusable toplevel and let it
     // steal focus. Nothing in the pet window needs keyboard input.
     focusable: process.platform !== 'linux',
@@ -124,15 +163,42 @@ export async function createPetWindow(options: {
 
   applyWindowSecurity(win, 'pet')
 
+  let keeper: AlwaysOnTopKeeper | null = null
+  /** Last animation sent, so the bubble band can use the right per-state head top and foot inset. */
+  let lastAnimation: string | null = null
+  /** Whether the last frame carried a bubble. Drives the shape region and the callout raise. */
+  let lastBubbleVisible = false
+  /** Whether the last frame carried a CSS overlay — the sleep Z's. Drives the shape region. */
+  let lastOverlayVisible = false
+
+  /**
+   * The Linux input-and-drawing region for what is currently on screen.
+   *
+   * Recomputed rather than fixed because `setShape` clips *drawing*: a region covering only the
+   * character means the speech bubble and the sleep Z's are never painted at all on Linux. See
+   * `shapeRectsForFrame`.
+   */
+  const currentShapeRects = (): readonly Rectangle[] =>
+    shapeRectsForFrame(
+      ALPHA_MASK,
+      {
+        spriteOrigin: placement.spriteOrigin,
+        scale: placement.scale,
+        windowWidth: placement.windowSize.width,
+        windowHeight: placement.windowSize.height,
+      },
+      {
+        animation: lastAnimation ?? 'idle',
+        bubbleVisible: lastBubbleVisible,
+        overlayVisible: lastOverlayVisible,
+        bubbleSide: placement.bubbleSide,
+      },
+    )
+
   const forwarding = createForwardingController(win, {
-    shapeRects: shapeRectsForWindow(ALPHA_MASK, placement.spriteOrigin, { scale: placement.scale }),
+    shapeRects: currentShapeRects(),
     log,
   })
-  let keeper: AlwaysOnTopKeeper | null = null
-  /** Last animation sent, so `bubbleFloorY()` can pick the right per-state head top. */
-  let lastAnimation: string | null = null
-  /** Whether the last frame carried a bubble. Harness-only; see `bubbleFloorY`. */
-  let lastBubbleVisible = false
 
   // ---- IPC from the renderer. Every handler checks provenance: a message from another
   // webContents has no business steering the pet window.
@@ -188,7 +254,7 @@ export async function createPetWindow(options: {
 
   // `showInactive` rather than `show`: the pet must never take focus from what the user is doing.
   win.showInactive()
-  keeper = startAlwaysOnTopKeeper(win)
+  keeper = startAlwaysOnTopKeeper(win, { enabled: options.alwaysOnTop ?? true })
   forwarding.onShown()
 
   const petWindow: PetWindow = {
@@ -232,9 +298,31 @@ export async function createPetWindow(options: {
         })
         return
       }
+      const previous = { lastAnimation, lastBubbleVisible, lastOverlayVisible }
       lastAnimation = parsed.data.animation
       lastBubbleVisible = parsed.data.bubble !== null
+      lastOverlayVisible = parsed.data.overlay !== 'none'
       win.webContents.send(IPC.frame, parsed.data)
+
+      // On Linux the shape region decides what gets *painted*, so it has to follow the frame: the
+      // bubble band belongs in it only while a bubble is up, and the pose changes where that band
+      // ends. Guarded on an actual change — this runs on every animation assignment, and `setShape`
+      // is an X server round trip.
+      if (
+        previous.lastAnimation !== lastAnimation ||
+        previous.lastBubbleVisible !== lastBubbleVisible ||
+        previous.lastOverlayVisible !== lastOverlayVisible
+      ) {
+        forwarding.setShapeRects(currentShapeRects())
+      }
+
+      // A pet the user has sent behind their windows still has to be able to say something. Doing it
+      // here rather than at each call site is what makes it cover reminders, broadcasts and update
+      // announcements alike: this is the one place that knows whether a bubble is on screen, so the
+      // raise cannot drift out of sync with what is actually visible.
+      if (previous.lastBubbleVisible !== lastBubbleVisible) {
+        keeper?.raiseForCallout(lastBubbleVisible)
+      }
     },
 
     spriteRect(): Rectangle {
@@ -242,13 +330,24 @@ export async function createPetWindow(options: {
       return spriteScreenRect(ALPHA_MASK, bounds, placement.spriteOrigin, placement.scale) as Rectangle
     },
 
-    bubbleFloorY(): { y: number; visible: boolean } {
+    bubbleBand(): { y: number; side: BubbleSide; visible: boolean } {
       const bounds = win.isDestroyed() ? { x, y } : win.getBounds()
-      const headTop =
-        (lastAnimation === null ? undefined : ALPHA_MASK.headTopByState[lastAnimation]) ??
-        ALPHA_MASK.bbox.y
+      const band = bubbleBandRect(
+        ALPHA_MASK,
+        {
+          spriteOrigin: placement.spriteOrigin,
+          scale: placement.scale,
+          windowWidth: placement.windowSize.width,
+          windowHeight: placement.windowSize.height,
+        },
+        lastAnimation ?? 'idle',
+        placement.bubbleSide,
+      )
       return {
-        y: bounds.y + placement.spriteOrigin.y + headTop * placement.scale,
+        // The band's inner edge — the head top for `above`, the feet for `below`. Both are the line
+        // the bubble cannot cross, which is the only thing the harness needs from it.
+        y: bounds.y + (placement.bubbleSide === 'below' ? band.y : band.height),
+        side: placement.bubbleSide,
         visible: lastBubbleVisible,
       }
     },
@@ -257,7 +356,7 @@ export async function createPetWindow(options: {
       if (win.isDestroyed()) return placement
       if (scale === placement.scale) return placement
 
-      placement = placementForScale(scale)
+      placement = placementForScale(scale, ALPHA_MASK, placement.bubbleSide)
       const nextX = windowXForPetCentre(petCentreX, placement)
       const nextY = windowYForFloor(feetY, placement)
 
@@ -270,15 +369,32 @@ export async function createPetWindow(options: {
         height: placement.windowSize.height,
       })
 
-      forwarding.setShapeRects(
-        shapeRectsForWindow(ALPHA_MASK, placement.spriteOrigin, { scale: placement.scale }),
-      )
+      forwarding.setShapeRects(currentShapeRects())
       log('pet size changed', { scale, height: placement.windowSize.height })
+      return placement
+    },
+
+    setBubbleSide(side: BubbleSide, petCentreX: number, feetY: number): Placement {
+      if (win.isDestroyed()) return placement
+      // The controller asks on every tick, so the early return is what stops a drag issuing a
+      // `setBounds` and a `setShape` seventeen times a second.
+      if (side === placement.bubbleSide) return placement
+
+      placement = placementForScale(placement.scale, ALPHA_MASK, side)
+      // The window keeps its size; only which end of it is reserved changes, so this moves the window
+      // by exactly the band height and leaves the sprite on the same screen pixels.
+      win.setPosition(windowXForPetCentre(petCentreX, placement), windowYForFloor(feetY, placement), false)
+      forwarding.setShapeRects(currentShapeRects())
+      log('bubble side changed', { side, feetY })
       return placement
     },
 
     reassertAlwaysOnTop(): void {
       keeper?.reassert()
+    },
+
+    setAlwaysOnTopEnabled(enabled: boolean): void {
+      keeper?.setEnabled(enabled)
     },
 
     setDragging(active: boolean): void {

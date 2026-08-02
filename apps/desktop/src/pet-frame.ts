@@ -46,6 +46,18 @@ export const petFrameSchema = z.strictObject({
   sprite: z.strictObject({ x: z.number().int(), y: z.number().int() }),
 
   /**
+   * Which side of the pet the speech bubble is anchored on.
+   *
+   * Geometry, which is the one category of knowledge the renderer is allowed. Main decides it — the
+   * decision needs the work area and the pet's height on screen, neither of which the renderer can
+   * see — and the renderer only chooses which edge to hang the bubble and its tail from.
+   *
+   * It exists because the window reserves a fixed band for the bubble at one end, and a pet dragged
+   * to the top of the screen has no room left above it. See `bubbleSideFor`.
+   */
+  bubbleSide: z.enum(['above', 'below']),
+
+  /**
    * Sprite scale — 0.5, 0.75 or 1. Applied as a CSS transform from the cell's top-left.
    *
    * Bounded rather than a free number: the renderer sets it as a custom property that multiplies

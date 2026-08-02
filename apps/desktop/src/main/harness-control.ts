@@ -60,8 +60,9 @@ export interface HarnessTargets {
    * lucky and passes them against the wrong pixels when you are not.
    */
   spriteRect?: () => { x: number; y: number; width: number; height: number }
-  /** Screen y at and below which the speech bubble cannot paint. See PetWindow.bubbleFloorY. */
-  bubbleFloorY?: () => { y: number; visible: boolean }
+  /** The line the speech bubble cannot cross, and which side of the pet it is on. See
+   * PetWindow.bubbleBand. */
+  bubbleBand?: () => { y: number; side: 'above' | 'below'; visible: boolean }
   /** Whether the pet is floor-locked, so the harness knows if feet-on-floor is assertable. */
   floorLocked?: () => boolean
   /** Place the pet at an absolute position, as a drop would. */
@@ -99,7 +100,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           const size = image.getSize()
           const isPet = command.window === 'pet'
           const rect = isPet ? targets.spriteRect?.() : undefined
-          const bubble = isPet ? targets.bubbleFloorY?.() : undefined
+          const bubble = isPet ? targets.bubbleBand?.() : undefined
           const floorLocked = isPet ? targets.floorLocked?.() : undefined
           const petScale = isPet ? targets.petScale?.() : undefined
           emit({
@@ -112,7 +113,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
             ...(rect ? { spriteRect: rect } : {}),
             ...(bubble === undefined
               ? {}
-              : { bubbleFloorY: bubble.y, bubbleVisible: bubble.visible }),
+              : { bubbleEdgeY: bubble.y, bubbleSide: bubble.side, bubbleVisible: bubble.visible }),
             ...(floorLocked === undefined ? {} : { floorLocked }),
             ...(petScale === undefined ? {} : { petScale }),
           })

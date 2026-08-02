@@ -19,7 +19,7 @@
 import { z } from 'zod'
 import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 4 as const
+export const SETTINGS_SCHEMA_VERSION = 5 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -30,6 +30,15 @@ export const settingsSchema = z.strictObject({
   movementEnabled: z.boolean(),
   waterReminderEnabled: z.boolean(),
   stretchReminderEnabled: z.boolean(),
+
+  /**
+   * Whether the pet floats in front of everything.
+   *
+   * Off sends it behind other windows, where it is a companion you glance at rather than something in
+   * the way. A callout still raises it for as long as the bubble is up — see the keeper — because a
+   * team broadcast delivered to a window nobody can see has not been delivered.
+   */
+  alwaysOnTop: z.boolean(),
 
   /** Sprite scale. The bubble does not scale with it — see PET_SIZE_SCALES. */
   petSize: z.enum(PET_SIZES as unknown as [PetSize, ...PetSize[]]),
@@ -87,6 +96,7 @@ export const DEFAULT_SETTINGS: Settings = {
   movementEnabled: true,
   waterReminderEnabled: true,
   stretchReminderEnabled: true,
+  alwaysOnTop: true,
   petSize: DEFAULT_PET_SIZE,
   position: null,
   reminders: {
@@ -149,6 +159,13 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
           ? { ...(reminders as Record<string, unknown>), waterMinutes: null, stretchMinutes: null }
           : reminders,
     }
+  }
+
+  // v4 → v5: always-on-top became a choice. It defaults to true because that is what every existing
+  // install already does — an upgrade that silently sent everyone's pet behind their windows would
+  // look exactly like the app having broken.
+  if (out['schemaVersion'] === 4) {
+    out = { ...out, schemaVersion: 5, alwaysOnTop: true }
   }
 
   return out

@@ -454,14 +454,15 @@ function assertSpritePainted(png, region, label) {
  * Reading alpha directly is what makes this trustworthy: a composite could show the
  * backdrop colour through a window that is merely *painted* the same colour.
  *
- * `bubbleFloor` (in capture pixels, or null) excludes everything above it. The speech bubble is
- * anchored just over the character's hair and is wider than the body, so when one is on screen the
- * app is legitimately painting in the ring — above, and to both sides. Main reports the exact y
- * below which no bubble pixel can exist, derived from the same generated per-state head top the
- * renderer anchors to, so this excludes the bubble and nothing more. Everything from the hair down
- * still has to be transparent, and a run without a callout still checks the whole ring.
+ * `bubble` — `{ edge, side }` in capture pixels, or null — excludes the band the bubble occupies. The
+ * speech bubble is wider than the body, so when one is on screen the app is legitimately painting in
+ * the ring on three sides. Main reports the exact y no bubble pixel can cross, derived from the same
+ * generated per-state mask entries the renderer anchors to, so this excludes the bubble and nothing
+ * more. `side` matters because a pet near the top of the screen wears its bubble *below* its feet:
+ * excluding the region above it would then check nothing and miss the region that is actually painted.
+ * A run without a callout still checks the whole ring.
  */
-function assertWindowTransparentAround(png, spriteRegion, label, ringPx, bubbleFloor = null) {
+function assertWindowTransparentAround(png, spriteRegion, label, ringPx, bubble = null) {
   let transparent = 0
   let total = 0
 
@@ -471,8 +472,14 @@ function assertWindowTransparentAround(png, spriteRegion, label, ringPx, bubbleF
     x < spriteRegion.x + spriteRegion.width + 1 &&
     y < spriteRegion.y + spriteRegion.height + 1
 
-  const top = Math.max(spriteRegion.y - ringPx, bubbleFloor ?? -Infinity)
-  for (let y = top; y < spriteRegion.y + spriteRegion.height + ringPx; y += 1) {
+  const above = bubble && bubble.side !== 'below' ? bubble.edge : null
+  const below = bubble && bubble.side === 'below' ? bubble.edge : null
+  const top = Math.max(spriteRegion.y - ringPx, above ?? -Infinity)
+  const bottom = Math.min(
+    spriteRegion.y + spriteRegion.height + ringPx,
+    below ?? Number.POSITIVE_INFINITY,
+  )
+  for (let y = top; y < bottom; y += 1) {
     for (let x = spriteRegion.x - ringPx; x < spriteRegion.x + spriteRegion.width + ringPx; x += 1) {
       if (inSprite(x, y)) continue
       if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue
@@ -692,8 +699,11 @@ async function assertPass(session, opts, name) {
       Math.max(8, Math.round(24 * scale)),
       // Gated on main reporting a bubble actually on screen — never on `--callout`, because a
       // broadcast or a reminder raises one with no flag involved. Absent, the full ring is checked.
-      captured.bubbleVisible && captured.bubbleFloorY !== undefined
-        ? Math.round((captured.bubbleFloorY - captured.bounds.y) * scale)
+      captured.bubbleVisible && captured.bubbleEdgeY !== undefined
+        ? {
+            edge: Math.round((captured.bubbleEdgeY - captured.bounds.y) * scale),
+            side: captured.bubbleSide ?? 'above',
+          }
         : null,
     )
     // `floorLocked` is absent on builds before free placement, where floor-locked was the only mode.
@@ -709,7 +719,13 @@ async function assertPass(session, opts, name) {
     console.log(`  ✓ A1 sprite painted (${(fill * 100).toFixed(1)}% of the bbox has alpha)`)
     console.log(
       `  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring` +
-        `${captured.bubbleVisible ? ', from the hair down — a bubble is up' : ''})`,
+        `${
+          captured.bubbleVisible
+            ? captured.bubbleSide === 'below'
+              ? ', down to the feet — a bubble is up below the pet'
+              : ', from the hair down — a bubble is up'
+            : ''
+        })`,
     )
     console.log(`  ✓ A3 image is not blank (${colours} distinct colours)`)
     console.log(

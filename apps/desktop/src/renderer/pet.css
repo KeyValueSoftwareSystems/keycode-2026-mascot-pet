@@ -100,10 +100,13 @@ body {
  * head, because the window is 360px wide for a 107px body and the cell has transparent padding
  * above the hair. It read as an unrelated notification rather than as the pet speaking.
  *
- * `--body-cx` / `--body-top` come from main via the renderer, derived from the generated mask
- * bbox. `100%` here is the window height, so the `bottom` anchor puts the box's lower edge
- * exactly one tail-plus-gap above the topmost opaque pixel of *any* pose — the bbox is a union,
+ * `--body-cx` / `--body-top` / `--body-bottom` come from main via the renderer, derived from the
+ * generated mask bbox. `100%` here is the window height, so the `bottom` anchor puts the box's lower
+ * edge exactly one tail-plus-gap above the topmost opaque pixel of *any* pose — the bbox is a union,
  * so a taller frame like `jumping` still cannot collide with it.
+ *
+ * `data-side='below'` flips the whole thing under the pet's feet, for when the pet has been dragged
+ * to the top of the screen and there is no room above it. Main decides which; see `bubbleSideFor`.
  */
 #bubble {
   position: absolute;
@@ -124,19 +127,30 @@ body {
   background: var(--bubble-bg);
   color: var(--bubble-fg);
   /*
-   * System emoji fonts first, bundled font last. macOS and Windows both ship one, so they never
-   * load the 4.8MB file; Linux falls through to it. See pet.fonts.css.
+   * System emoji fonts first, bundled font next, and **the generic family last of all**.
+   * macOS and Windows both ship an emoji font, so they never load the 4.8MB file; Linux is meant to
+   * fall through to it. See pet.fonts.css.
+   *
+   * `sans-serif` used to sit in the middle of this list, ahead of every emoji family. That is wrong on
+   * its own terms — a generic family resolves through fontconfig's alias chain, which yields
+   * *something* for any character, so nothing after it is reliably reachable — and it is fixed here.
+   *
+   * It is **not** a proven fix for the open bug that emoji show as tofu on Linux (see
+   * docs/VERIFICATION.md). Measured in the lab: this reordering alone does not restore them, while the
+   * very same font file *does* render once installed system-wide, so the file and the platform's
+   * COLRv1 support are both fine and something about the `@font-face` route is not. Cause not yet
+   * identified. Recorded rather than guessed at.
    */
   font:
     13px / 1.35 system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
-    sans-serif,
     'Apple Color Emoji',
     'Segoe UI Emoji',
     'Noto Color Emoji',
-    'Keycode Emoji';
+    'Keycode Emoji',
+    sans-serif;
   /* Wraps long words rather than overflowing: manifest text is not under our control. */
   overflow-wrap: anywhere;
 }
@@ -168,6 +182,37 @@ body {
 #bubble::after {
   bottom: calc(-1 * var(--bubble-tail) + var(--bubble-line-width));
   border-top-color: var(--bubble-bg);
+}
+
+/*
+ * Below the pet: the same bubble, mirrored vertically.
+ *
+ * Every offset flips end for end — `top` for `bottom`, the tail's `border-bottom-*` for its
+ * `border-top-*`, and the fill triangle shifted *down* over the bubble's top border instead of up
+ * over its bottom one. `bottom: auto` is required: leaving the `bottom` anchor set alongside `top`
+ * would stretch the box between the two.
+ */
+#bubble[data-side='below'] {
+  top: calc(var(--body-bottom, 0px) + var(--bubble-tail) + var(--bubble-tail-gap));
+  bottom: auto;
+}
+
+#bubble[data-side='below']::before,
+#bubble[data-side='below']::after {
+  bottom: auto;
+  border-bottom-width: var(--bubble-tail);
+  border-top-width: 0;
+  border-top-color: transparent;
+}
+
+#bubble[data-side='below']::before {
+  top: calc(-1 * var(--bubble-tail));
+  border-bottom-color: var(--bubble-line);
+}
+
+#bubble[data-side='below']::after {
+  top: calc(-1 * var(--bubble-tail) + var(--bubble-line-width));
+  border-bottom-color: var(--bubble-bg);
 }
 
 /*

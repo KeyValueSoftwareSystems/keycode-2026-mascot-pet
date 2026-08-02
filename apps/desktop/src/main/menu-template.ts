@@ -35,6 +35,7 @@ export interface ReminderView {
 
 export interface MenuViewModel {
   movementEnabled: boolean
+  alwaysOnTop: boolean
   petSize: PetSize
   water: ReminderView
   stretch: ReminderView
@@ -43,6 +44,7 @@ export interface MenuViewModel {
 
 export interface MenuActions {
   toggleMovement(): void
+  toggleAlwaysOnTop(): void
   setPetSize(size: PetSize): void
   /** `minutes: null` means off. Anything else enables the reminder at that interval. */
   setReminder(kind: 'water' | 'stretch', minutes: number | null): void
@@ -130,6 +132,12 @@ export function buildMenuTemplate(
       click: () => actions.toggleMovement(),
     },
     {
+      label: 'Always on top',
+      type: 'checkbox',
+      checked: view.alwaysOnTop,
+      click: () => actions.toggleAlwaysOnTop(),
+    },
+    {
       label: 'Drink water reminder',
       submenu: reminderSubmenu('water', view.water, actions),
     },
@@ -169,6 +177,7 @@ export const MENU_ITEM_ORDER = [
   'title',
   'separator',
   'movement',
+  'alwaysOnTop',
   'water',
   'stretch',
   'size',

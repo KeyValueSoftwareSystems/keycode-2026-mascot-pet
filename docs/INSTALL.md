@@ -78,14 +78,23 @@ Wayland and accept a pet that cannot move, launch it with `KEYCODE_PET_OZONE=nat
 **If right-clicking the pet does nothing** — some Wayland compositors swallow it. Use the tray icon
 instead; it has exactly the same menu.
 
+**Emoji in a message may show as a box.** A known bug, not a corrupt download: the app bundles a colour
+emoji font for Linux and it is not being applied. Installing your distribution's own emoji font fixes
+it — `sudo apt install fonts-noto-color-emoji` on Debian, Ubuntu and Mint. The rest of the message is
+unaffected.
+
 ---
 
 ## First run
 
 - The pet starts at the bottom of your primary display and wanders.
 - **Drag it anywhere.** Drop it mid-screen and it stays there; drop it near the bottom and it re-locks
-  to the floor. "Reset position" in the menu brings it home.
-- **Right-click** the pet (or use the tray icon) for size, movement, and reminder intervals.
+  to the floor. Take it to the very top and its speech bubble moves underneath it. "Reset position" in
+  the menu brings it home.
+- **Right-click** the pet (or use the tray icon) for size, movement, always-on-top, and reminder
+  intervals.
+- **Always on top** is on to begin with. Turn it off and the pet sits behind your windows; it still
+  comes forward for as long as it has a message on screen, then drops back.
 - Water and stretch reminders are on by default, at 45 and 60 minutes.
 
 ## Uninstalling

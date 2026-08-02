@@ -1,6 +1,6 @@
 {
   "name": "keycode-pet-workspace",
-  "version": "1.7.1",
+  "version": "1.8.0",
   "private": true,
   "description": "Keycode mascot desktop companion \u2014 workspace root",
   "license": "MIT",
@@ -25,6 +25,7 @@
     "test:watch": "vitest",
     "smoke": "pnpm build && node scripts/smoke.mjs",
     "smoke:states": "pnpm build && node scripts/smoke.mjs --all-states",
+    "lab:linux": "bash docker/linux-lab/lab.sh",
     "manifest:serve": "node scripts/dev-manifest-server.mjs",
     "notify": "pnpm build && node scripts/notify.mjs",
     "notify:list": "pnpm build && node scripts/notify.mjs --list",

@@ -57,8 +57,13 @@ export type HandshakeEvent =
        * actually in this image rather than where the pet was at startup. Pet window only.
        */
       spriteRect?: HandshakeRect
-      /** Screen y at and below which no speech-bubble pixel can exist. Pet window only. */
-      bubbleFloorY?: number
+      /**
+       * The screen y no speech-bubble pixel can cross: the head top when the bubble is above the
+       * pet, the feet when it is below. Pet window only.
+       */
+      bubbleEdgeY?: number
+      /** Which side of the pet the bubble is anchored on. Pet window only. */
+      bubbleSide?: 'above' | 'below'
       /** Whether a bubble was actually on screen for this capture. Pet window only. */
       bubbleVisible?: boolean
       /**

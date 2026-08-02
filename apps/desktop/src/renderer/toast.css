@@ -40,16 +40,18 @@ body {
   border-left: 3px solid var(--accent, var(--tone-info));
   background: var(--surface);
   color: var(--text);
+  /* Generic family last — see the note in pet.css. Anything after `sans-serif` is not reliably
+   * reachable, so the emoji families have to precede it. */
   font:
     13px / 1.35 system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
-    sans-serif,
     'Apple Color Emoji',
     'Segoe UI Emoji',
     'Noto Color Emoji',
-    'Keycode Emoji';
+    'Keycode Emoji',
+    sans-serif;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 
   /* `both` so the pre-animation state is the 0% frame — otherwise the toast flashes at full

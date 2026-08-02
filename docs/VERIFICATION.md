@@ -6,6 +6,74 @@ window was constructed with `transparent: true` and still miss that a compositor
 a grey box behind the sprite. So the loop is **build → launch → capture → look at the image**,
 and the harness that does it was built before the pet existed.
 
+## ⚠ What `capturePage()` cannot see, and the bug that proved it
+
+`webContents.capturePage()` renders the **web contents**. It never touches the window itself — not
+its shape, not its z-order, not what the compositor did with its alpha. Everything below in this
+document that says "verified" on the strength of a window capture is therefore a claim about the
+*renderer*, and silent about the *window*.
+
+That gap shipped a bug for four versions. On Linux, click-through is done with `win.setShape(rects)`,
+whose documentation reads: *"Setting a window shape determines the area within the window where the
+system permits **drawing** and user interaction. Outside of the given region, **no pixels will be
+drawn**."* The rects covered only the character's opaque cells, so the speech bubble — which lives in
+a band above the sprite — was never painted on Linux at all. Only the sliver overlapping the head's
+mask cells appeared.
+
+Every assertion passed the whole time, including the run this document cited as "Linux rendering
+verified in CI". Both statements were true and neither was the one that mattered:
+
+| The same instant, two instruments | |
+|---|---|
+| `capturePage()` — what CI saw | ![](demo/linux-lab/v18-linux-capturepage-blind.png) |
+| `import -window root` — what the X server drew | ![](demo/linux-lab/v18-linux-bubble-clipped.png) |
+| after the fix | ![](demo/linux-lab/v18-linux-bubble-fixed.png) |
+
+**The rule this produces:** a window capture cannot support a claim about window shape,
+transparency-as-composited, or z-order. Those need a picture taken *outside* the process — the
+composite screenshot on macOS, or the Linux lab below.
+
+## The Linux lab
+
+`pnpm lab:linux` runs the pet on a real X server inside a container, so the questions above can be
+asked from a Mac. Colima on Apple Silicon is aarch64, so it runs natively rather than emulated.
+
+```bash
+pnpm lab:linux                                    # capture, with a sticky callout
+pnpm lab:linux capture sleep-z --state sleep       # any smoke flags after the name
+pnpm lab:linux capture top --place 700,192 --callout "at the top" --sticky
+pnpm lab:linux vnc                                # then: open vnc://localhost:5900
+pnpm lab:linux shell                              # a prompt inside, X already up
+```
+
+Output lands in `docs/demo/linux-lab/`. Three files per run, and the point is comparing them:
+
+| | |
+|---|---|
+| `*.root.png` | The whole X root window — **the only one that shows shape clipping and real compositing** |
+| `*.window-x11.png` | The pet's window as the X server holds it, i.e. after shaping |
+| `*.capturePage.png` | The harness's own capture of the same instant, for the side-by-side |
+
+Two parts of the setup are load-bearing rather than incidental:
+
+- **`picom`.** Xvfb has no compositor, and an ARGB window without one paints its transparent regions
+  black — which looks exactly like a rendering bug and sends you chasing the wrong thing. Cinnamon and
+  GNOME both composite, so running picom emulates the user's machine rather than working around it.
+- **`-screen 0 1440x900x24+32`.** The `+32` is what gives Chromium a 32-bit ARGB visual to choose. At
+  plain depth 24 the window comes out opaque no matter how well the compositor behaves.
+
+It also runs a **pointer-routing probe** — `xdotool getmouselocation` reports the window under the
+pointer *as the X server resolves it*, which is precisely what the shape region decides. So
+click-through is now a checked assertion on Linux rather than a ported-on-trust claim: the pet's body
+and the bubble must route to the pet, and the transparent margin must fall through.
+
+Two things it deliberately does not do. Network is off unless `LAB_NET=1`, because the live manifest
+injects the current release announcement into any run long enough to poll and silently replaces
+whatever callout the run was about. And Chromium's sandbox stays *on* (`--security-opt
+seccomp=unconfined`, plus a root-owned setuid `chrome-sandbox` in the image) rather than being turned
+off with `--no-sandbox`: the lab exists to watch how Chromium composites a shaped transparent window,
+so it had better be the same Chromium the user runs.
+
 ## The two captures, and why there are two
 
 `pnpm smoke` takes two different pictures because they answer different questions.
@@ -176,11 +244,13 @@ Stated plainly because a green checklist that silently means "macOS only" is wor
 | macOS packaged build refusing loopback HTTP | **Verified** in the packaged app's own log — the `app.isPackaged` half of the two-condition broadcast gate |
 | **Launching from an Applications folder** | **Blocked on this machine — now explained.** Gatekeeper, not a defect. Installing the quarantined `.dmg` and launching produced the macOS dialog *"Keycode Pet" Not Opened — Apple could not verify Keycode Pet is free of malware*, with Done / Move to Bin. That is the modern form of the failure originally logged as unexplained: the process starts, stays alive, and never runs its main script, with no stdout, no log and no crash report. Isolated by running one **byte-identical** bundle (copied with `ditto`, `codesign -v` valid) from three places: build output — **runs**; a scratch directory — **runs**; `~/Applications` — **blocked**. So the variable is the Applications folder, not quarantine, not the copy method, not the signature: macOS assesses apps registered there strictly, and `spctl -a` rejects this one because it is ad-hoc signed (`identity: '-'`) and unnotarized. The real fix is a Developer ID plus notarization. Until then a human approves it once — right-click → Open, or System Settings › Privacy & Security › Open Anyway — or runs it from a folder that is not an Applications folder |
 | Right-click menu on the sprite | **Not directly verified.** The shared template is exercised by 15 tests and builds successfully in a real Electron process (the tray menu is constructed from it at boot), but no synthetic right-click was delivered — that needs cursor control the harness does not have |
-| Click-through and drag | **Not directly verified.** The alpha mask, its rect derivation and the placement maths have 20 tests; the forwarding predicates and watchdog are ported from openpets. Delivering a real click at a real coordinate was not automated |
-| **Linux rendering** | **Verified in CI**, first time ever, on the v1.7.0 release run: `A1 sprite painted (43.2%)` and `A2 window transparent around the sprite (100.0% of ring)` under `xvfb` on `ubuntu-22.04`. The pet renders, and the window really is see-through. Still unverified there: `setShape` click-through (needs a pointer), the tray-menu fallback for Wayland's swallowed right-click, and the bundled emoji font — xvfb is X11, so the XWayland path was not exercised either |
+| Click-through and drag, macOS | **Not directly verified.** The alpha mask, its rect derivation and the placement maths have 20 tests; the forwarding predicates and watchdog are ported from openpets. Delivering a real click at a real coordinate was not automated on macOS — `setIgnoreMouseEvents` is not observable from outside the process the way an X11 input shape is |
+| **Linux rendering** | **Verified in CI** on the v1.7.0 release run: `A1 sprite painted (43.2%)` and `A2 window transparent around the sprite (100.0% of ring)` under `xvfb`. That claim was about the renderer only, and it concealed the bubble being clipped away by `setShape` — see the top of this document. **Now verified properly in the lab**, at the X server: the pet, the complete bubble with its tail, and the sleep Z's all draw (`docs/demo/linux-lab/v18-linux-bubble-fixed.png`) |
+| **Linux click-through** | **Verified in the lab**, and it is a checked assertion rather than an observation. `xdotool getmouselocation` reports the window the X server routes the pointer to, which is what the shape region decides: pet body → pet, bubble → pet, margins → root, stable across repeated runs. This is the first direct evidence for the `setShape` path, which was previously ported on trust |
+| **Linux bubble below the pet** | **Verified in the lab.** Placed at the highest feet position the work area allows, the band flips under the feet, the tail points up at the shoes, and A2 correctly excludes the band on that side (`down to the feet — a bubble is up below the pet`) |
 | **Windows: boots and runs** | **Verified in CI.** The app reached `app-ready`, `window-ready` and `sprite-ready`, emitted a stream of `frame` events — so the motion engine is ticking — and fetched the Pages manifest, applying `pollMinutes` from it. That is the launch path, the window, the spritesheet decode, the renderer seam and the whole broadcast path, all working on Windows |
 | **Windows: the pixels** | **Not verified.** `webContents.capturePage()` did not return within 8s on the runner, so the run ended at exit 3 with every assertion unrun. The app was demonstrably alive at that point, so this reads as the capture stalling on a session with no real compositor rather than an app fault — but it is the next thing to chase, and until it passes the transparency, always-on-top and click-through claims are macOS-and-Linux only |
 | **Windows/Linux input** | **Not verified.** The occlusion-tracker fix, the `HWND_TOPMOST` re-assert interval, the mouse-forwarding retry ladder and Linux's `setShape` are ported from openpets on trust. Their constants live in one named object so a session on either platform can tune them without archaeology |
 | Windows `.exe`, Linux `.AppImage`/`.deb`/`.rpm` | **Built and published.** The v1.7.0 release carries all nine artifacts from the three-OS matrix. `deb`/`rpm` must come from the Ubuntu leg only: fpm on an Apple Silicon host is documented to produce broken packages, which is why `pnpm package` is restricted to `--mac` |
 | Broadcast reaching real clients | **Verified against a real host**, over the internet, with no env vars set. That evidence was gathered against the nginx box the manifest was originally served from; the host has since moved to GitHub Pages, which is **not** yet verified end to end — the first release rehearsal is what confirms it. A message published to the then-live host appeared in the pet (`docs/demo/m6-broadcast-live-host.window.png`), and a restart against the same file showed nothing — A2 reported the *full* transparency ring with no "a bubble is up" qualifier, which is the machine-checkable form of "the message did not re-appear". All nine fault modes were exercised against the dev server, which is where they can be injected |
-| The bundled emoji font | **Not verified.** Every emoji test here rendered via Apple Color Emoji, which comes first in the font stack by design. The bundled COLRv1 file is the Linux backstop and only a Linux run exercises it |
+| **The bundled emoji font** | **Verified as NOT working — an open bug.** It exists solely as the Linux backstop, and on Linux emoji render as tofu: `Time for some water 💧` shows a box (`docs/demo/linux-lab/v18-linux-emoji-tofu.png`). It has therefore never worked anywhere, since macOS and Windows use their own system emoji fonts and never load the file. Bisected in the lab: the *same* file installed system-wide renders the emoji correctly, so neither the font nor the platform's COLRv1 support is at fault, and something about the `@font-face` route is. Not the font-stack ordering either — `sans-serif` was moved after the emoji families (correct on its own terms; anything after a generic family is not reliably reachable) and the tofu persisted. No CSP violation and no font error appear with `ELECTRON_ENABLE_LOGGING=1`. **Cause not yet identified**, and recorded rather than guessed at. It costs one glyph in a message that is otherwise fully legible, and it is 4.8MB of payload currently buying nothing |

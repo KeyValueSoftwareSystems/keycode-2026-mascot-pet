@@ -44,10 +44,11 @@ cannot be missed by looking away.
 
 **Put it anywhere.** Drag it off the floor and it stays where you drop it, patrolling left and right at
 that height — and it is still there after a restart. Drop it near the bottom and it re-locks to the
-floor.
+floor. Take it right to the very top and the speech bubble moves underneath it, because there is
+nowhere above left to put one.
 
 </td>
-<td width="48%"><img src="docs/demo/v12-free-placement.window.png" alt="The pet placed mid-screen rather than on the floor"></td>
+<td width="48%"><img src="docs/demo/v18-top-bubble-below.window.png" alt="The pet at the top of the screen with its speech bubble below it, tail pointing up at its shoes"></td>
 </tr>
 <tr>
 <td width="52%" valign="top">
@@ -72,6 +73,8 @@ reminders on wake.
 <td width="52%" valign="top">
 
 **Turn movement off** and it settles down to sleep rather than freezing, then cycles quietly in place.
+**Turn "Always on top" off** and it drops behind your windows entirely — though it still rises for as
+long as it has something to say, because a message nobody can see has not been delivered.
 Right-clicking the pet gives the same menu as the tray icon — which matters on Wayland, where the
 compositor swallows right-clicks and the tray is the only way in.
 
@@ -134,10 +137,10 @@ fault-injection modes, and how release announcements work.
 | | |
 |---|---|
 | **macOS** | Verified — transparency, always-on-top, motion, sizes, free placement, broadcast, and installing from a quarantined `.dmg`. |
-| **Linux** | Rendering verified in CI: the pet paints and the window is genuinely transparent (100% of the alpha ring) under xvfb. Click-through (`setShape`) and the Wayland tray fallback are still unverified. |
+| **Linux** | Verified at the X server, not just in-process — `pnpm lab:linux` runs the app on a real X server in a container and screenshots the **root window**, which is the only way to see window shaping and real compositing. The pet, the whole speech bubble, the sleep overlay and click-through all check out. Unverified: the Wayland tray fallback, and **emoji render as tofu** ([an open bug](docs/VERIFICATION.md)). |
 | **Windows** | Boots, animates and polls the manifest — verified in CI. Its **pixels are unverified**: `capturePage()` times out on the runner, so the transparency and always-on-top assertions never ran there. |
 
-397 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
+433 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
 list of what is proven and what is not.
 
 **No telemetry.** One network request — the manifest — and no analytics, identifiers or accounts. The
@@ -168,12 +171,13 @@ KEYCODE_PET_BACKDROP=1 pnpm dev
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 397 tests, no Electron required |
+| `pnpm test` | 433 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
 | `pnpm smoke --name x --backdrop` | Launch, screenshot, assert pixels — see [docs/VERIFICATION.md](docs/VERIFICATION.md) |
 | `pnpm smoke:states` | One screenshot per animation state |
+| `pnpm lab:linux` | Run the pet on a real X server in a container and screenshot the root window. This is the only way to see Linux window shaping from a Mac — `capturePage()` cannot |
 | `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — Windows and Linux come from CI |
 | `pnpm notify "…"` | Publish a broadcast: validate, commit, push |
 | `pnpm manifest:serve` | Local manifest server with fault injection |

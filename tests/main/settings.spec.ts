@@ -119,6 +119,41 @@ describe('settings schema', () => {
     expect(result.value.stretchReminderEnabled).toBe(false)
   })
 
+  it('migrates a v4 file forward, leaving the pet in front of things as it was', () => {
+    // The shape written by the installed 1.7.x builds. Defaulting `alwaysOnTop` to true is what makes
+    // the upgrade invisible: false would send every existing pet behind the user's windows, which
+    // looks exactly like the app having stopped working.
+    const result = parseSettings({
+      schemaVersion: 4,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: true,
+      petSize: 'medium',
+      position: { displayKey: '0,0,1512x945', x: 812.5, feetY: 300 },
+      reminders: {
+        waterNextDueAt: 1_800_000_000_000,
+        stretchNextDueAt: null,
+        waterMinutes: 15,
+        stretchMinutes: null,
+      },
+      seenBroadcastIds: ['keycode-on-fire-20260802t1030'],
+      lastKnownRelease: '1.7.1',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.value.alwaysOnTop).toBe(true)
+    // And nothing else moves: a free placement, a chosen size, a chosen interval and a seen id are
+    // all things a silent reset would destroy.
+    expect(result.value.petSize).toBe('medium')
+    expect(result.value.position).toEqual({ displayKey: '0,0,1512x945', x: 812.5, feetY: 300 })
+    expect(result.value.reminders.waterMinutes).toBe(15)
+    expect(result.value.reminders.waterNextDueAt).toBe(1_800_000_000_000)
+    expect(result.value.seenBroadcastIds).toEqual(['keycode-on-fire-20260802t1030'])
+    expect(result.value.lastKnownRelease).toBe('1.7.1')
+    expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
+  })
+
   it('chains v1 all the way to the current version', () => {
     const result = parseSettings({
       schemaVersion: 1,

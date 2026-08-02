@@ -20,6 +20,7 @@ import {
 function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
   return {
     movementEnabled: true,
+    alwaysOnTop: true,
     petSize: 'large',
     water: { enabled: true, minutes: 45, isDefault: true },
     stretch: { enabled: true, minutes: 60, isDefault: true },
@@ -31,6 +32,7 @@ function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
 function noopActions(): MenuActions {
   return {
     toggleMovement: () => {},
+    toggleAlwaysOnTop: () => {},
     setPetSize: () => {},
     setReminder: () => {},
     resetPosition: () => {},
@@ -54,6 +56,7 @@ describe('menu template', () => {
       'Keycode Pet',
       'separator',
       'Movement',
+      'Always on top',
       'Drink water reminder',
       'Stretch reminder',
       'Size',
@@ -99,6 +102,7 @@ describe('menu template', () => {
   it('routes every click to its action exactly once', () => {
     const actions = {
       toggleMovement: vi.fn(),
+      toggleAlwaysOnTop: vi.fn(),
       setPetSize: vi.fn(),
       setReminder: vi.fn(),
       resetPosition: vi.fn(),
@@ -112,6 +116,7 @@ describe('menu template', () => {
       if (typeof item.click === 'function') (item.click as () => void)()
     }
     expect(actions.toggleMovement).toHaveBeenCalledOnce()
+    expect(actions.toggleAlwaysOnTop).toHaveBeenCalledOnce()
     expect(actions.resetPosition).toHaveBeenCalledOnce()
     expect(actions.checkForUpdates).toHaveBeenCalledOnce()
     expect(actions.showAbout).toHaveBeenCalledOnce()

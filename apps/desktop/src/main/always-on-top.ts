@@ -48,9 +48,32 @@ export function assertAlwaysOnTop(win: BrowserWindow): void {
   }
 }
 
+/** Drop the window out of the always-on-top band. The inverse of `assertAlwaysOnTop`. */
+export function releaseAlwaysOnTop(win: BrowserWindow): void {
+  if (win.isDestroyed()) return
+  win.setAlwaysOnTop(false)
+  // `setVisibleOnAllWorkspaces` is deliberately left alone. Being on every Space is a different
+  // question from being in front of things, and revoking it here would make a pet the user merely
+  // sent to the back *vanish* when they switched Space — which reads as a crash, not as a setting.
+}
+
 export interface AlwaysOnTopKeeper {
   /** Re-assert now. Call after anything that could have disturbed z-order. */
   reassert(): void
+  /**
+   * Turn the behaviour on or off. Off releases the window and silences every hook, so nothing
+   * quietly puts it back — which is the failure this whole module is otherwise designed to prevent.
+   */
+  setEnabled(enabled: boolean): void
+  /**
+   * Hold the pet on top for as long as a callout is on screen, even when the setting is off.
+   *
+   * Without this, turning the setting off would mean team broadcasts and reminders could be
+   * delivered to a window nobody can see — the message is "shown" and missed. Scoped to the
+   * lifetime of the bubble and nothing longer: this is a pet raising its hand, not a pet
+   * changing its mind about where it lives.
+   */
+  raiseForCallout(active: boolean): void
   dispose(): void
 }
 
@@ -62,35 +85,74 @@ export interface AlwaysOnTopKeeper {
  */
 export function startAlwaysOnTopKeeper(
   win: BrowserWindow,
-  options: { intervalMs?: number } = {},
+  options: { intervalMs?: number; enabled?: boolean } = {},
 ): AlwaysOnTopKeeper {
   const intervalMs = options.intervalMs ?? TOPMOST_KEEPER_INTERVAL_MS
   let timer: NodeJS.Timeout | null = null
   let disposed = false
+  let enabled = options.enabled ?? true
+  let calloutActive = false
+
+  /** Should the window be on top right now? The setting, or a callout overriding it. */
+  const wanted = (): boolean => enabled || calloutActive
 
   const reassert = (): void => {
-    if (disposed || win.isDestroyed()) return
+    if (disposed || win.isDestroyed() || !wanted()) return
     assertAlwaysOnTop(win)
   }
 
-  reassert()
+  /**
+   * Start or stop the Windows re-assert sweep to match the current state.
+   *
+   * Windows is the only platform that strips the flag behind Electron's back, so it is the only one
+   * that needs a timer — and while the pet is deliberately *not* on top, that timer would be a
+   * battery cost whose only possible effect is to undo the user's choice.
+   */
+  const syncTimer = (): void => {
+    if (process.platform !== 'win32') return
+    if (wanted() && !timer && !disposed) {
+      timer = setInterval(() => {
+        if (disposed || win.isDestroyed() || !wanted()) return
+        if (win.isVisible()) reassert()
+      }, intervalMs)
+      timer.unref?.()
+    } else if (!wanted() && timer) {
+      clearInterval(timer)
+      timer = null
+    }
+  }
+
+  const apply = (): void => {
+    if (disposed || win.isDestroyed()) return
+    if (wanted()) assertAlwaysOnTop(win)
+    else releaseAlwaysOnTop(win)
+    syncTimer()
+  }
+
+  apply()
 
   // Each of these is a moment where the window manager may have reordered things underneath us.
+  // `reassert` is a no-op while the pet is meant to be behind things, so the hooks can stay attached.
   win.on('show', reassert)
   win.on('restore', reassert)
   win.on('blur', reassert)
   powerMonitor.on('resume', reassert)
 
-  if (process.platform === 'win32') {
-    timer = setInterval(() => {
-      if (disposed || win.isDestroyed()) return
-      if (win.isVisible()) reassert()
-    }, intervalMs)
-    timer.unref?.()
-  }
-
   return {
     reassert,
+
+    setEnabled(next: boolean): void {
+      if (next === enabled) return
+      enabled = next
+      apply()
+    },
+
+    raiseForCallout(active: boolean): void {
+      if (active === calloutActive) return
+      calloutActive = active
+      apply()
+    },
+
     dispose(): void {
       disposed = true
       if (timer) clearInterval(timer)

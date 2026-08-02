@@ -35,6 +35,8 @@ export interface ActionDeps {
   reportProblem: () => void
   /** Re-evaluate reminders now, so a changed interval takes effect immediately. */
   evaluateReminders: () => void
+  /** Put the pet window in or out of the always-on-top band. */
+  setAlwaysOnTop: (enabled: boolean) => void
   quit: () => void
   log?: (message: string, meta?: unknown) => void
 }
@@ -52,7 +54,7 @@ export function createActions(deps: ActionDeps): MenuActions {
    * Reads the store and writes the inverse — never trusts the menu item's own `checked`, which is a
    * rendering of state and can be stale if a menu rebuild raced a click.
    */
-  const toggle = (key: 'movementEnabled'): boolean => {
+  const toggle = (key: 'movementEnabled' | 'alwaysOnTop'): boolean => {
     const next = !settings.get()[key]
     settings.patch({ [key]: next })
     return next
@@ -65,6 +67,14 @@ export function createActions(deps: ActionDeps): MenuActions {
       // Mid-stride, not next tick.
       controller.tickNow()
       log('movement toggled', { enabled })
+    },
+
+    toggleAlwaysOnTop(): void {
+      const enabled = toggle('alwaysOnTop')
+      // Applied here rather than through the settings subscription, so the window changes band on the
+      // click instead of on the next menu rebuild. The subscription still refreshes the tick.
+      deps.setAlwaysOnTop(enabled)
+      log('always on top toggled', { enabled })
     },
 
     setPetSize(size): void {

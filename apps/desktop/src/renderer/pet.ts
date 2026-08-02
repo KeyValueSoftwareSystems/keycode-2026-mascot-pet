@@ -46,9 +46,16 @@ function applyFrame(frame: PetFrame): void {
   // stay out of the hand-written CSS, which is asserted to contain no sheet geometry.
   const bbox = ALPHA_MASK.bbox
   const headTop = ALPHA_MASK.headTopByState[frame.animation] ?? bbox.y
+  const footInset = ALPHA_MASK.footInsetByState[frame.animation] ?? ALPHA_MASK.footInset
   // Cell-space offsets scaled here rather than in CSS, so the bubble tracks the head at every size.
   root.style.setProperty('--body-cx', `${frame.sprite.x + (bbox.x + bbox.width / 2) * frame.scale}px`)
   root.style.setProperty('--body-top', `${frame.sprite.y + headTop * frame.scale}px`)
+  // The other end, for a bubble hanging below the pet. Per-state like the head top, so the tail meets
+  // the shoes in a pose whose feet have left the ground rather than hanging in space below them.
+  root.style.setProperty(
+    '--body-bottom',
+    `${frame.sprite.y + (ALPHA_MASK.frameHeight - footInset) * frame.scale}px`,
+  )
 
   // Setting data-state and data-nonce is the whole animation mechanism: the generated CSS keys
   // its keyframes off this pair, and a changed nonce is what makes the same state replay.
@@ -57,6 +64,7 @@ function applyFrame(frame: PetFrame): void {
   sprite.dataset.facing = frame.facing
 
   root.dataset.overlay = frame.overlay
+  bubble.dataset.side = frame.bubbleSide
 
   if (frame.bubble) {
     // textContent, never innerHTML. Manifest text is remote input rendered into a window that

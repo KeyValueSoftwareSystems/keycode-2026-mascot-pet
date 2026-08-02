@@ -31,7 +31,12 @@
  * off-screen and the *pet's centre x* is what gets clamped.
  */
 
-import { ALPHA_MASK, bodyHalfWidth, type AlphaMaskData } from '../sprite/alpha-mask.js'
+import {
+  ALPHA_MASK,
+  bodyHalfWidth,
+  type AlphaMaskData,
+  type BubbleSide,
+} from '../sprite/alpha-mask.js'
 import { SHEET } from '../pet-animations.generated.js'
 import type { Floor } from './display-manager.js'
 
@@ -73,10 +78,52 @@ export function petWindowFor(scale: number, mask: AlphaMaskData = ALPHA_MASK): {
   }
 }
 
+/**
+ * Height of the pet's *visible* body at a scale — cell top to lowest opaque pixel.
+ *
+ * The same number as `spriteBottomOffset` in bubble-below mode, and the reason both exist: this one
+ * is what the *floor* needs, before any placement has been chosen, to answer "how high can the feet
+ * go before the character leaves the screen".
+ */
+export function spriteVisibleHeight(scale: number, mask: AlphaMaskData = ALPHA_MASK): number {
+  return (mask.frameHeight - mask.footInset) * (scale > 0 ? scale : 1)
+}
+
+/**
+ * Which side of the pet the bubble goes on, for a given feet height.
+ *
+ * The bubble band and the sprite share one window, and the window is never allowed outside the work
+ * area — that invariant is what stopped macOS clamping the window and silently lifting the pet 16px
+ * (see `PET_WINDOW_HEIGHT`). Keeping the band above the sprite therefore costs the pet the top
+ * `BUBBLE_AREA_HEIGHT` pixels of the screen, which is exactly the ceiling this replaces: the head used
+ * to stop 112px short of the top with nothing visible up there to explain why.
+ *
+ * So when there is no longer room for the band above the head, the band moves *below the feet*, where
+ * a pet that high has plenty of room. The window keeps its size and the sprite keeps its screen
+ * position; only which end of the window is reserved changes.
+ *
+ * Decided from the union bbox and not the current pose, deliberately: a per-pose threshold would flip
+ * the side when the pet jumped, and a bubble that hops from one side of the pet to the other mid-
+ * sentence looks broken.
+ */
+export function bubbleSideFor(
+  feetY: number,
+  workArea: { y: number },
+  scale: number,
+  mask: AlphaMaskData = ALPHA_MASK,
+  bubbleAreaHeight: number = BUBBLE_AREA_HEIGHT,
+): BubbleSide {
+  return feetY - spriteVisibleHeight(scale, mask) - bubbleAreaHeight >= workArea.y
+    ? 'above'
+    : 'below'
+}
+
 export interface Placement {
   windowSize: { width: number; height: number }
   /** Sprite scale this placement was computed for. */
   scale: number
+  /** Which end of the window is reserved for the bubble. See `bubbleSideFor`. */
+  bubbleSide: BubbleSide
   /** Sprite cell's top-left inside the window. */
   spriteOrigin: { x: number; y: number }
   /**
@@ -94,6 +141,7 @@ export function computePlacement(
   window: { width: number; height: number } = PET_WINDOW,
   bubbleAreaHeight: number = BUBBLE_AREA_HEIGHT,
   scale = 1,
+  bubbleSide: BubbleSide = 'above',
 ): Placement {
   const s = scale > 0 ? scale : 1
   // Centre the *rendered* sprite cell horizontally; hang it below the bubble area. The cell's bottom
@@ -102,14 +150,19 @@ export function computePlacement(
   // The sprite is scaled with a CSS transform from its top-left, so the element still occupies a full
   // unscaled cell in layout while painting at `s` — which is why every offset past the origin is
   // multiplied here rather than the origin being derived from a scaled cell size.
+  //
+  // `y` is the only thing the bubble side changes: reserving the band below the sprite instead of
+  // above it means moving the cell to the window's top edge, and the window's *size* never changes.
+  // Every offset below is derived from this origin, so they all follow with no second branch.
   const spriteOrigin = {
     x: Math.round((window.width - mask.frameWidth * s) / 2),
-    y: bubbleAreaHeight,
+    y: bubbleSide === 'below' ? 0 : bubbleAreaHeight,
   }
 
   return {
     windowSize: { width: window.width, height: window.height },
     scale: s,
+    bubbleSide,
     spriteOrigin,
     spriteCentreOffset: spriteOrigin.x + (mask.bbox.x + mask.bbox.width / 2) * s,
     footInset: mask.footInset * s,
@@ -118,8 +171,12 @@ export function computePlacement(
 }
 
 /** Placement for a pet scale, sizing the window to match. */
-export function placementForScale(scale: number, mask: AlphaMaskData = ALPHA_MASK): Placement {
-  return computePlacement(mask, petWindowFor(scale, mask), BUBBLE_AREA_HEIGHT, scale)
+export function placementForScale(
+  scale: number,
+  mask: AlphaMaskData = ALPHA_MASK,
+  bubbleSide: BubbleSide = 'above',
+): Placement {
+  return computePlacement(mask, petWindowFor(scale, mask), BUBBLE_AREA_HEIGHT, scale, bubbleSide)
 }
 
 /**
@@ -159,10 +216,17 @@ export function floorForWorkArea(
 ): Floor {
   const half = bodyHalfWidth(mask, placement.scale)
   const floorY = workArea.y + workArea.height
-  // The highest the feet may go is set by the *window*, not the body: `spriteBottomOffset` is the
-  // distance from the window's top edge down to the feet, so keeping the window top at or below the
-  // work area's top means feetY >= workArea.y + spriteBottomOffset.
-  const minFeetY = workArea.y + placement.spriteBottomOffset
+  // The highest the feet may go is set by the *window*, not the body — the window is never allowed
+  // outside the work area, so `feetY >= workArea.y + (window top to feet)`.
+  //
+  // Measured against the **bubble-below** layout, which is the whole of the fix for "the pet cannot be
+  // dragged to the top of the screen". This used to read `placement.spriteBottomOffset`, and in the
+  // only layout that then existed that distance included the 112px bubble band — so the character's
+  // head stopped 112px short of the top with nothing up there to explain why. Nobody chose that; it
+  // was the bubble's reserved space showing up as a movement limit. The band moves below the feet as
+  // the pet nears the top (`bubbleSideFor`), which frees those pixels honestly rather than by
+  // letting the window hang off-screen and be clamped back by the OS.
+  const minFeetY = workArea.y + spriteVisibleHeight(placement.scale, mask)
   return {
     minX: workArea.x + half,
     maxX: workArea.x + workArea.width - half,

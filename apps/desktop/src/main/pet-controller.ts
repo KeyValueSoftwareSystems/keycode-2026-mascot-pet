@@ -22,7 +22,13 @@ import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../motion/motion-confi
 import type { MotionState, MotionTrigger } from '../motion/types.js'
 import { resolveTrigger, type Trigger } from '../pet-animations.generated.js'
 import type { PetFrame, Tone } from '../pet-frame.js'
-import { floorForWorkArea, clampToFloor, clampFeetY, isOnFloor } from './floor-placement.js'
+import {
+  floorForWorkArea,
+  clampToFloor,
+  clampFeetY,
+  isOnFloor,
+  bubbleSideFor,
+} from './floor-placement.js'
 import type { DisplayManager, Floor } from './display-manager.js'
 import type { PetWindow } from './pet-window.js'
 import { emit, isHarnessEnabled } from './harness-handshake.js'
@@ -135,6 +141,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
       facing: state.facing,
       sprite: pet.placement.spriteOrigin,
       scale: pet.placement.scale,
+      bubbleSide: pet.placement.bubbleSide,
       bubble: callout
         ? {
             text: callout.text,
@@ -211,6 +218,17 @@ export function createPetController(options: PetControllerOptions): PetControlle
         config,
       )
 
+      // Before moving, not after: the bubble side changes `spriteOrigin`, and therefore what window y
+      // puts the feet where the motion engine says they are. Moving first would place the window with
+      // the old offset and leave the pet a band-height out of position for one frame.
+      //
+      // Asked every tick and a no-op almost every time — `setBubbleSide` returns early when the side
+      // is unchanged, which keeps a drag from issuing a `setBounds` seventeen times a second.
+      pet.setBubbleSide(
+        bubbleSideFor(state.feetY, display.workArea, pet.placement.scale),
+        state.x,
+        state.feetY,
+      )
       pet.moveTo(state.x, state.feetY)
       sendFrameIfChanged()
 
@@ -328,6 +346,13 @@ export function createPetController(options: PetControllerOptions): PetControlle
         feetY: state.floorLocked ? floor.maxFeetY : clampFeetY(state.feetY, floor),
       }
 
+      // A smaller pet needs less room above it, so a size change can free up the space for the bubble
+      // to go back over the head — or take it away.
+      pet.setBubbleSide(
+        bubbleSideFor(state.feetY, display.workArea, pet.placement.scale),
+        state.x,
+        state.feetY,
+      )
       pet.moveTo(state.x, state.feetY)
       sendFrameIfChanged()
     },

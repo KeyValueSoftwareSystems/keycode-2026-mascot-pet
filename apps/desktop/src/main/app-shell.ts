@@ -49,7 +49,7 @@ import {
   isPetSize,
   petScaleFor,
 } from '../config/constants.js'
-import { floorForWorkArea, placementForScale } from './floor-placement.js'
+import { bubbleSideFor, floorForWorkArea, placementForScale } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { env } from '../config/env.js'
@@ -139,6 +139,12 @@ export async function startApp(): Promise<AppShell> {
     initialPetCentreX: startX,
     initialFeetY: startFeetY,
     initialScale: startScale,
+    initialBubbleSide: bubbleSideFor(
+      startFeetY ?? startFloor.y,
+      startDisplay.workArea,
+      startScale,
+    ),
+    alwaysOnTop: settings.get().alwaysOnTop,
     log,
     events: {
       onReady(): void {
@@ -402,6 +408,7 @@ export async function startApp(): Promise<AppShell> {
     const current = settings.get()
     return {
       movementEnabled: current.movementEnabled,
+      alwaysOnTop: current.alwaysOnTop,
       petSize: current.petSize,
       water: {
         enabled: current.waterReminderEnabled,
@@ -462,6 +469,7 @@ export async function startApp(): Promise<AppShell> {
     displays,
     getCursorPoint: () => screen.getCursorScreenPoint(),
     evaluateReminders: () => reminders.evaluateNow(),
+    setAlwaysOnTop: (enabled) => pet.setAlwaysOnTopEnabled(enabled),
     showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
     reportProblem,
     checkForUpdates: () => {
@@ -509,7 +517,7 @@ export async function startApp(): Promise<AppShell> {
     pet: () => pet.win,
     backdrop: () => backdrop,
     spriteRect: () => pet.spriteRect(),
-    bubbleFloorY: () => pet.bubbleFloorY(),
+    bubbleBand: () => pet.bubbleBand(),
     floorLocked: () => controller?.position().floorLocked ?? true,
     petScale: () => pet.placement.scale,
     place(position): void {

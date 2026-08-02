@@ -88,6 +88,134 @@ export function shapeRectsForWindow(
   }))
 }
 
+/** Which side of the pet the speech bubble is anchored on. */
+export type BubbleSide = 'above' | 'below'
+
+/**
+ * Enough of the window's geometry to place things in it.
+ *
+ * Structural rather than an import of `Placement`, so `sprite/` stays independent of `main/` —
+ * `Placement` satisfies this shape, but naming it here would close a cycle, since floor-placement
+ * derives its whole geometry from this module.
+ */
+export interface WindowLayout {
+  spriteOrigin: { x: number; y: number }
+  scale: number
+  windowWidth: number
+  windowHeight: number
+}
+
+/**
+ * Where in the window the bubble is allowed to paint, given the pose and which side it is on.
+ *
+ * `above` runs from the window's top edge down to the pose's topmost opaque pixel; `below` runs from
+ * the pose's lowest opaque pixel to the window's bottom edge. Both are derived from the *per-state*
+ * mask entries rather than the union bbox, because "jumping" reaches well above idle's hair and its
+ * feet leave the ground — a band measured from the union would be short of the tail by that
+ * difference, and the tail is the first thing to disappear.
+ *
+ * Full window width, because main cannot know how wide the bubble rendered: it is `max-content` and
+ * depends on the text.
+ */
+export function bubbleBandRect(
+  mask: AlphaMaskData,
+  layout: WindowLayout,
+  animation: string,
+  side: BubbleSide,
+): MaskRect {
+  const s = layout.scale > 0 ? layout.scale : 1
+  if (side === 'below') {
+    const footInset = mask.footInsetByState[animation] ?? mask.footInset
+    const bodyBottom = Math.round(layout.spriteOrigin.y + (mask.frameHeight - footInset) * s)
+    return {
+      x: 0,
+      y: Math.max(0, bodyBottom),
+      width: layout.windowWidth,
+      height: Math.max(0, layout.windowHeight - Math.max(0, bodyBottom)),
+    }
+  }
+  const headTop = mask.headTopByState[animation] ?? mask.bbox.y
+  return {
+    x: 0,
+    y: 0,
+    width: layout.windowWidth,
+    height: Math.max(0, Math.round(layout.spriteOrigin.y + headTop * s)),
+  }
+}
+
+/**
+ * The Linux `setShape` region for a *specific frame* — sprite, plus whatever else is on screen.
+ *
+ * ### Why this is not just the sprite rects
+ *
+ * `setShape` is documented as determining "the area within the window where the system permits
+ * **drawing** and user interaction. Outside of the given region, **no pixels will be drawn**."
+ * Restricting the region to the character therefore does not merely stop clicks landing in the
+ * window's transparent margin — it stops anything in that margin being *painted*. The speech bubble
+ * lives entirely in a band above the sprite, so on Linux it was silently never drawn: only the sliver
+ * overlapping the head's mask cells appeared. The sleep Z's, which sit above the hair, went the same
+ * way.
+ *
+ * Nothing caught it because the only pixel evidence the harness produces is
+ * `webContents.capturePage()`, which renders the web contents and never touches the window shape.
+ *
+ * ### Why over-covering is the right error
+ *
+ * The band is the full window width and the overlay region is the whole sprite cell, both larger than
+ * what is actually painted. Too large costs a few click-throughs in empty space *while a bubble is up*;
+ * too small makes the bubble invisible again. Those are not comparable costs.
+ *
+ * The overlay region is the sprite cell rather than the Z's own rectangle so that their offsets stay
+ * in the stylesheet, where they belong — the Z's are positioned from `--sprite-x`/`--sprite-y`, which
+ * puts them inside the cell by construction. It is also 192px wide rather than 360, and that matters
+ * because sleep persists for as long as movement is off.
+ */
+export function shapeRectsForFrame(
+  mask: AlphaMaskData,
+  layout: WindowLayout,
+  frame: {
+    animation: string
+    bubbleVisible: boolean
+    overlayVisible: boolean
+    bubbleSide?: BubbleSide
+  },
+  options: { paddingPx?: number } = {},
+): MaskRect[] {
+  const s = layout.scale > 0 ? layout.scale : 1
+  const rects = shapeRectsForWindow(mask, layout.spriteOrigin, {
+    paddingPx: options.paddingPx,
+    scale: s,
+  })
+
+  if (frame.bubbleVisible) {
+    rects.push(bubbleBandRect(mask, layout, frame.animation, frame.bubbleSide ?? 'above'))
+  }
+
+  if (frame.overlayVisible) {
+    rects.push({
+      x: Math.max(0, layout.spriteOrigin.x),
+      y: Math.max(0, layout.spriteOrigin.y),
+      width: Math.round(mask.frameWidth * s),
+      height: Math.round(mask.frameHeight * s),
+    })
+  }
+
+  // Clipped to the window, and empties dropped. A rect reaching past the window is not defined
+  // behaviour in Electron's `setShape`, and an empty one is a wasted region entry.
+  return rects
+    .map((rect) => {
+      const x = Math.max(0, Math.min(rect.x, layout.windowWidth))
+      const y = Math.max(0, Math.min(rect.y, layout.windowHeight))
+      return {
+        x,
+        y,
+        width: Math.min(rect.width, layout.windowWidth - x),
+        height: Math.min(rect.height, layout.windowHeight - y),
+      }
+    })
+    .filter((rect) => rect.width > 0 && rect.height > 0)
+}
+
 /** The sprite's *visible* bounds in screen coordinates. What the harness asserts against. */
 export function spriteScreenRect(
   mask: AlphaMaskData,

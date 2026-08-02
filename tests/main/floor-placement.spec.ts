@@ -12,6 +12,9 @@ import {
   BUBBLE_AREA_HEIGHT,
   petWindowFor,
   placementForScale,
+  bubbleSideFor,
+  spriteVisibleHeight,
+  feetYForWindowY,
 } from '../../apps/desktop/src/main/floor-placement.js'
 import {
   ALPHA_MASK,
@@ -267,5 +270,122 @@ describe('pet size scaling', () => {
     const area = (rects: readonly { width: number; height: number }[]) =>
       rects.reduce((sum, r) => sum + r.width * r.height, 0)
     expect(area(shapeHalf)).toBeLessThan(area(shape1))
+  })
+})
+
+describe('reaching the top of the screen', () => {
+  const workArea = { x: 0, y: 33, width: 1512, height: 907 }
+
+  it('lets the pet’s feet rise until the character reaches the top of the work area', () => {
+    // The bug this replaces: `minFeetY` was measured from `spriteBottomOffset`, which in the only
+    // layout that then existed included the 112px bubble band. The head stopped 112px short of the
+    // top with nothing up there to explain why.
+    const floor = floorForWorkArea(workArea, 'key')
+    expect(floor.minFeetY).toBe(workArea.y + ALPHA_MASK.frameHeight - ALPHA_MASK.footInset)
+    expect(floor.minFeetY).toBeLessThan(workArea.y + BUBBLE_AREA_HEIGHT + 192)
+  })
+
+  it('leaves the window inside the work area at the highest feet position, on both sides', () => {
+    // The invariant that keeps the OS out of it: a window hanging outside the work area gets clamped
+    // back, which silently moves the pet. True in the layout that is actually used up there (below)
+    // and in the one it came from (above).
+    const floor = floorForWorkArea(workArea, 'key')
+    for (const side of ['above', 'below'] as const) {
+      const placement = placementForScale(1, ALPHA_MASK, side)
+      const windowTop = windowYForFloor(floor.minFeetY, placement)
+      if (side === 'below') expect(windowTop).toBeGreaterThanOrEqual(workArea.y)
+      expect(windowTop + placement.windowSize.height).toBeLessThanOrEqual(floor.y + BUBBLE_AREA_HEIGHT)
+    }
+  })
+
+  it('rises further at a smaller size, because a smaller character needs less room', () => {
+    const large = floorForWorkArea(workArea, 'k', undefined, placementForScale(1)).minFeetY
+    const small = floorForWorkArea(workArea, 'k', undefined, placementForScale(0.5)).minFeetY
+    expect(small).toBeLessThan(large)
+  })
+
+  it('collapses to the floor on a display shorter than the pet rather than inverting', () => {
+    const tiny = floorForWorkArea({ x: 0, y: 0, width: 800, height: 100 }, 'k')
+    expect(tiny.minFeetY).toBe(tiny.maxFeetY)
+  })
+})
+
+describe('bubbleSideFor', () => {
+  const workArea = { x: 0, y: 33, width: 1512, height: 907 }
+  const spriteHeight = ALPHA_MASK.frameHeight - ALPHA_MASK.footInset
+
+  it('keeps the bubble above the pet anywhere there is room for it', () => {
+    expect(bubbleSideFor(940, workArea, 1)).toBe('above')
+    expect(bubbleSideFor(workArea.y + spriteHeight + BUBBLE_AREA_HEIGHT, workArea, 1)).toBe('above')
+  })
+
+  it('flips it below once the band would leave the work area', () => {
+    expect(bubbleSideFor(workArea.y + spriteHeight + BUBBLE_AREA_HEIGHT - 1, workArea, 1)).toBe(
+      'below',
+    )
+    expect(bubbleSideFor(workArea.y + spriteHeight, workArea, 1)).toBe('below')
+  })
+
+  it('is monotonic in feetY — one flip, never oscillation', () => {
+    // A predicate that flipped twice would make the bubble hop sides as the pet was dragged, which
+    // reads as a rendering fault rather than as a decision.
+    const sides = []
+    for (let feetY = workArea.y + spriteHeight; feetY <= 940; feetY += 1) {
+      sides.push(bubbleSideFor(feetY, workArea, 1))
+    }
+    const flips = sides.filter((side, i) => i > 0 && side !== sides[i - 1]).length
+    expect(flips).toBe(1)
+    expect(sides[0]).toBe('below')
+    expect(sides.at(-1)).toBe('above')
+  })
+
+  it('flips lower down for a smaller pet, whose band clears the top sooner', () => {
+    // 220px of headroom: enough for a half-size pet (96px) plus the 112px band, not for a full one.
+    const feetY = workArea.y + 220
+    expect(spriteVisibleHeight(1)).toBe(192)
+    expect(spriteVisibleHeight(0.5)).toBe(96)
+    expect(bubbleSideFor(feetY, workArea, 1)).toBe('below')
+    expect(bubbleSideFor(feetY, workArea, 0.5)).toBe('above')
+  })
+
+  it('does not depend on the pose, so a jump cannot move the bubble', () => {
+    // Deliberately the union bbox and not `headTopByState`: `jumping` reaches well above idle's hair,
+    // and a per-pose threshold would flip the side mid-animation.
+    const feetY = workArea.y + spriteHeight + BUBBLE_AREA_HEIGHT + 4
+    expect(bubbleSideFor(feetY, workArea, 1)).toBe('above')
+    expect(bubbleSideFor(feetY, workArea, 1, ALPHA_MASK)).toBe('above')
+  })
+})
+
+describe('placement with the bubble below', () => {
+  it('moves the sprite cell to the window’s top edge and keeps the window the same size', () => {
+    const above = placementForScale(1, ALPHA_MASK, 'above')
+    const below = placementForScale(1, ALPHA_MASK, 'below')
+    expect(below.spriteOrigin.y).toBe(0)
+    expect(above.spriteOrigin.y).toBe(BUBBLE_AREA_HEIGHT)
+    expect(below.windowSize).toEqual(above.windowSize)
+    // Horizontal geometry is untouched, so the pet does not shift sideways when the side flips.
+    expect(below.spriteOrigin.x).toBe(above.spriteOrigin.x)
+    expect(below.spriteCentreOffset).toBe(above.spriteCentreOffset)
+  })
+
+  it('keeps the pet on the same screen pixels when the side flips', () => {
+    // What makes the flip invisible: the window moves by exactly the band height, so the sprite
+    // does not. If this ever fails, the pet jumps 112px as it is dragged past the threshold.
+    const feetY = 400
+    const above = placementForScale(1, ALPHA_MASK, 'above')
+    const below = placementForScale(1, ALPHA_MASK, 'below')
+    const yAbove = windowYForFloor(feetY, above) + above.spriteOrigin.y
+    const yBelow = windowYForFloor(feetY, below) + below.spriteOrigin.y
+    expect(yBelow).toBe(yAbove)
+    expect(windowYForFloor(feetY, below) - windowYForFloor(feetY, above)).toBe(BUBBLE_AREA_HEIGHT)
+  })
+
+  it('round-trips window y and feet y in both layouts', () => {
+    for (const side of ['above', 'below'] as const) {
+      const placement = placementForScale(0.75, ALPHA_MASK, side)
+      const windowY = windowYForFloor(517, placement)
+      expect(feetYForWindowY(windowY, placement)).toBe(517)
+    }
   })
 })

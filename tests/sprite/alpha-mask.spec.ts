@@ -11,6 +11,8 @@ import {
   ALPHA_MASK,
   isOpaqueAt,
   shapeRectsForWindow,
+  shapeRectsForFrame,
+  bubbleBandRect,
   spriteScreenRect,
   bodyHalfWidth,
 } from '../../apps/desktop/src/sprite/alpha-mask.js'
@@ -271,5 +273,132 @@ describe('mask accessors', () => {
   it('reports half the visible body width, not half the window', () => {
     expect(bodyHalfWidth(ALPHA_MASK)).toBe(ALPHA_MASK.bbox.width / 2)
     expect(bodyHalfWidth(ALPHA_MASK)).toBeLessThan(sheet.frameWidth / 2)
+  })
+})
+
+describe('shapeRectsForFrame', () => {
+  // `setShape` is documented as deciding where the system "permits drawing", not merely where it
+  // permits clicks: "Outside of the given region, no pixels will be drawn." Every test here is about
+  // that sentence. The bug it fixes was a speech bubble that Linux never painted, which passed every
+  // assertion the harness makes because `capturePage()` renders the web contents and never sees the
+  // window shape.
+  const layout = {
+    spriteOrigin: { x: 84, y: 112 },
+    scale: 1,
+    windowWidth: 360,
+    windowHeight: 304,
+  }
+
+  const covers = (rects: readonly { x: number; y: number; width: number; height: number }[], x: number, y: number) =>
+    rects.some((r) => x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height)
+
+  const frame = (over: Partial<Parameters<typeof shapeRectsForFrame>[2]> = {}) => ({
+    animation: 'idle',
+    bubbleVisible: false,
+    overlayVisible: false,
+    ...over,
+  })
+
+  it('is the sprite rects, clipped to the window, when only the pet is on screen', () => {
+    const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame())
+    const unclipped = shapeRectsForWindow(ALPHA_MASK, layout.spriteOrigin, { scale: 1 })
+    expect(rects).toHaveLength(unclipped.length)
+
+    // Not identical, and that is the point of clipping. The 8px hit padding inflates the lowest rect
+    // past the window's bottom edge — the window ends *at the feet*, so there are no rows below them
+    // to inflate into. A region reaching outside the window is not defined behaviour in `setShape`.
+    const last = rects.at(-1)!
+    expect(last.y + last.height).toBe(layout.windowHeight)
+    expect(unclipped.at(-1)!.height).toBeGreaterThan(last.height)
+    expect(rects.slice(0, -1)).toEqual(unclipped.slice(0, -1))
+  })
+
+  it('does NOT cover the bubble band when no bubble is up', () => {
+    // The bug, stated as a property. Without a bubble the band must stay outside the region, or the
+    // window swallows clicks across an empty 360×112 strip for no reason.
+    const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame())
+    expect(covers(rects, layout.windowWidth / 2, 8)).toBe(false)
+  })
+
+  it('covers the whole band above the head when a bubble is up', () => {
+    const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame({ bubbleVisible: true }))
+    const headTop = layout.spriteOrigin.y + (ALPHA_MASK.headTopByState['idle'] ?? ALPHA_MASK.bbox.y)
+
+    // Every row from the window's top edge down to the head, at the centre and at both extremes —
+    // the bubble is wider than the character, so the horizontal clipping was as bad as the vertical.
+    for (let y = 0; y < headTop; y += 4) {
+      for (const x of [0, 1, layout.windowWidth / 2, layout.windowWidth - 1]) {
+        expect(covers(rects, x, y)).toBe(true)
+      }
+    }
+  })
+
+  it('covers the tail, which hangs below the nominal band', () => {
+    // The tail's tip reaches to within a few pixels of the hair, i.e. *below* y=112. A band of a flat
+    // 112px would clip the one part of the bubble that makes it read as speech.
+    const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame({ bubbleVisible: true }))
+    expect(covers(rects, layout.windowWidth / 2, 112 + 2)).toBe(true)
+  })
+
+  it('reaches the top for every pose, including the ones that reach highest', () => {
+    for (const animation of Object.keys(ALPHA_MASK.headTopByState)) {
+      const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame({ animation, bubbleVisible: true }))
+      const headTop = layout.spriteOrigin.y + ALPHA_MASK.headTopByState[animation]!
+      expect(covers(rects, layout.windowWidth / 2, Math.max(0, headTop - 1))).toBe(true)
+      expect(covers(rects, 2, 2)).toBe(true)
+    }
+  })
+
+  it('covers below the feet instead when the bubble is under the pet', () => {
+    const below = { ...layout, spriteOrigin: { x: 84, y: 0 } }
+    const rects = shapeRectsForFrame(
+      ALPHA_MASK,
+      below,
+      frame({ bubbleVisible: true, bubbleSide: 'below' }),
+    )
+    const feet = ALPHA_MASK.frameHeight - (ALPHA_MASK.footInsetByState['idle'] ?? ALPHA_MASK.footInset)
+    expect(covers(rects, below.windowWidth / 2, feet + 4)).toBe(true)
+    expect(covers(rects, below.windowWidth - 1, below.windowHeight - 1)).toBe(true)
+    // And not the other end, which is where the pet's head now is.
+    expect(covers(rects, below.windowWidth - 1, 2)).toBe(false)
+  })
+
+  it('covers the sprite cell for the sleep Z’s, which sit above the hair', () => {
+    const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame({ overlayVisible: true }))
+    // The Z's are positioned from --sprite-x/--sprite-y at roughly +118,+6 in cell space. Asserting
+    // the cell rather than that rectangle is what keeps their offsets in the stylesheet.
+    expect(covers(rects, layout.spriteOrigin.x + 118, layout.spriteOrigin.y + 6)).toBe(true)
+    // Narrower than the whole window, which matters because sleep persists indefinitely.
+    expect(covers(rects, 2, layout.spriteOrigin.y + 6)).toBe(false)
+  })
+
+  it('scales the bubble band with the pet, since the head moves down as it shrinks', () => {
+    const small = { ...layout, scale: 0.5 }
+    const rects = shapeRectsForFrame(ALPHA_MASK, small, frame({ bubbleVisible: true }))
+    const headTop =
+      small.spriteOrigin.y + (ALPHA_MASK.headTopByState['idle'] ?? ALPHA_MASK.bbox.y) * 0.5
+    expect(covers(rects, small.windowWidth / 2, headTop - 1)).toBe(true)
+  })
+
+  it('never emits a rect outside the window, or an empty one', () => {
+    for (const bubbleVisible of [true, false]) {
+      for (const overlayVisible of [true, false]) {
+        for (const side of ['above', 'below'] as const) {
+          const rects = shapeRectsForFrame(
+            ALPHA_MASK,
+            side === 'below' ? { ...layout, spriteOrigin: { x: 84, y: 0 } } : layout,
+            frame({ bubbleVisible, overlayVisible, bubbleSide: side }),
+          )
+          for (const r of rects) {
+            expect(r.width).toBeGreaterThan(0)
+            expect(r.height).toBeGreaterThan(0)
+            expect(r.x).toBeGreaterThanOrEqual(0)
+            expect(r.y).toBeGreaterThanOrEqual(0)
+            expect(r.x + r.width).toBeLessThanOrEqual(layout.windowWidth)
+            expect(r.y + r.height).toBeLessThanOrEqual(layout.windowHeight)
+          }
+        }
+      }
+    }
   })
 })

@@ -1,0 +1,22 @@
+# Only the Linux lab image (docker/linux-lab) builds from this repo.
+#
+# node_modules is the important exclusion, not a size optimisation: the Mac's copy holds a darwin
+# Electron binary, and copying it in would shadow the linux one the image installs — the app would
+# then fail to start with an exec-format error that looks nothing like its cause.
+node_modules
+**/node_modules
+
+# Build output, regenerated inside the image by `pnpm build`.
+apps/desktop/dist
+release
+dist
+
+# Evidence and reference art: ~10MB of PNGs that no build step reads.
+docs/demo
+pet/source-sheet.png
+pet/preview.png
+
+.git
+.github
+site
+*.log
