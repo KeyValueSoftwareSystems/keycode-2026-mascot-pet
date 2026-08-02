@@ -182,6 +182,8 @@ jobs:
     if: ${{ !contains(github.ref_name, '-') }}
     permissions:
       contents: write
+      # To dispatch the Pages deploy. See the note on the last step.
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -237,3 +239,14 @@ jobs:
           git add site/manifest.json
           git commit -m "release: announce ${{ github.ref_name }}"
           git push origin main
+
+      # Pages must be dispatched, not left to the push above.
+      #
+      # GitHub deliberately does not run workflows for commits pushed with GITHUB_TOKEN — it is how
+      # recursive CI is prevented. So the announce commit landed on main with the correct release block
+      # and pages.yml simply never fired: the Release existed, the manifest in git was right, and every
+      # client kept fetching the old file. Nothing failed, which is what made it worth a comment.
+      - name: Deploy the announcement
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run pages.yml --ref main
