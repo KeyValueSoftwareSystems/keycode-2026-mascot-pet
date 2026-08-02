@@ -1,0 +1,50 @@
+name: Bug report
+description: Something the pet does wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Tip:** the app has a **Report a problem…** item in its menu (right-click the pet, or the tray
+        icon). It copies the version, platform and log path straight to your clipboard and opens the log
+        file — paste it below rather than typing it out.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Version and platform
+      description: Paste what “Report a problem…” copied. Or fill it in by hand.
+      placeholder: |
+        Version: 1.7.1
+        Platform: darwin arm64
+        Log: /Users/you/Library/Application Support/Keycode Pet/logs/main.log
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Attach `main.log`, or paste the last ~50 lines. Nothing is uploaded automatically, so without
+        this most problems are guesswork — the log is where the answer usually is.
+      render: text
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Before you file
+      options:
+        - label: This is not the first-launch security warning (that one is expected — see docs/INSTALL.md)
+          required: false
+        - label: I am on the latest release
+          required: false

@@ -55,12 +55,19 @@ function fail(message) {
 // ---------------------------------------------------------------------------------------
 
 function parseDuration(raw, label) {
-  const match = /^(\d+)(m|h|d)$/.exec(String(raw ?? '').trim())
-  if (!match) fail(`${label} must look like 30m, 24h or 7d — got ${JSON.stringify(raw)}`)
+  // Seconds are included because `--duration` needs them: the schema clamps a bubble's display time to
+  // 2000–30000ms, so the smallest unit the old parser accepted (1m = 60000) already exceeded the
+  // maximum. The flag could not express a single legal value.
+  const match = /^(\d+)(s|m|h|d)$/.exec(String(raw ?? '').trim())
+  if (!match) fail(`${label} must look like 10s, 30m, 24h or 7d — got ${JSON.stringify(raw)}`)
   const n = Number(match[1])
-  const ms = { m: 60_000, h: 3_600_000, d: 86_400_000 }[match[2]]
+  const ms = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }[match[2]]
   return n * ms
 }
+
+/** The window the client will actually honour for a bubble's display time. */
+const DURATION_MIN_MS = 2_000
+const DURATION_MAX_MS = 30_000
 
 function parseArgs(argv) {
   const opts = {
@@ -90,7 +97,19 @@ function parseArgs(argv) {
       case '--starts-in': opts.startsInMs = parseDuration(argv[(i += 1)], '--starts-in'); break
       case '--url': opts.url = argv[(i += 1)]; break
       // Omitting --duration is what makes a notification wait to be clicked. See DECISIONS #72.
-      case '--duration': opts.durationMs = Math.round(parseDuration(argv[(i += 1)], '--duration') / 1) ; break
+      case '--duration': {
+        const ms = parseDuration(argv[(i += 1)], '--duration')
+        // Refuse rather than let the client silently clamp: someone asking for 5 minutes should be told
+        // it is impossible, not given 30 seconds and left wondering.
+        if (ms < DURATION_MIN_MS || ms > DURATION_MAX_MS) {
+          fail(
+            `--duration must be between 2s and 30s (the client clamps it) — got ${ms}ms.\n` +
+              '  Omit it entirely and the notification waits to be clicked instead.',
+          )
+        }
+        opts.durationMs = ms
+        break
+      }
       case '--list': opts.list = true; break
       case '--dry-run': opts.dryRun = true; break
       case '--no-push': opts.push = false; break

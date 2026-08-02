@@ -134,6 +134,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # For an unsigned app this is the *only* integrity check a user has — there is no signature to
+      # verify against, so a published digest is the difference between "trust the download" and
+      # "check the download".
+      - name: Checksums
+        shell: bash
+        run: |
+          cd release
+          shasum -a 256 *.dmg *.zip *.exe *.AppImage *.deb *.rpm *.tar.gz 2>/dev/null \
+            | sed 's|\*||' > "SHA256SUMS-${{ matrix.name }}.txt" || true
+          cat "SHA256SUMS-${{ matrix.name }}.txt"
+
       # Attach to the tag's Release. The app is UNSIGNED, so the body leads with the macOS approval
       # step — most people never open a docs file, and without it the first thing a new user sees is
       # "Apple could not verify this app".
@@ -142,7 +153,10 @@ jobs:
         with:
           draft: false
           fail_on_unmatched_files: false
+          # GitHub's own "What's Changed" from the commits, appended below the install steps.
+          generate_release_notes: true
           files: |
+            release/SHA256SUMS-*.txt
             release/*.dmg
             release/*.zip
             release/*.exe
@@ -160,6 +174,16 @@ jobs:
             **Windows** — SmartScreen will warn about an unrecognised app: **More info** → **Run anyway**.
 
             **Linux** — the AppImage needs `chmod +x`; `.deb`/`.rpm` install normally.
+
+            ### Verify your download
+
+            The app is unsigned, so a checksum is the only integrity check available. Compare against
+            `SHA256SUMS-<platform>.txt` below:
+
+            ```
+            shasum -a 256 -c SHA256SUMS-mac.txt        # macOS / Linux
+            certutil -hashfile "<file>" SHA256          # Windows
+            ```
 
             Full instructions, including what each warning looks like: [docs/INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/INSTALL.md)
 

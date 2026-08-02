@@ -3,7 +3,7 @@
   "version": "1.7.1",
   "private": true,
   "description": "Keycode Pet \u2014 Electron desktop companion",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {

@@ -1,21 +1,154 @@
+<div align="center">
+
 # Keycode Pet
 
-A small pixel character that lives on your desktop. It runs along the bottom of the screen, over
-whatever you are working on, in a window with no edges. You can grab it. It reminds you to drink
-water. And the whole team can make every installed pet say something by editing one JSON file.
+**A pixel character that lives on your desktop.** It runs along the bottom of your screen over
+whatever you are working on, reminds you to drink water, and the whole team can make every installed
+pet say something by editing one file.
 
-Cross-platform Electron app for macOS, Windows and Linux. Internal tool — no signing, no store, no
-accounts, no telemetry.
+[![CI](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/doylefermi-kv/keycode-2026-mascot-pet?label=download)](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **The character is a placeholder.** `pixel-coder` is a pixel-art chibi human, not the Keycode
-> mascot. Swapping it is a file swap plus a JSON edit with no code changes — see
-> [docs/ASSETS.md](docs/ASSETS.md).
+**[Download for macOS, Windows or Linux →](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest)**
+
+![The pet running, jumping and settling along the bottom of the screen](docs/demo/m3-motion-strip.png)
+
+</div>
+
+> [!IMPORTANT]
+> **The app is not code-signed**, so macOS and Windows both warn you the first time you open it. On
+> macOS, **right-click the app and choose Open** rather than double-clicking — you only do it once.
+> [Full install instructions →](docs/INSTALL.md)
+
+> **The character is a placeholder.** `pixel-coder` is a pixel-art chibi human, not the Keycode mascot.
+> Swapping it is a file swap plus a JSON edit, with no code changes — see [docs/ASSETS.md](docs/ASSETS.md).
 
 ---
 
-## Running it
+## What it does
 
-Requires Node ≥ 20 and pnpm. About five minutes from clone to a pet on screen.
+<table>
+<tr>
+<td width="52%" valign="top">
+
+**It talks.** The team publishes a message and every installed pet says it — once each, whenever that
+machine next wakes up. A notification with no timeout waits until you click it, so an announcement
+cannot be missed by looking away.
+
+</td>
+<td width="48%"><img src="docs/demo/v16-sticky-notification.window.png" alt="The pet with a speech bubble reading 'Deploy freeze starts at 5pm' and a dismiss cross"></td>
+</tr>
+<tr>
+<td width="52%" valign="top">
+
+**Put it anywhere.** Drag it off the floor and it stays where you drop it, patrolling left and right at
+that height — and it is still there after a restart. Drop it near the bottom and it re-locks to the
+floor.
+
+</td>
+<td width="48%"><img src="docs/demo/v12-free-placement.window.png" alt="The pet placed mid-screen rather than on the floor"></td>
+</tr>
+<tr>
+<td width="52%" valign="top">
+
+**Three sizes.** Right-click → Size. Only the sprite scales — bubble text stays readable at every size,
+because a message you cannot read is not a message.
+
+</td>
+<td width="48%"><img src="docs/demo/v13-size-small-bubble.window.png" alt="A small pet with a full-size speech bubble"></td>
+</tr>
+<tr>
+<td width="52%" valign="top">
+
+**Wellness reminders.** Water and stretch, at intervals you pick from the menu. They are wall-clock
+deadlines rather than timers, so closing your laptop for two hours does not produce a backlog of four
+reminders on wake.
+
+</td>
+<td width="48%"><img src="docs/demo/m5-bubble-emoji.window.png" alt="The pet reminding you to drink water"></td>
+</tr>
+<tr>
+<td width="52%" valign="top">
+
+**Turn movement off** and it settles down to sleep rather than freezing, then cycles quietly in place.
+Right-clicking the pet gives the same menu as the tray icon — which matters on Wayland, where the
+compositor swallows right-clicks and the tray is the only way in.
+
+</td>
+<td width="48%"><img src="docs/demo/m4-sleep-overlay.window.png" alt="The pet asleep with animated z's"></td>
+</tr>
+</table>
+
+---
+
+## Sending a notification
+
+Every installed pet polls one JSON file every minute. Publishing to it is how you reach everyone.
+
+### From the browser — no checkout needed
+
+**[Actions → Notify → Run workflow](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/notify.yml)**
+
+Type the message, pick a tone and an expiry, run it. Every pet has it within about a minute. No clone,
+no Node, no shell — which is the point: publishing should not be limited to whoever has the repo
+checked out.
+
+| Field | |
+|---|---|
+| **message** | What the pet says. Clamped to 200 characters. Emoji are fine. |
+| **expires** | `30m`, `24h`, `7d`. Required — see below. |
+| **tone** | `info` · `success` · `warning` · `error`. Colours the accent bar. |
+| **priority** | `urgent` also raises a corner toast **and** displaces whatever is on screen. Keep it scarce or it stops meaning anything. |
+| **animation** | What the pet does while it speaks. |
+| **url** | Optional. Clicking the bubble opens it *and* dismisses it. |
+| **duration** | Optional, `2s`–`30s`. **Leave it empty and the bubble waits to be clicked** — usually what you want. |
+
+### From a terminal
+
+```bash
+pnpm notify "Keycode on Fire 🔥" --tone warning --animation jumping --expires 24h
+pnpm notify:list                    # what is live, scheduled, expired
+pnpm notify "…" --dry-run           # validate and print, change nothing
+```
+
+### Three rules that will bite you otherwise
+
+**Ids are generated, and permanent.** Each message is shown *once per install, ever*, keyed by its id.
+Reusing an id shows nothing at all to anyone who saw the first one — silently, while you see a
+successful publish. So ids come from the text plus a timestamp; never write one by hand.
+
+**An expiry is required.** Anything phrased relative to now — "starting in 15 minutes", "in 30 days" —
+is wrong for whoever installs next week. Give it a window matching how long it stays true.
+
+**Publishing is a commit.** The manifest lives in [`site/`](site/) and deploys to GitHub Pages, so a
+message reaching everyone is a reviewable change rather than a side effect of someone's shell.
+
+See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp with its number, the nine
+fault-injection modes, and how release announcements work.
+
+---
+
+## Status
+
+| | |
+|---|---|
+| **macOS** | Verified — transparency, always-on-top, motion, sizes, free placement, broadcast, and installing from a quarantined `.dmg`. |
+| **Linux** | Rendering verified in CI: the pet paints and the window is genuinely transparent (100% of the alpha ring) under xvfb. Click-through (`setShape`) and the Wayland tray fallback are still unverified. |
+| **Windows** | Boots, animates and polls the manifest — verified in CI. Its **pixels are unverified**: `capturePage()` times out on the runner, so the transparency and always-on-top assertions never ran there. |
+
+397 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
+list of what is proven and what is not.
+
+**No telemetry.** One network request — the manifest — and no analytics, identifiers or accounts. The
+"Report a problem…" menu item copies a report and reveals the log for you to attach; nothing is ever
+uploaded by the app itself.
+
+---
+
+## Building it
+
+Requires Node ≥ 20 and pnpm.
 
 ```bash
 pnpm install          # also fetches the Electron binary (~290MB)
@@ -23,80 +156,13 @@ pnpm build
 pnpm dev
 ```
 
-The pet appears at the bottom of your primary display and starts moving. A tray icon gives you the
-settings menu; right-clicking the pet gives you the same menu.
-
-**Broadcast notifications wait to be clicked.** A message from the manifest has no timeout unless the
-publisher sets one — it sits above the pet with a small × until you click it, so an announcement cannot
-be missed by looking away. Clicking one that has a link opens the link and dismisses it together.
-
-**Reminders, with intervals.** Right-click → Drink water reminder / Stretch reminder → Off, or every
-5 / 15 / 30 / 45 / 60 / 90 minutes. Changing an interval clears the pending deadline, so the next
-reminder is one *new* interval away rather than inheriting the old one. **The 5-minute option is how you
-test that reminders work** without waiting 45 minutes.
-
-The team can set default intervals for anyone who never picked one, via the manifest — see
-[docs/BROADCAST.md](docs/BROADCAST.md). Defaults never override a local choice, and there is no way for
-a manifest to switch a reminder back on. The manifest also sets **how often clients re-fetch it**
-(`pollMinutes`), so the broadcast cadence is changed by publishing rather than by shipping a build.
-
-**Three sizes.** Right-click → Size → Small / Medium / Large. `Large` is the size it has always
-rendered at, so upgrading changes nothing; `Small` is half that. Only the sprite scales — bubble text
-stays readable at every size.
-
-**Drag it anywhere.** It is not stuck to the bottom of the screen — drop it mid-screen and it stays
-there, patrolling left and right at that height, and it comes back there after a restart. Drop it near
-the floor and it re-locks to the floor. "Reset position" always brings it home.
-
-To watch it over a dark backdrop, which is how you see transparency problems:
+To watch it over a dark backdrop, which is how transparency bugs become visible:
 
 ```bash
 KEYCODE_PET_BACKDROP=1 pnpm dev
 ```
 
-### Broadcast messages
-
-Every install polls one static JSON file over HTTPS, served from GitHub Pages out of `site/`:
-
-```
-https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json
-```
-
-To say something to everyone:
-
-```bash
-pnpm notify "Keycode on Fire 🔥" --tone warning --animation jumping --expires 24h
-pnpm notify:list                                  # what is live, scheduled, expired
-pnpm notify "…" --dry-run                         # validate and print, change nothing
-```
-
-**Publishing is a commit.** `notify` writes `site/manifest.json`, validates it with the client's own
-parser, commits and pushes; CI deploys Pages. That is deliberate — remote text that lands above
-everything on a colleague's screen goes through the same review path as code.
-
-It also generates the id (they are permanent dedupe keys, and reusing one silently shows nothing to
-anyone who saw it before) and requires an expiry, defaulting to 24h — every message phrased relative to
-"now" is wrong for whoever installs next week.
-
-**The manifest is world-readable.** Nothing goes in it that would not be fine on a public page.
-
-To test against a local server instead, with fault injection:
-
-```bash
-pnpm manifest:serve      # serves site/manifest.json on 127.0.0.1:8787
-
-# in another terminal
-KEYCODE_PET_MANIFEST_URL=http://127.0.0.1:8787/manifest.json \
-KEYCODE_PET_ALLOW_INSECURE_MANIFEST=1 \
-KEYCODE_PET_POLL_MINUTES=1 \
-pnpm dev
-```
-
-See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the fault-injection modes.
-
----
-
-## Commands
+### Commands
 
 | | |
 |---|---|
@@ -106,22 +172,13 @@ See [docs/BROADCAST.md](docs/BROADCAST.md) for the schema, every clamp, and the 
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
-| `pnpm smoke --name x --backdrop [--place x,feetY] [--size small]` | Launch, screenshot, assert pixels — see [docs/VERIFICATION.md](docs/VERIFICATION.md) |
+| `pnpm smoke --name x --backdrop` | Launch, screenshot, assert pixels — see [docs/VERIFICATION.md](docs/VERIFICATION.md) |
 | `pnpm smoke:states` | One screenshot per animation state |
-| `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — see below |
-| `pnpm icons` | Regenerate app icons from the art (macOS only, output committed) |
-| `pnpm manifest:serve` | Local broadcast manifest server with fault injection |
+| `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — Windows and Linux come from CI |
 | `pnpm notify "…"` | Publish a broadcast: validate, commit, push |
-| `pnpm notify:list` | What is live, scheduled and expired |
+| `pnpm manifest:serve` | Local manifest server with fault injection |
 
-`pnpm package` is deliberately restricted to `--mac`. Building `deb`/`rpm` on an Apple Silicon host
-produces broken packages, so Windows and Linux artifacts come from the CI matrix
-(`.github/workflows/release.yml`) only. `package:win-ci-only` and `package:linux-ci-only` exist but are
-named to make that obvious.
-
----
-
-## Environment variables
+### Environment variables
 
 | Variable | Effect |
 |---|---|
@@ -137,18 +194,16 @@ named to make that obvious.
 
 ## How it is put together
 
-Two seams carry the whole design. [ARCHITECTURE.md](ARCHITECTURE.md) has the detail; the short
-version:
+Two seams carry the whole design. [ARCHITECTURE.md](ARCHITECTURE.md) has the detail; the short version:
 
 **Main owns truth; the renderer is a dumb view.** One validated object flows main → renderer, one
 boolean flows back. The renderer sets attributes, sets `textContent`, hit-tests against a generated
-alpha mask, and decides nothing. A test greps it for timers, `fetch` and `innerHTML`, because that
-rule only survives if something checks.
+alpha mask, and decides nothing. A test greps it for timers, `fetch` and `innerHTML`, because that rule
+only survives if something checks.
 
 **The motion engine is pure.** `advance(state, input) => state`, with the clock and the randomness
-injected. Ten minutes of pet life simulates headlessly in about 90ms, deterministically — which
-matters because the liveliness logic is the code whose bugs are subtlest and only visible after
-minutes of watching.
+injected. Ten minutes of pet life simulates headlessly in about 90ms, deterministically — which matters
+because the liveliness logic has the subtlest bugs and they are only visible after minutes of watching.
 
 Everything about the sprite — row offsets, frame counts, durations, state names, the alpha mask, the
 tray icon — is generated from `pet/spritesheet.json`. Nobody types `-208px` by hand.
@@ -164,75 +219,44 @@ apps/desktop/src/
   renderer/    two dumb views (pet, toast) and their CSS
   preload/     two narrow contextBridge bridges
 pet/           the art and its animation map — the single source of truth
-scripts/       generators, the smoke harness, the dev manifest server
+site/          what GitHub Pages serves: the manifest and the landing page
+scripts/       generators, the smoke harness, notify, the dev manifest server
 ```
 
 Runtime dependencies: **`zod`**. That is the whole list.
 
----
-
 ## Commits, tags and versions
-
-The build used one convention and then drifted out of it, so it is written down here.
 
 **Commits** are [Conventional Commits](https://www.conventionalcommits.org/) with a scope naming the
 directory the change lives in — `feat(motion):`, `fix(broadcast):`, `build(package):`, `docs:` — and a
-lowercase subject in the imperative. Scopes in use: `harness`, `infra`, `settings`, `sprite`, `window`,
-`motion`, `menu`, `reminders`, `callouts`, `broadcast`, `updates`, `package`.
+lowercase imperative subject.
 
-**Tags** are annotated, never lightweight, so `git tag -n1` reads as a changelog. `v0.0.0`–`v0.8.0`
-mark the nine build milestones; `v1.0.0` marks all of them green. From `v1.1.0` they are releases.
+**Tags** are annotated, never lightweight, so `git tag -n1` reads as a changelog. `v0.0.0`–`v0.8.0` mark
+the nine build milestones; `v1.0.0` marks all of them green; from `v1.1.0` they are releases.
 
-**The version in `package.json` matches the tag at that commit** — both files, they are kept in step.
-This is not cosmetic: `app.getVersion()` reads it, and the update check compares the manifest's
-`latestVersion` against it. A stale `0.0.0` is what made every install think a phantom `0.6.0` was
-available.
+**The version in `package.json` matches the tag** — both files. Not cosmetic: `app.getVersion()` reads
+it, and the update check compares the manifest's `latestVersion` against it. A stale `0.0.0` is what
+made every install think a phantom `0.6.0` was available.
 
 > Known artefact: `v0.8.0` is an *ancestor* of `v0.7.0`. M8 (the update check) was built before M7
 > (packaging), because packaging last means packaging everything. The tags name milestones, not a
-> release sequence, and rewriting them to look ordered would misreport when the work actually landed.
-
----
+> release sequence, and reordering them would misreport when the work landed.
 
 ## Documentation
 
 | | |
 |---|---|
-| [docs/INSTALL.md](docs/INSTALL.md) | How users install it, including the unsigned-app warnings |
-| [docs/PROMPT.md](docs/PROMPT.md) | The implementation brief this was built from, with its errors corrected in place |
-| [DECISIONS.md](DECISIONS.md) | Every deviation from the brief, the issue, or openpets — with reasons |
+| [docs/INSTALL.md](docs/INSTALL.md) | Installing, including what each unsigned-app warning looks like |
+| [docs/BROADCAST.md](docs/BROADCAST.md) | Manifest schema, every limit, how to publish |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The seams, the two clocks, and what would break at scale |
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | The screenshot loop, and **what is not verified** |
-| [docs/BROADCAST.md](docs/BROADCAST.md) | Manifest schema, every limit, how to publish |
+| [DECISIONS.md](DECISIONS.md) | Every deviation from the brief, the issue, or openpets — with reasons |
 | [docs/ASSETS.md](docs/ASSETS.md) | Swapping the art with no code changes |
+| [docs/PROMPT.md](docs/PROMPT.md) | The implementation brief this was built from, errors corrected in place |
+| [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
 | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) | openpets (MIT), Noto Color Emoji (OFL 1.1 / Apache-2.0) |
 
----
+## License
 
-## Status
-
-All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
-releases from `v1.1.0`. 397 tests pass; typecheck is clean.
-
-**[Download v1.7.0](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest)** —
-macOS, Windows and Linux, built by CI. See [docs/INSTALL.md](docs/INSTALL.md) first: the app is
-unsigned, so both macOS and Windows warn on the first launch.
-
-**Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
-watching the pet render over another application with a transparent window.
-
-**Broadcast is verified against the real host**, over the internet, with no flags: a published
-message appeared once and a restart against the same file showed nothing.
-
-**Linux rendering is now verified** in CI — the pet paints and the window is genuinely transparent
-(100% of the alpha ring) under xvfb. **Windows boots, animates and polls the manifest**, but its pixels
-are still unverified: `capturePage()` times out on the runner, so the visual assertions never ran.
-Details and the full untested list are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
-
-**The app is not code-signed**, so macOS and Windows both warn on first open. On macOS, right-click →
-**Open** rather than double-clicking. See [docs/INSTALL.md](docs/INSTALL.md) — this is the single
-biggest support cost of the current setup, and buying an Apple Developer certificate is what removes it.
-
-**No telemetry.** One network request (the manifest), no analytics, no identifiers, no accounts. The
-"Report a problem…" menu item copies a report and reveals the log for you to attach; nothing is ever
-uploaded by the app itself.
+[MIT](LICENSE) © KeyValue Software Systems. Platform workarounds were learned from **openpets** (MIT) —
+see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

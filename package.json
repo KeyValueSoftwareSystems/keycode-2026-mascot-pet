@@ -3,7 +3,7 @@
   "version": "1.7.1",
   "private": true,
   "description": "Keycode mascot desktop companion \u2014 workspace root",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "author": {
     "name": "KeyValue Systems",
     "email": "doyle@keyvalue.systems"

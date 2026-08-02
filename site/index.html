@@ -3,89 +3,284 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Keycode Pet</title>
+    <title>Keycode Pet — a pixel character for your desktop</title>
+    <meta
+      name="description"
+      content="A pixel character that lives on your desktop. Runs along the bottom of your screen, reminds you to drink water, and the whole team can make every installed pet speak by editing one file."
+    />
+    <meta property="og:title" content="Keycode Pet" />
+    <meta
+      property="og:description"
+      content="A pixel character that lives on your desktop. For macOS, Windows and Linux."
+    />
+    <meta property="og:image" content="./img/m3-motion-strip.png" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🐾</text></svg>" />
     <style>
+      /* Brand: purple #a16ae8 on near-black #141111, per docs/ASSETS.md. */
       :root {
         --ink: #141111;
+        --ink-soft: #5b5450;
         --paper: #fffff8;
+        --panel: #f4f1e8;
+        --line: #e2ddd0;
         --accent: #a16ae8;
-        --muted: #6b6560;
+        --radius: 14px;
       }
       @media (prefers-color-scheme: dark) {
-        :root { --ink: #f3efe9; --paper: #17151a; --muted: #a09a94; }
+        :root {
+          --ink: #f4f0ea;
+          --ink-soft: #a59e97;
+          --paper: #121014;
+          --panel: #1b1820;
+          --line: #2b2733;
+        }
       }
       * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
       body {
         margin: 0;
-        padding: 3rem 1.25rem 5rem;
         background: var(--paper);
         color: var(--ink);
-        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
       }
-      main { max-width: 42rem; margin: 0 auto; }
-      h1 { font-size: 2rem; margin: 0 0 .25rem; letter-spacing: -0.02em; }
-      .sub { color: var(--muted); margin: 0 0 2.5rem; }
-      h2 { font-size: 1.1rem; margin: 2.5rem 0 .75rem; }
-      a { color: inherit; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
-      .cta {
-        display: inline-block; padding: .7rem 1.1rem; border: 2px solid var(--ink);
-        border-radius: 12px; text-decoration: none; font-weight: 600;
+      .wrap { max-width: 56rem; margin: 0 auto; padding: 0 1.25rem; }
+      a { color: inherit; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+
+      /* ---- Hero ---- */
+      header { padding: 4.5rem 0 2rem; text-align: center; }
+      h1 {
+        margin: 0 0 .5rem;
+        font-size: clamp(2.4rem, 7vw, 3.6rem);
+        letter-spacing: -0.03em;
+        line-height: 1.05;
       }
-      .warn {
-        border-left: 5px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent);
-        padding: .9rem 1rem; border-radius: 8px; margin: 1.25rem 0;
+      .tagline {
+        margin: 0 auto 2rem;
+        max-width: 34rem;
+        font-size: clamp(1.05rem, 2.6vw, 1.2rem);
+        color: var(--ink-soft);
       }
+      .strip {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #101014;
+      }
+      .cap { margin: .6rem 0 0; font-size: .82rem; color: var(--ink-soft); text-align: center; }
+
+      /* ---- Downloads ---- */
+      .dl { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin: 0 0 1rem; }
+      .btn {
+        display: inline-flex; align-items: center; gap: .5rem;
+        padding: .72rem 1.15rem;
+        border: 2px solid var(--ink); border-radius: 11px;
+        font-weight: 600; font-size: .95rem; text-decoration: none;
+      }
+      .btn.primary { background: var(--ink); color: var(--paper); }
+      .btn:hover { border-color: var(--accent); }
+      .btn.primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+      /* ---- Notice ---- */
+      .notice {
+        margin: 2rem 0;
+        padding: 1rem 1.15rem;
+        border: 1px solid var(--line);
+        border-left: 5px solid var(--accent);
+        border-radius: 10px;
+        background: var(--panel);
+        font-size: .95rem;
+      }
+      .notice strong { display: block; margin-bottom: .2rem; }
+
+      /* ---- Features ---- */
+      section { padding: 2.5rem 0; }
+      h2 { font-size: 1.55rem; letter-spacing: -0.02em; margin: 0 0 1.75rem; }
+      .feat {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.75rem 2.25rem;
+        align-items: center;
+        margin-bottom: 2.25rem;
+      }
+      .feat:nth-child(even) .shot { order: -1; }
+      .feat h3 { margin: 0 0 .4rem; font-size: 1.12rem; }
+      .feat p { margin: 0; color: var(--ink-soft); font-size: .97rem; }
+      .shot {
+        margin: 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background:
+          linear-gradient(45deg, rgba(120,120,140,.07) 25%, transparent 25%, transparent 75%, rgba(120,120,140,.07) 75%),
+          linear-gradient(45deg, rgba(120,120,140,.07) 25%, transparent 25%, transparent 75%, rgba(120,120,140,.07) 75%);
+        background-size: 18px 18px;
+        background-position: 0 0, 9px 9px;
+        overflow: hidden;
+      }
+      .shot img { display: block; width: 100%; height: auto; }
+      @media (max-width: 46rem) {
+        .feat { grid-template-columns: 1fr; gap: .9rem; }
+        .feat:nth-child(even) .shot { order: 0; }
+      }
+
+      /* ---- Team ---- */
+      .team { border-top: 1px solid var(--line); }
       code {
-        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-        background: color-mix(in srgb, var(--ink) 8%, transparent);
-        padding: .15rem .4rem; border-radius: 5px;
+        font: .875em/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        padding: .12em .4em;
+        border-radius: 6px;
       }
-      footer { margin-top: 4rem; color: var(--muted); font-size: .875rem; }
+      pre {
+        margin: 1rem 0; padding: .9rem 1rem;
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 10px; overflow-x: auto;
+      }
+      pre code { background: none; border: 0; padding: 0; }
+      ul { padding-left: 1.15rem; color: var(--ink-soft); }
+      li { margin: .35rem 0; }
+      li strong { color: var(--ink); }
+
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 2rem 0 3.5rem;
+        color: var(--ink-soft);
+        font-size: .875rem;
+      }
+      footer p { margin: .35rem 0; }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Keycode Pet</h1>
-      <p class="sub">
-        A small pixel character that lives on your desktop. It runs along the bottom of your screen over
-        whatever you are working on, reminds you to drink water, and the whole team can make every
-        installed pet say something by editing one JSON file.
-      </p>
+    <div class="wrap">
+      <header>
+        <h1>Keycode Pet</h1>
+        <p class="tagline">
+          A pixel character that lives on your desktop. It runs along the bottom of your screen over
+          whatever you are working on — and the whole team can make every installed pet speak.
+        </p>
 
-      <p>
-        <a class="cta" href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest">
-          Download for macOS, Windows or Linux →
-        </a>
-      </p>
+        <div class="dl">
+          <a class="btn primary" href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest">Download</a>
+          <a class="btn" href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md">Install guide</a>
+          <a class="btn" href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet">Source</a>
+        </div>
+        <p class="cap">macOS (Apple Silicon &amp; Intel) · Windows · Linux (AppImage, deb, rpm)</p>
+      </header>
 
-      <div class="warn">
-        <strong>This app is not code-signed.</strong> macOS and Windows will both warn you the first time
-        you open it. On macOS, <strong>right-click the app and choose Open</strong> rather than
-        double-clicking. You only do it once.
-        <a href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md">
-          Full instructions
-        </a>.
+      <figure style="margin: 0">
+        <img class="strip" src="./img/m3-motion-strip.png" alt="Five frames of the pet: idle, running left, mid-jump, running right, and settled" />
+        <figcaption class="cap">Idle, running, mid-jump, running back, settled — one continuous stretch of pet life.</figcaption>
+      </figure>
+
+      <div class="notice">
+        <strong>It is not code-signed, so your machine will warn you once.</strong>
+        There is no Apple or Windows certificate behind this build. On macOS, <b>right-click the app and
+        choose Open</b> instead of double-clicking; on Windows, <b>More info → Run anyway</b>. You do it
+        once, and nothing about the app changes when you do.
+        <a href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md">What each warning looks like →</a>
       </div>
 
-      <h2>Privacy</h2>
-      <p>
-        The app makes one network request: it fetches
-        <a href="./manifest.json"><code>manifest.json</code></a> from this site so the team can broadcast
-        a message to everyone. No analytics, no identifiers, no usage data, no accounts. Nothing is ever
-        uploaded from your machine unless you use “Report a problem…” and send it yourself.
-      </p>
+      <section>
+        <h2>What it does</h2>
 
-      <h2>For the team</h2>
-      <p>
-        <code>manifest.json</code> on this page is what every installed pet polls. Publishing a message
-        is <code>pnpm notify "…"</code>, which commits it — so anything that appears on a colleague's
-        screen goes through the same review as code.
-      </p>
+        <div class="feat">
+          <div>
+            <h3>It talks</h3>
+            <p>
+              Publish a message and every installed pet says it — once each, whenever that machine next
+              wakes up. A notification with no timeout waits until you click it, so an announcement
+              cannot be missed by looking away.
+            </p>
+          </div>
+          <figure class="shot"><img src="./img/v16-sticky-notification.window.png" alt="The pet with a white speech bubble reading 'Deploy freeze starts at 5pm', with a dismiss cross" /></figure>
+        </div>
+
+        <div class="feat">
+          <div>
+            <h3>Put it anywhere</h3>
+            <p>
+              Drag it off the floor and it stays where you drop it, patrolling left and right at that
+              height — and it is still there after a restart. Drop it near the bottom and it re-locks to
+              the floor.
+            </p>
+          </div>
+          <figure class="shot"><img src="./img/v12-free-placement.window.png" alt="The pet placed mid-screen rather than along the bottom" /></figure>
+        </div>
+
+        <div class="feat">
+          <div>
+            <h3>Three sizes</h3>
+            <p>
+              Small, medium or large, from the right-click menu. Only the character scales — the speech
+              bubble keeps its type size, because a message you cannot read is not a message.
+            </p>
+          </div>
+          <figure class="shot"><img src="./img/v13-size-small-bubble.window.png" alt="A small pet with a full-size speech bubble above it" /></figure>
+        </div>
+
+        <div class="feat">
+          <div>
+            <h3>It looks after you</h3>
+            <p>
+              Water and stretch reminders, at intervals you choose. They are wall-clock deadlines rather
+              than timers, so closing your laptop for two hours does not greet you with a backlog of
+              four reminders on wake.
+            </p>
+          </div>
+          <figure class="shot"><img src="./img/m5-bubble-emoji.window.png" alt="The pet reminding you to drink water" /></figure>
+        </div>
+
+        <div class="feat">
+          <div>
+            <h3>Or leave it be</h3>
+            <p>
+              Turn movement off and it settles down to sleep rather than freezing in place. Right-clicking
+              the pet gives the same menu as the tray icon — which matters on Wayland, where the
+              compositor swallows right-clicks and the tray is the only way in.
+            </p>
+          </div>
+          <figure class="shot"><img src="./img/m4-sleep-overlay.window.png" alt="The pet asleep with animated z's rising from its head" /></figure>
+        </div>
+      </section>
+
+      <section class="team">
+        <h2>For the team</h2>
+        <p style="color: var(--ink-soft)">
+          Every pet polls <a href="./manifest.json"><code>manifest.json</code></a> on this site once a
+          minute. Publishing to it is how you reach everyone — and the easiest way needs nothing
+          installed:
+        </p>
+        <p>
+          <a class="btn" href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/notify.yml">Actions → Notify → Run workflow</a>
+        </p>
+        <p style="color: var(--ink-soft)">Or from a checkout:</p>
+        <pre><code>pnpm notify "Keycode on Fire 🔥" --tone warning --expires 24h</code></pre>
+        <ul>
+          <li><strong>Ids are generated.</strong> A message shows once per install, ever, keyed by its id — so reusing one silently shows nothing to anyone who already saw it.</li>
+          <li><strong>An expiry is required.</strong> "Starting in 15 minutes" is wrong for whoever installs next week.</li>
+          <li><strong>Publishing is a commit.</strong> Text that appears above everything on a colleague's screen goes through the same review as code.</li>
+        </ul>
+        <p style="color: var(--ink-soft)">
+          <a href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/blob/main/docs/BROADCAST.md">The schema, every limit, and the nine fault modes →</a>
+        </p>
+      </section>
 
       <footer>
-        <a href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet">Source on GitHub</a> ·
-        The character is a placeholder, not the Keycode mascot.
+        <p>
+          <strong>No telemetry.</strong> The app makes one network request — the manifest above — and sends
+          no analytics, no identifiers and no usage data. It has no accounts. Nothing leaves your machine
+          unless you use “Report a problem…” and send it yourself.
+        </p>
+        <p>
+          MIT licensed ·
+          <a href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet">Source</a> ·
+          <a href="https://github.com/doylefermi-kv/keycode-2026-mascot-pet/issues/new">Report a problem</a>
+        </p>
+        <p>The character is a placeholder, not the Keycode mascot.</p>
       </footer>
-    </main>
+    </div>
   </body>
 </html>

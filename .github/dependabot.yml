@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Electron is the one that matters: this app renders remote text in Chromium, so Electron patches
+  # are security patches. A major bump is a different matter — every platform workaround was validated
+  # against Electron 42 (DECISIONS #38), so majors get reviewed rather than merged.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        patterns: ['@types/*', 'typescript', 'vite', 'vitest', 'electron-builder']
+        update-types: [minor, patch]
+
+  # Pinned action majors go stale quietly and are a supply-chain surface of their own.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

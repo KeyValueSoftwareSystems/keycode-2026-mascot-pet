@@ -1,0 +1,125 @@
+name: Notify
+
+# Broadcast a message to every installed pet, from the browser.
+#
+# Actions → Notify → Run workflow. No checkout, no Node, no shell — so publishing is not restricted to
+# whoever has the repo cloned. It runs the same `scripts/notify.mjs` that a developer runs locally, so
+# there is one implementation of the rules rather than two that can disagree.
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'What the pet says (max 200 characters)'
+        required: true
+        type: string
+      expires:
+        description: 'How long it stays live: 30m, 24h, 7d…'
+        required: true
+        default: '24h'
+        type: string
+      tone:
+        description: 'Colour of the accent bar'
+        required: true
+        default: 'info'
+        type: choice
+        options: [info, success, warning, error]
+      priority:
+        description: 'urgent also raises a corner toast and displaces whatever is on screen — keep it scarce'
+        required: true
+        default: 'high'
+        type: choice
+        options: [low, normal, high, urgent]
+      animation:
+        description: 'What the pet does while it speaks'
+        required: true
+        default: 'waving'
+        type: choice
+        options: [waving, jumping, review, drink, idle, failed]
+      url:
+        description: 'Optional link. Clicking the bubble opens it and dismisses.'
+        required: false
+        type: string
+      duration:
+        description: 'Optional auto-dismiss, e.g. 10s. Leave empty and it waits to be clicked.'
+        required: false
+        type: string
+      dry_run:
+        description: 'Validate and print only — publish nothing'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  # To dispatch the Pages deploy — see the last step.
+  actions: write
+
+# One publisher at a time. Two concurrent runs would each append to the manifest and the second push
+# would be rejected as non-fast-forward, losing a message someone thought they had sent.
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.6.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Publish
+        env:
+          MESSAGE: ${{ inputs.message }}
+          EXPIRES: ${{ inputs.expires }}
+          TONE: ${{ inputs.tone }}
+          PRIORITY: ${{ inputs.priority }}
+          ANIMATION: ${{ inputs.animation }}
+          LINK: ${{ inputs.url }}
+          DURATION: ${{ inputs.duration }}
+          DRY: ${{ inputs.dry_run }}
+        run: |
+          git config user.name "${{ github.actor }} via Actions"
+          git config user.email '${{ github.actor }}@users.noreply.github.com'
+
+          # Inputs go through the environment, never interpolated into the command line: a message
+          # containing a quote or a backtick would otherwise be shell syntax rather than text — and the
+          # whole point of this file is that non-developers type into it.
+          args=(--tone "$TONE" --priority "$PRIORITY" --animation "$ANIMATION" --expires "$EXPIRES")
+          [ -n "$LINK" ] && args+=(--url "$LINK")
+          [ -n "$DURATION" ] && args+=(--duration "$DURATION")
+          [ "$DRY" = "true" ] && args+=(--dry-run)
+
+          pnpm build
+          node scripts/notify.mjs "$MESSAGE" "${args[@]}"
+
+      # `notify` commits and pushes, but a push made with GITHUB_TOKEN does not trigger workflows —
+      # that is how GitHub prevents recursive CI. So pages.yml has to be asked explicitly, or the
+      # message sits in git having reached nobody.
+      - name: Deploy it
+        if: ${{ inputs.dry_run != true }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run pages.yml --ref main
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ inputs.dry_run == true && 'Validated (dry run)' || 'Published' }}"
+            echo ''
+            echo "> ${{ inputs.message }}"
+            echo ''
+            echo "\`${{ inputs.tone }}\` · \`${{ inputs.priority }}\` · \`${{ inputs.animation }}\` · expires in \`${{ inputs.expires }}\`"
+            echo ''
+            echo 'Every pet fetches it within a minute of the Pages deploy finishing.'
+          } >> "$GITHUB_STEP_SUMMARY"
