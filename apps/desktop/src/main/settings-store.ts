@@ -61,8 +61,28 @@ export class SettingsStore {
 
   #timer: NodeJS.Timeout | null = null
   #firstDirtyAt: number | null = null
-  #writing: Promise<void> | null = null
-  #pendingAfterWrite = false
+  /**
+   * Tail of the write chain — every write, queued or running. `flush` awaits this.
+   *
+   * The bug it fixes: writes were tracked by a single in-flight promise, and `flush` awaited *that*.
+   * A write queued behind it was invisible. So `flush` could resolve, the caller could conclude
+   * everything was on disk, and a moment later the queued write would start and create a temp file.
+   * On `before-quit` that is a settings write racing process exit; in the test suite it was teardown
+   * removing the directory while a write appeared inside it — `ENOTEMPTY`, at random, on unrelated
+   * commits.
+   *
+   * The queue is reached by the max-wait path, which fires `void this.#write()` — nobody holds that
+   * promise, so nothing else was ever going to wait for it. A long drag plus a `patchNow` is enough,
+   * and `patchNow` is `seenBroadcastIds`, where "shown exactly once, ever" depends on the write
+   * landing.
+   */
+  #tail: Promise<void> = Promise.resolve()
+  /** A write that has been asked for but has not started; later asks join it instead of stacking. */
+  #pending: Promise<void> | null = null
+  /** Whether the state has changed since the last write took its snapshot. */
+  #dirty = false
+  /** Makes each temp filename unique. Belt and braces now that writes are serialised. */
+  #tempSeq = 0
   #listeners = new Set<SettingsChangeListener>()
 
   readonly recovery: RecoveryInfo | null
@@ -181,14 +201,17 @@ export class SettingsStore {
     await this.#write()
   }
 
-  /** Flush any pending write. Awaited on `before-quit` and on `powerMonitor` suspend. */
+  /**
+   * Flush any pending write. Awaited on `before-quit` and on `powerMonitor` suspend.
+   *
+   * Awaits the whole chain, not just its own write: if it returned while an earlier write was still
+   * running, the process could exit mid-rename and leave a stray temp file — which is exactly the
+   * failure `#tail` exists to prevent.
+   */
   async flush(): Promise<void> {
-    if (this.#timer) {
-      this.#cancelTimer()
-      await this.#write()
-      return
-    }
-    if (this.#writing) await this.#writing
+    this.#cancelTimer()
+    if (this.#dirty) await this.#write()
+    await this.#tail
   }
 
   #apply(patch: Partial<Settings>): boolean {
@@ -201,6 +224,9 @@ export class SettingsStore {
     if (changed.length === 0) return false
 
     this.#state = next
+    // Set here rather than in `#schedule`, so `patchNow` marks it too — otherwise a `flush` following
+    // a `patchNow` whose write had already started would decide there was nothing to do.
+    this.#dirty = true
     for (const listener of this.#listeners) {
       try {
         listener(next, previous, changed)
@@ -236,44 +262,62 @@ export class SettingsStore {
     this.#timer = null
   }
 
-  async #write(): Promise<void> {
-    // Serialise writes. Two concurrent rename()s to the same target is a race with no
-    // upside; the later caller just waits and then writes the newest state.
-    if (this.#writing) {
-      this.#pendingAfterWrite = true
-      await this.#writing
-      if (!this.#pendingAfterWrite) return
-    }
+  /**
+   * Queue a write. Resolves when the state as of *its* turn has reached disk.
+   *
+   * Two properties, and both are load-bearing:
+   *
+   *   - **Serialised.** A write only starts once every earlier one has finished, so there is never
+   *     more than one temp file and never two renames racing for the same destination.
+   *   - **Collapsed.** Asks that arrive before the queued write has started share it, because it will
+   *     snapshot whatever the newest state is when it runs — a second waiter would write the same
+   *     bytes again. An ask that arrives *after* it starts gets its own turn, because by then the
+   *     snapshot is already taken and its change would otherwise be dropped.
+   */
+  #write(): Promise<void> {
+    if (this.#pending) return this.#pending
 
-    this.#pendingAfterWrite = false
+    const pending = this.#tail.then(() => {
+      // Cleared before writing, not after: from here on, a new ask is a genuinely later change and
+      // must get its own turn rather than joining a write whose snapshot is about to be taken.
+      this.#pending = null
+      return this.#writeOnce()
+    })
+
+    this.#pending = pending
+    // Swallowed on the tail only: one failed write must not poison every write after it. The caller's
+    // own promise still rejects.
+    this.#tail = pending.then(
+      () => {},
+      () => {},
+    )
+    return pending
+  }
+
+  async #writeOnce(): Promise<void> {
     this.#firstDirtyAt = null
+    this.#dirty = false
 
     const snapshot = `${JSON.stringify(this.#state, null, 2)}\n`
-    const temp = `${this.#path}.${process.pid}.tmp`
+    const temp = `${this.#path}.${process.pid}.${(this.#tempSeq += 1)}.tmp`
 
-    this.#writing = (async () => {
+    try {
+      const handle = await open(temp, 'w')
       try {
-        const handle = await open(temp, 'w')
-        try {
-          await handle.writeFile(snapshot, 'utf8')
-          // fsync before rename: rename is atomic with respect to the directory entry, but
-          // without a flush the *contents* may not have reached the device yet, so a power
-          // loss can leave a correctly-named, empty file.
-          await handle.sync()
-        } finally {
-          await handle.close()
-        }
-        await renameWithRetry(temp, this.#path)
-      } catch (error) {
-        // Losing a settings write is annoying; crashing the pet over it is worse.
-        this.#log('settings: write failed', { error: String(error) })
-        await unlink(temp).catch(() => {})
+        await handle.writeFile(snapshot, 'utf8')
+        // fsync before rename: rename is atomic with respect to the directory entry, but
+        // without a flush the *contents* may not have reached the device yet, so a power
+        // loss can leave a correctly-named, empty file.
+        await handle.sync()
+      } finally {
+        await handle.close()
       }
-    })()
-
-    const inFlight = this.#writing
-    await inFlight
-    if (this.#writing === inFlight) this.#writing = null
+      await renameWithRetry(temp, this.#path)
+    } catch (error) {
+      // Losing a settings write is annoying; crashing the pet over it is worse.
+      this.#log('settings: write failed', { error: String(error) })
+      await unlink(temp).catch(() => {})
+    }
   }
 }
 

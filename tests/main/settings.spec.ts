@@ -352,6 +352,50 @@ describe('SettingsStore', () => {
     expect(written.position?.x).toBe(24)
   })
 
+  it('flush waits for a write queued behind the one in flight, not just that one', async () => {
+    // The flake, made deliberate. Writes were tracked by a single in-flight promise and `flush`
+    // awaited *that*; a write queued behind it was invisible. So `flush` resolved, the caller
+    // concluded everything was on disk, and a moment later the queued write started and created a
+    // temp file — teardown then removed the directory while a file appeared inside it (`ENOTEMPTY`,
+    // at random, on unrelated commits). On `before-quit` the same shape is a settings write racing
+    // process exit.
+    //
+    // `maxWaitMs: 0` makes every patch take the immediate branch, which fires `void this.#write()` —
+    // a promise nobody holds, so nothing else was ever going to wait for it.
+    const store = await SettingsStore.open({ dir, debounceMs: 50, maxWaitMs: 0, now: () => 0 })
+
+    void store.patchNow({ lastKnownRelease: 'in-flight' }) // starts a write; deliberately not awaited
+    store.patch({ petSize: 'small' }) // queues a second one behind it
+
+    await store.flush()
+
+    // Checked immediately: the point is that nothing is still to come once flush has resolved.
+    expect((await readdir(dir)).filter((name) => name.endsWith('.tmp'))).toEqual([])
+    expect(await readdir(dir)).toEqual([SETTINGS_FILENAME])
+
+    const written = JSON.parse(await readFile(settingsPath(), 'utf8')) as typeof DEFAULT_SETTINGS
+    expect(written.petSize).toBe('small')
+    expect(written.lastKnownRelease).toBe('in-flight')
+  })
+
+  it('serialises many overlapping writes and lands the newest state', async () => {
+    const store = await SettingsStore.open({ dir, debounceMs: 5, maxWaitMs: 0, now: () => 0 })
+    const races: Promise<unknown>[] = []
+    for (let i = 0; i < 12; i += 1) {
+      store.patch({ position: { displayKey: 'k', x: i, feetY: null } })
+      races.push(store.patchNow({ seenBroadcastIds: [`id-${i}`] }))
+    }
+    store.patch({ petSize: 'small' })
+    races.push(store.flush())
+    await Promise.all(races)
+
+    expect(await readdir(dir)).toEqual([SETTINGS_FILENAME])
+    const written = JSON.parse(await readFile(settingsPath(), 'utf8')) as typeof DEFAULT_SETTINGS
+    expect(written.petSize).toBe('small')
+    expect(written.seenBroadcastIds).toEqual(['id-11'])
+    expect(written.position?.x).toBe(11)
+  })
+
   it('honours the max-wait so a long continuous drag still reaches disk', async () => {
     vi.useFakeTimers()
     try {
