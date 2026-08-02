@@ -214,14 +214,20 @@ available.
 All nine milestones are built, tagged `v0.0.0`–`v0.8.0`, with `v1.0.0` marking them all green and
 releases from `v1.1.0`. 397 tests pass; typecheck is clean.
 
+**[Download v1.7.0](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest)** —
+macOS, Windows and Linux, built by CI. See [docs/INSTALL.md](docs/INSTALL.md) first: the app is
+unsigned, so both macOS and Windows warn on the first launch.
+
 **Verified on macOS**, including installing from a quarantined `.dmg` — the real download path — and
 watching the pet render over another application with a transparent window.
 
 **Broadcast is verified against the real host**, over the internet, with no flags: a published
 message appeared once and a restart against the same file showed nothing.
 
-**Not verified:** all Windows behaviour and all Linux behaviour. Details and the full untested list
-are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+**Linux rendering is now verified** in CI — the pet paints and the window is genuinely transparent
+(100% of the alpha ring) under xvfb. **Windows boots, animates and polls the manifest**, but its pixels
+are still unverified: `capturePage()` times out on the runner, so the visual assertions never ran.
+Details and the full untested list are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 **The app is not code-signed**, so macOS and Windows both warn on first open. On macOS, right-click →
 **Open** rather than double-clicking. See [docs/INSTALL.md](docs/INSTALL.md) — this is the single
