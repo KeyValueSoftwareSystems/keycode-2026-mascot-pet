@@ -1,6 +1,17 @@
 {
   "version": 1,
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "keycode-pet-v1-7-0-is-out-download-from-20260802T0742",
+      "text": "Keycode Pet v1.7.0 is out 🎉 Download from the GitHub release.",
+      "tone": "success",
+      "priority": "high",
+      "animation": "waving",
+      "startsAt": "2026-08-02T07:41:33Z",
+      "expiresAt": "2026-08-09T07:42:33Z",
+      "url": "https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest"
+    }
+  ],
   "defaults": {
     "pollMinutes": 10
   }
