@@ -68,7 +68,7 @@ jobs:
         with:
           ref: main
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.6.0
       - uses: actions/setup-node@v4
