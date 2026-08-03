@@ -12,6 +12,8 @@ import type { Settings } from '../../apps/desktop/src/main/settings-schema.js'
 import { DEFAULT_SETTINGS } from '../../apps/desktop/src/main/settings-schema.js'
 import { ALPHA_MASK } from '../../apps/desktop/src/sprite/alpha-mask.js'
 import {
+  DEFAULT_ALWAYS_ON_TOP,
+  DEFAULT_PET_SIZE,
   PET_SIZES,
   PET_SIZE_SCALES,
   REMINDER_MINUTE_CHOICES,
@@ -21,8 +23,8 @@ import {
 function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
   return {
     movementEnabled: true,
-    alwaysOnTop: true,
-    petSize: 'large',
+    alwaysOnTop: { value: true, isDefault: false },
+    petSize: { value: 'small', isDefault: false },
     water: { enabled: true, minutes: 45, isDefault: true },
     stretch: { enabled: true, minutes: 60, isDefault: true },
     update: { state: 'idle', latestVersion: null },
@@ -69,6 +71,16 @@ describe('menu template', () => {
       'separator',
       'Quit',
     ])
+  })
+
+  it('marks always-on-top as a default when nobody chose it', () => {
+    const on = buildMenuTemplate(view({ alwaysOnTop: { value: true, isDefault: true } }), noopActions())
+    expect(on[3]).toMatchObject({ label: 'Always on top (default)', checked: true })
+    const chosen = buildMenuTemplate(
+      view({ alwaysOnTop: { value: false, isDefault: false } }),
+      noopActions(),
+    )
+    expect(chosen[3]).toMatchObject({ label: 'Always on top', checked: false })
   })
 
   it('renders Movement as a checkbox reflecting the view model', () => {
@@ -219,6 +231,12 @@ function makeActions(overrides: Partial<Parameters<typeof createActions>[0]> = {
     showAbout: () => {},
     checkForUpdates: () => {},
     quit: () => {},
+    // The three-way resolution lives in app-shell, which holds the manifest defaults. Actions take it
+    // injected so there is not a second copy of the precedence rule to get wrong; the fixture supplies
+    // the built-ins, which is what "no team default and nothing chosen" resolves to.
+    setAlwaysOnTop: () => {},
+    effectivePetSize: () => DEFAULT_PET_SIZE,
+    effectiveAlwaysOnTop: () => DEFAULT_ALWAYS_ON_TOP,
     ...overrides,
   })
   return { actions, settings, controller, evaluations: () => evaluations }
@@ -290,9 +308,11 @@ describe('actions', () => {
     const trigger = controller.enqueued[0]
     expect(trigger?.kind).toBe('reset-position')
 
-    // 0.35 across a floor inset by half the pet's body width on each side. Taken from the mask rather
-    // than written as a literal: it was 107 until the stretch art widened the union to 120.
-    const halfBody = ALPHA_MASK.bbox.width / 2
+    // 0.35 across a floor inset by half the pet's body width on each side — at the pet's *effective
+    // scale*, because a small pet may stand closer to the screen edge than a large one. Both factors
+    // have moved under this test already: the mask widened from 107 to 121 with the stretch art, and the
+    // default size went from `large` to `small`. Deriving both is what stops it being rewritten each time.
+    const halfBody = (ALPHA_MASK.bbox.width * petScaleFor(DEFAULT_PET_SIZE)) / 2
     const minX = 0 + halfBody
     const maxX = 1512 - halfBody
     const expected = minX + (maxX - minX) * RESET_POSITION_FRACTION
@@ -335,10 +355,29 @@ describe('pet size menu', () => {
 
   it('ticks exactly the current size', () => {
     for (const size of PET_SIZES) {
-      const ticked = sizeSubmenu(view({ petSize: size })).filter((i) => i.checked)
+      const ticked = sizeSubmenu(view({ petSize: { value: size, isDefault: false } })).filter(
+        (i) => i.checked,
+      )
       expect(ticked).toHaveLength(1)
       expect(ticked[0]?.label?.toLowerCase()).toBe(size)
     }
+  })
+
+  it('marks a size that came from a team default, so nobody has to guess why', () => {
+    // The same choice `reminderSubmenu` makes: mark it rather than hide it. A pet that is small because
+    // the team publishes small is indistinguishable from one somebody shrank, and an unexplained
+    // setting is a spooky one.
+    const submenu = sizeSubmenu(view({ petSize: { value: 'medium', isDefault: true } }))
+    const ticked = submenu.filter((i) => i.checked)
+    expect(ticked).toHaveLength(1)
+    expect(ticked[0]?.label).toBe('Medium (default)')
+    // Only the effective one is marked — the others are still plain choices.
+    expect(submenu.filter((i) => i.label?.includes('(default)'))).toHaveLength(1)
+  })
+
+  it('leaves the label alone when the size was chosen here', () => {
+    const submenu = sizeSubmenu(view({ petSize: { value: 'medium', isDefault: false } }))
+    expect(submenu.map((i) => i.label)).toEqual(['Small', 'Medium', 'Large'])
   })
 
   it('names the size it wants instead of reading the item back', () => {

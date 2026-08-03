@@ -53,8 +53,9 @@ nowhere above left to put one.
 <tr>
 <td width="52%" valign="top">
 
-**Three sizes.** Right-click → Size. Only the sprite scales — bubble text stays readable at every size,
-because a message you cannot read is not a message.
+**Three sizes.** Starts small; right-click → Size to change it. Only the sprite scales — bubble text
+stays readable at every size, because a message you cannot read is not a message. The starting size is
+a team default, so it can be changed for everyone without shipping a build.
 
 </td>
 <td width="48%"><img src="docs/demo/v13-size-small-bubble.window.png" alt="A small pet with a full-size speech bubble"></td>
@@ -141,7 +142,7 @@ fault-injection modes, and how release announcements work.
 | **Windows** | **Pixels now attempted**, for the first time: the harness takes a desktop-level composite screenshot (PowerShell `CopyFromScreen`) and asserts against it, which needs no alpha channel and so does not depend on `capturePage()` — that still stalls on the runner. Whether the runner's session yields a real frame is answered by the uploaded artifact on each release run. |
 | **Linux** | Verified at the X server, not just in-process — `pnpm lab:linux` runs the app on a real X server in a container and screenshots the **root window**, which is the only way to see window shaping and real compositing. The pet, the whole speech bubble, the sleep overlay and click-through all check out. Unverified: the Wayland tray fallback, and **emoji render as tofu** ([an open bug](docs/VERIFICATION.md)). |
 
-439 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
+446 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
 list of what is proven and what is not.
 
 **No telemetry.** One network request — the manifest — and no analytics, identifiers or accounts. The
@@ -172,7 +173,7 @@ KEYCODE_PET_BACKDROP=1 pnpm dev
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 439 tests, no Electron required |
+| `pnpm test` | 446 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |
@@ -181,6 +182,7 @@ KEYCODE_PET_BACKDROP=1 pnpm dev
 | `pnpm lab:linux` | Run the pet on a real X server in a container and screenshot the root window. This is the only way to see Linux window shaping from a Mac — `capturePage()` cannot |
 | `pnpm package` | macOS `.dmg` + `.zip`. **macOS only by design** — Windows and Linux come from CI |
 | `pnpm notify "…"` | Publish a broadcast: validate, commit, push |
+| `pnpm manifest:check` | Validate `site/manifest.json` with the client's own parser — fails on anything that would not reach clients as written. Run by CI and before every Pages deploy |
 | `pnpm manifest:serve` | Local manifest server with fault injection |
 
 ### Environment variables

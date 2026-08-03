@@ -19,7 +19,7 @@
 import { z } from 'zod'
 import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 5 as const
+export const SETTINGS_SCHEMA_VERSION = 6 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -32,16 +32,23 @@ export const settingsSchema = z.strictObject({
   stretchReminderEnabled: z.boolean(),
 
   /**
-   * Whether the pet floats in front of everything.
+   * Whether the pet floats in front of everything, or **null for "never chosen here"**.
    *
    * Off sends it behind other windows, where it is a companion you glance at rather than something in
    * the way. A callout still raises it for as long as the bubble is up — see the keeper — because a
    * team broadcast delivered to a window nobody can see has not been delivered.
+   *
+   * Nullable since v1.10.0 so a manifest default can fill it. Null is load-bearing in exactly the way
+   * the reminder intervals' null is: it is the difference between "this person wants the pet in front"
+   * and "nobody has said", and only the second may be answered by a remote file.
    */
-  alwaysOnTop: z.boolean(),
+  alwaysOnTop: z.boolean().nullable(),
 
-  /** Sprite scale. The bubble does not scale with it — see PET_SIZE_SCALES. */
-  petSize: z.enum(PET_SIZES as unknown as [PetSize, ...PetSize[]]),
+  /**
+   * Sprite scale, or **null for "never chosen here"**. The bubble does not scale with it — see
+   * PET_SIZE_SCALES.
+   */
+  petSize: z.enum(PET_SIZES as unknown as [PetSize, ...PetSize[]]).nullable(),
 
   position: z
     .strictObject({
@@ -96,8 +103,10 @@ export const DEFAULT_SETTINGS: Settings = {
   movementEnabled: true,
   waterReminderEnabled: true,
   stretchReminderEnabled: true,
-  alwaysOnTop: true,
-  petSize: DEFAULT_PET_SIZE,
+  // Null, not the built-in value. Writing the built-in eagerly is what made every install look like it
+  // had *chosen* `large`, which is why v1.10.0 needs a migration to undo it — see below.
+  alwaysOnTop: null,
+  petSize: null,
   position: null,
   reminders: {
     waterNextDueAt: null,
@@ -166,6 +175,27 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   // look exactly like the app having broken.
   if (out['schemaVersion'] === 4) {
     out = { ...out, schemaVersion: 5, alwaysOnTop: true }
+  }
+
+  // v5 → v6: `petSize` and `alwaysOnTop` became nullable so a team default can fill them.
+  //
+  // Both were written eagerly at their built-in values, so every existing file looks like a deliberate
+  // choice and no default could ever reach anybody. They are treated differently on the way out, and
+  // the difference is whether the stored value is *distinguishable* from never having chosen:
+  //
+  //   - `petSize` is nulled unconditionally. Every install has `large`, which was the built-in and the
+  //     only size that existed before v1.3.0, so it carries no information. A deliberate `medium` or
+  //     `small` is lost too — that was an explicit call, taken because the alternative was for the new
+  //     `small` default to reach nobody at all.
+  //   - `alwaysOnTop: false` is **kept**. Nobody arrives at it by accident; it takes a menu click. Only
+  //     `true` is indistinguishable from the built-in, so only `true` becomes eligible.
+  if (out['schemaVersion'] === 5) {
+    out = {
+      ...out,
+      schemaVersion: 6,
+      petSize: null,
+      alwaysOnTop: out['alwaysOnTop'] === false ? false : null,
+    }
   }
 
   return out

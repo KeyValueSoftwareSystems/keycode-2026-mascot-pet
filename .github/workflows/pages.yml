@@ -43,8 +43,11 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Fails on a rejected manifest, a dropped notification *and* a dropped default. `notify --list`
+      # only failed on the first of those, and the third did not exist as a concept until clients
+      # started tolerating a bad default instead of rejecting the whole file.
       - name: Manifest is valid
-        run: pnpm build && node scripts/notify.mjs --list
+        run: pnpm manifest:check
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

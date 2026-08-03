@@ -157,24 +157,59 @@ Optional, and **applied only where the user never made that choice locally**:
 
 ```jsonc
 "defaults": {
-  "waterMinutes": 30,
-  "stretchMinutes": 60,
-  "pollMinutes": 5          // how often clients re-fetch THIS file
+  "waterMinutes": 5,
+  "stretchMinutes": 15,
+  "pollMinutes": 1,         // how often clients re-fetch THIS file
+  "petSize": "small",       // small | medium | large
+  "alwaysOnTop": true
 }
 ```
 
-The settings file stores a chosen interval as `null` until someone picks one, and that null is what a
-default fills in. Somebody who chose 15 minutes keeps 15; somebody who turned a reminder off stays
-off. The menu marks a default-provided interval as `(default)` rather than hiding it, so nobody has to
-guess why their reminder is every 30 minutes.
+| | resolves as |
+|---|---|
+| the person picked one | **that wins**, always |
+| nobody picked, the manifest says | the manifest's value |
+| nobody picked, the manifest is silent | the built-in |
 
-**There is no way to force a reminder on.** Defaults may suggest *how often*, never *whether* — an
-`enabled` field here would let remote text switch a reminder back on after someone deliberately turned
-it off, which is remote control of a machine rather than a shared default. The schema rejects it.
+The settings file stores each of these as `null` until somebody chooses, and that null is what a
+default fills. Somebody who chose 15 minutes keeps 15; somebody who turned a reminder off stays off;
+somebody who picked `large` stays large no matter what the team publishes. The menu marks a
+default-provided value as `(default)` rather than hiding it, so nobody has to guess why their pet is
+small or their reminder is every five minutes.
+
+### The rule, and the rewrite
+
+This section used to say *defaults may suggest **how often**, never **whether***. That was a proxy for
+the real property and it did not survive contact with `alwaysOnTop`, which is plainly a *whether* and
+is a legitimate thing for a team to set. The rule that actually holds is narrower and stronger:
+
+> **A default may fill in a choice nobody made. It may never override one somebody did.**
+
+It is enforced structurally rather than by category: a setting is defaultable if and only if the
+settings file can represent "unchosen" for it, and the default is applied with `??` against that null.
+Nobody has to remember the rule for it to hold.
+
+**There is still no way to force a reminder on**, and now for a reason that survives scrutiny rather
+than by category: `waterReminderEnabled` has no unchosen state, so a default there could only ever be
+an override — the one thing this must never be. Adding one would mean making it nullable first, and
+that is the decision to argue about, not the field.
+
+### A bad value costs that value, not the file
+
+Every field is independently droppable (`.catch(undefined)`). A value that fails validation — `0`
+minutes, `"Small"` for a size, a string where a boolean belongs — drops **that one default** and leaves
+the rest of the manifest working. It is reported in the client log as `unusable defaults`, and
+`pnpm manifest:check` **fails** on it so a publisher finds out before clients do.
+
+Before v1.10.0 a bad value on a declared key failed the whole envelope, which a client treats as "trust
+nothing in this file" — costing every announcement in it. That was caught before deploy by CI, so it
+was never an exposure in practice; it was simply the wrong granularity, and it becomes a worse bet as
+this block grows.
 
 Defaults are held **in memory only** and never written to disk. Nothing the manifest says outlives the
-process that received it, so there is no stale remote policy after a restart. The built-in intervals
-apply for the second between launch and the first poll, which does not matter for a 45-minute reminder.
+process that received it, so there is no stale remote policy after a restart. This is why the built-in
+`petSize` matches what the manifest publishes: the pet window is created at the built-in size and only
+learns the team's a second later, so if the two disagreed it would visibly resize on every launch.
 
 ### `pollMinutes` — the manifest sets its own fetch interval
 
@@ -223,6 +258,10 @@ one default not applying; a rejected envelope costs every announcement, for ever
 
 This also makes the trust boundary stronger rather than weaker: a hypothetical `waterEnabled` cannot
 switch a reminder back on, because it is not merely rejected, it does nothing at all.
+
+`petSize` and `alwaysOnTop` are the first keys to arrive since that tolerance shipped, and they are the
+proof it works: a v1.9.0 client ignores both and keeps showing announcements normally. No coordinated
+rollout was needed for them — which is exactly what the loose object was for.
 
 > ⛔ **Publishing `defaults` breaks every client older than v1.4.0**, and adding `pollMinutes` breaks
 > **v1.4.0 itself** — that build shipped with a strict `defaults`, so an unknown key inside it rejects

@@ -25,6 +25,8 @@ import {
   CALLOUT_DEFAULT_MS,
   CALLOUT_TEXT_MAX,
   MANIFEST_MAX_NOTIFICATIONS,
+  PET_SIZES,
+  type PetSize,
 } from '../config/constants.js'
 import { isAnimationState, type AnimationState } from '../pet-animations.generated.js'
 import { sanitizeBubbleText } from '../callouts/sanitize-text.js'
@@ -74,9 +76,23 @@ export const releaseSchema = z.strictObject({
  * turned them off, or change a setting they deliberately picked — that turns an untrusted file into
  * remote control of a machine.
  *
- * Deliberately intervals only. `petSize` was considered and left out: it is a cosmetic personal
- * preference, so a team default for it has no reason to exist, and supporting one would mean adding a
- * "never chosen" state to `petSize` purely to enable it.
+ * The rule this block used to state — *defaults may suggest how much, never whether* — was the wrong
+ * way to express the property that actually matters, and v1.10.0 replaced it. `petSize` was excluded on
+ * the grounds that a cosmetic preference needs no team default, which turned out to be wrong twice
+ * over: a team asked for it, and "start small" is the kind of thing you want to change for everyone
+ * without shipping a build. `alwaysOnTop` followed, and it is squarely a *whether*.
+ *
+ * What is actually inviolable is narrower and stronger:
+ *
+ *   **A default may fill in a choice nobody made. It may never override one somebody did.**
+ *
+ * That is enforced structurally rather than by category — every defaultable setting is nullable in the
+ * settings file, null means "never chosen here", and a default is applied through `??` against it. So
+ * the question for a new default is not what kind of setting it is, it is whether the settings file can
+ * represent "unchosen" for it.
+ *
+ * Reminders on/off is still excluded, and now for a reason that survives scrutiny: `enabled` has no
+ * unchosen state, so a default there could only be an override — the one thing this must never be.
  *
  * ⚠ **Adding this block to a published manifest breaks every client older than v1.4.0.** The envelope
  * is strict, so an older build rejects the whole file on an unknown top-level key and silently shows
@@ -94,10 +110,32 @@ export const releaseSchema = z.strictObject({
  *
  * The failure modes are not comparable. An ignored unknown key costs one default not applying. A
  * rejected envelope costs every announcement, for everyone, silently.
+ *
+ * ---------------------------------------------------------------------------------------
+ * `.catch(undefined)` on every field, and why the loose object was not enough
+ * ---------------------------------------------------------------------------------------
+ *
+ * The paragraph above was true of unknown keys and **false of bad values on known keys**, which is a
+ * gap that survived three releases. `z.object` drops what it does not know, but a declared field whose
+ * value fails validation fails the *object*, and `defaults` is inside a strict envelope whose failure
+ * makes `parseManifest` return null — discarding every notification in the file.
+ *
+ * Demonstrated before fixing:
+ *
+ *     {"version":1,"notifications":[…],"defaults":{"waterMinutes":0}}
+ *       → envelope rejected → parseManifest → null → nobody gets any announcement, silently
+ *
+ * It had gone unnoticed because `defaults` only ever held integers typed by hand and `pnpm notify`
+ * validates through this very parser. A direct edit to `site/manifest.json` has no such check — which
+ * is what `pnpm manifest:check` now closes.
+ *
+ * `.catch(undefined)` makes each field independently droppable, so a bad value costs exactly that one
+ * default. It matters more now than it did: `petSize` is a string enum, and `"Small"` is a plausible
+ * typo that would otherwise take the broadcast channel down for everyone.
  */
 export const defaultsSchema = z.object({
-  waterMinutes: z.number().int().min(1).max(1_440).optional(),
-  stretchMinutes: z.number().int().min(1).max(1_440).optional(),
+  waterMinutes: z.number().int().min(1).max(1_440).optional().catch(undefined),
+  stretchMinutes: z.number().int().min(1).max(1_440).optional().catch(undefined),
   /**
    * How often to re-fetch this manifest, in minutes. Self-referential on purpose: each poll reads the
    * value that will govern the next one.
@@ -106,7 +144,25 @@ export const defaultsSchema = z.object({
    * a very long value is only recoverable after that long has elapsed, because clients have to fetch
    * the file to learn it changed.
    */
-  pollMinutes: z.number().int().min(1).max(1_440).optional(),
+  pollMinutes: z.number().int().min(1).max(1_440).optional().catch(undefined),
+  /**
+   * Size every pet starts at, for anyone who has not picked one.
+   *
+   * Validated against the same generated `PET_SIZES` list the menu and the renderer use, so a manifest
+   * cannot name a size the app has no scale for.
+   */
+  petSize: z
+    .enum(PET_SIZES as unknown as [PetSize, ...PetSize[]])
+    .optional()
+    .catch(undefined),
+  /**
+   * Whether pets float in front of everything, for anyone who has not decided.
+   *
+   * Publishing `true` changes nothing — it is the built-in. The value of the field is that a team can
+   * publish `false` later and have every pet drop behind their windows without shipping a build.
+   * Anyone who turned it off locally keeps it off; see the note above on fill-versus-override.
+   */
+  alwaysOnTop: z.boolean().optional().catch(undefined),
 })
 
 export const envelopeSchema = z.strictObject({
@@ -121,6 +177,8 @@ export interface SafeDefaults {
   waterMinutes: number | null
   stretchMinutes: number | null
   pollMinutes: number | null
+  petSize: PetSize | null
+  alwaysOnTop: boolean | null
 }
 
 export interface SafeNotification {
@@ -157,6 +215,15 @@ export interface ParsedManifest {
   defaults: SafeDefaults | null
   /** Entries rejected individually, with reasons, so a bad manifest is diagnosable. */
   dropped: Array<{ index: number; reason: string }>
+  /**
+   * Names of `defaults` keys that were present but unusable.
+   *
+   * `.catch(undefined)` makes a bad value indistinguishable from an absent one, which is right for
+   * robustness and wrong for diagnosis — a publisher who typed `"Small"` would otherwise see a default
+   * that simply never applies, with nothing anywhere saying why. Detected by comparing the raw block
+   * against the parsed one, and logged by the poller alongside dropped notifications.
+   */
+  droppedDefaults: string[]
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -276,15 +343,32 @@ export function parseManifest(body: string): ParsedManifest | null {
     }
   }
 
+  // Present-but-unusable keys, found by asking the raw block what it had. Must run against the raw
+  // JSON rather than the parsed envelope, because that is the only place the bad value still exists.
+  const rawDefaults =
+    json !== null && typeof json === 'object' && 'defaults' in json
+      ? (json as { defaults?: unknown }).defaults
+      : undefined
+  const droppedDefaults: string[] =
+    rawDefaults !== null && typeof rawDefaults === 'object'
+      ? Object.keys(defaultsSchema.shape).filter(
+          (key) =>
+            key in (rawDefaults as Record<string, unknown>) &&
+            (envelope.data.defaults as Record<string, unknown> | undefined)?.[key] === undefined,
+        )
+      : []
+
   const defaults: SafeDefaults | null = envelope.data.defaults
     ? {
         waterMinutes: envelope.data.defaults.waterMinutes ?? null,
         stretchMinutes: envelope.data.defaults.stretchMinutes ?? null,
         pollMinutes: envelope.data.defaults.pollMinutes ?? null,
+        petSize: envelope.data.defaults.petSize ?? null,
+        alwaysOnTop: envelope.data.defaults.alwaysOnTop ?? null,
       }
     : null
 
-  return { notifications, release, defaults, dropped }
+  return { notifications, release, defaults, dropped, droppedDefaults }
 }
 
 /**

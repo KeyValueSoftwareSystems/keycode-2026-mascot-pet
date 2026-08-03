@@ -92,10 +92,13 @@ unaffected.
   to the floor. Take it to the very top and its speech bubble moves underneath it. "Reset position" in
   the menu brings it home.
 - **Right-click** the pet (or use the tray icon) for size, movement, always-on-top, and reminder
-  intervals.
+  intervals. The pet starts small.
+- Anything marked **(default)** in the menu came from your team's shared settings rather than from you.
+  Pick it explicitly and it becomes yours, and no later team change will move it.
 - **Always on top** is on to begin with. Turn it off and the pet sits behind your windows; it still
   comes forward for as long as it has a message on screen, then drops back.
-- Water and stretch reminders are on by default, at 45 and 60 minutes.
+- Water and stretch reminders are on by default. Your team sets the starting intervals; out of the box
+  that is every 5 and 15 minutes, and you can change either from the menu — your choice then sticks.
 
 ## Uninstalling
 

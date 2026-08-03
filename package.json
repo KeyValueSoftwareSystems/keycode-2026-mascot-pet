@@ -1,6 +1,6 @@
 {
   "name": "keycode-pet-workspace",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "description": "Keycode mascot desktop companion \u2014 workspace root",
   "license": "MIT",
@@ -29,6 +29,7 @@
     "manifest:serve": "node scripts/dev-manifest-server.mjs",
     "notify": "pnpm build && node scripts/notify.mjs",
     "notify:list": "pnpm build && node scripts/notify.mjs --list",
+    "manifest:check": "pnpm build && node scripts/check-manifest.mjs",
     "package": "pnpm build && electron-builder --mac --config electron-builder.config.cjs",
     "icons": "node scripts/generate-icons.mjs",
     "package:linux-ci-only": "pnpm build && electron-builder --linux --config electron-builder.config.cjs",

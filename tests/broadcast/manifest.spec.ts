@@ -550,9 +550,30 @@ describe('manifest team defaults', () => {
   const wrap = (defaults: unknown) =>
     parseManifest(JSON.stringify({ version: 1, notifications: [], defaults }))
 
-  it('parses intervals and the poll interval when present', () => {
-    const parsed = wrap({ waterMinutes: 30, stretchMinutes: 90, pollMinutes: 1 })
-    expect(parsed?.defaults).toEqual({ waterMinutes: 30, stretchMinutes: 90, pollMinutes: 1 })
+  /** Every field null — the shape a caller gets when the manifest set none of them. */
+  const none = {
+    waterMinutes: null,
+    stretchMinutes: null,
+    pollMinutes: null,
+    petSize: null,
+    alwaysOnTop: null,
+  }
+
+  it('parses every default when present', () => {
+    const parsed = wrap({
+      waterMinutes: 30,
+      stretchMinutes: 90,
+      pollMinutes: 1,
+      petSize: 'medium',
+      alwaysOnTop: false,
+    })
+    expect(parsed?.defaults).toEqual({
+      waterMinutes: 30,
+      stretchMinutes: 90,
+      pollMinutes: 1,
+      petSize: 'medium',
+      alwaysOnTop: false,
+    })
   })
 
   it('is null when the manifest carries none, so nothing is implied', () => {
@@ -560,24 +581,68 @@ describe('manifest team defaults', () => {
   })
 
   it('allows any subset on its own', () => {
-    expect(wrap({ waterMinutes: 20 })?.defaults).toEqual({
-      waterMinutes: 20,
-      stretchMinutes: null,
-      pollMinutes: null,
-    })
-    expect(wrap({ pollMinutes: 1 })?.defaults).toEqual({
-      waterMinutes: null,
-      stretchMinutes: null,
-      pollMinutes: 1,
-    })
+    expect(wrap({ waterMinutes: 20 })?.defaults).toEqual({ ...none, waterMinutes: 20 })
+    expect(wrap({ pollMinutes: 1 })?.defaults).toEqual({ ...none, pollMinutes: 1 })
+    expect(wrap({ petSize: 'small' })?.defaults).toEqual({ ...none, petSize: 'small' })
+    expect(wrap({ alwaysOnTop: true })?.defaults).toEqual({ ...none, alwaysOnTop: true })
   })
 
-  it('rejects the whole envelope for an out-of-range value on a declared key', () => {
-    // A declared key still validates: a default that silently clamped would be a policy nobody chose.
-    expect(wrap({ waterMinutes: 0 })).toBeNull()
-    expect(wrap({ waterMinutes: 100_000 })).toBeNull()
-    expect(wrap({ waterMinutes: 30.5 })).toBeNull()
-    expect(wrap({ pollMinutes: 0 })).toBeNull()
+  it('drops an unusable value on a declared key instead of rejecting the whole manifest', () => {
+    // ---------------------------------------------------------------------------------------
+    // This assertion is the exact inverse of the one it replaces, and the reversal is deliberate.
+    // ---------------------------------------------------------------------------------------
+    //
+    // The original read `expect(wrap({ waterMinutes: 0 })).toBeNull()`, reasoning that "a declared key
+    // still validates: a default that silently clamped would be a policy nobody chose." The intent was
+    // right and the mechanism was not, for two reasons:
+    //
+    //   1. **Dropping is not clamping.** Clamping `0` to `1` would invent a policy. Dropping it falls
+    //      back to the built-in, which is exactly what happens when the key is absent — no invention.
+    //   2. **The loudness pointed at the wrong audience.** A rejected envelope is silent for the
+    //      publisher, whose deploy succeeds, and catastrophic for every client, which loses *every
+    //      announcement in the file*. That is the same asymmetry this block already cites as its reason
+    //      for tolerating unknown keys; it simply had not been applied to bad values on known ones.
+    //
+    // The loudness now lives where it belongs: `pnpm manifest:check` fails the build when a published
+    // default is unusable, so the publisher finds out before clients do.
+    for (const bad of [
+      { waterMinutes: 0 },
+      { waterMinutes: 100_000 },
+      { waterMinutes: 30.5 },
+      { pollMinutes: 0 },
+      { petSize: 'Small' },
+      { petSize: 'huge' },
+      { alwaysOnTop: 'yes' },
+    ]) {
+      const parsed = wrap(bad)
+      expect(parsed, `${JSON.stringify(bad)} must not reject the manifest`).not.toBeNull()
+      expect(parsed?.defaults).toEqual(none)
+      // And it is reported rather than silently absent, so a typo is findable.
+      expect(parsed?.droppedDefaults).toEqual(Object.keys(bad))
+    }
+  })
+
+  it('keeps the good defaults in a block that also has a bad one', () => {
+    const parsed = wrap({ waterMinutes: 0, stretchMinutes: 15, petSize: 'small' })
+    expect(parsed?.defaults).toEqual({ ...none, stretchMinutes: 15, petSize: 'small' })
+    expect(parsed?.droppedDefaults).toEqual(['waterMinutes'])
+  })
+
+  it('reports nothing dropped when every default is usable', () => {
+    expect(wrap({ waterMinutes: 5, petSize: 'small' })?.droppedDefaults).toEqual([])
+    expect(parseManifest(JSON.stringify({ version: 1, notifications: [] }))?.droppedDefaults).toEqual(
+      [],
+    )
+  })
+
+  it('still delivers announcements when the defaults block is unusable', () => {
+    // The failure this whole change is about, stated as the thing a user would notice.
+    const body = JSON.stringify({
+      version: 1,
+      notifications: [{ id: 'a', text: 'hello', expiresAt: '2099-01-01T00:00:00Z' }],
+      defaults: { waterMinutes: 0, petSize: 'Small' },
+    })
+    expect(parseManifest(body)?.notifications).toHaveLength(1)
   })
 
   it('IGNORES unknown keys instead of rejecting the manifest — this block must stay extensible', () => {
@@ -585,18 +650,32 @@ describe('manifest team defaults', () => {
     // there means every new default makes every older client reject the whole file and stop receiving
     // announcements. The failure modes are not comparable: an ignored key costs one default; a
     // rejected envelope costs every announcement, for everyone, silently.
-    const parsed = wrap({ waterMinutes: 20, somethingFromTheFuture: 'x', petSize: 'small' })
+    //
+    // `petSize` used to be the example of a future key here. It is a real one now, so this uses a name
+    // that is still imaginary — the property under test is about *unknown* keys, and it would quietly
+    // stop testing anything the moment its example became real.
+    const parsed = wrap({ waterMinutes: 20, somethingFromTheFuture: 'x' })
     expect(parsed).not.toBeNull()
-    expect(parsed?.defaults).toEqual({ waterMinutes: 20, stretchMinutes: null, pollMinutes: null })
+    expect(parsed?.defaults).toEqual({ ...none, waterMinutes: 20 })
+    // An unknown key is not a *dropped* default either — nothing was published that we understood.
+    expect(parsed?.droppedDefaults).toEqual([])
   })
 
   it('carries no way to force a reminder on', () => {
-    // The trust boundary: defaults may suggest *how often*, never *whether*. Now that unknown keys are
-    // dropped, the guarantee is stronger than "rejected" — such a field cannot do anything at all.
+    // The trust boundary, restated. It used to read "defaults may suggest *how often*, never *whether*",
+    // and `alwaysOnTop` is plainly a whether — so that phrasing did not survive v1.10.0. The property
+    // that does, and that this test now pins, is stronger and structural:
+    //
+    //   a default may fill in a choice nobody made; it may never override one somebody did.
+    //
+    // Reminders on/off is excluded not by category but because `enabled` has no unchosen state in the
+    // settings file, so a default there could only ever be an override.
     const parsed = wrap({ waterEnabled: true, waterMinutes: 20 })
-    expect(parsed?.defaults).toEqual({ waterMinutes: 20, stretchMinutes: null, pollMinutes: null })
+    expect(parsed?.defaults).toEqual({ ...none, waterMinutes: 20 })
     // And the contract itself has no enable-like key to grow into one by accident.
     expect(Object.keys(defaultsSchema.shape).sort()).toEqual([
+      'alwaysOnTop',
+      'petSize',
       'pollMinutes',
       'stretchMinutes',
       'waterMinutes',

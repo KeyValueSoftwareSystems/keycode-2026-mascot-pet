@@ -98,9 +98,15 @@ describe('settings schema', () => {
     if (result.ok) expect(result.value.position).toBeNull()
   })
 
-  it('migrates a v2 file forward, keeping the pet the size it already was', () => {
-    // `large` is 1.0 — the size the app rendered at before sizes existed — so an upgrade must not
-    // visibly resize anybody's pet.
+  it('migrates a v2 file forward, and v6 hands the size question back to the default', () => {
+    // Two migrations pull in opposite directions here, and the later one wins on purpose.
+    //
+    // v2 → v3 set `large` explicitly, reasoning that `large` is 1.0 — the size the app rendered at
+    // before sizes existed — so an upgrade must not visibly resize anybody's pet. Correct at the time.
+    //
+    // v5 → v6 nulls it, because writing the built-in eagerly is exactly what made every install look
+    // like it had *chosen* `large` and put a team default permanently out of reach. So a v2 file now
+    // arrives at null: nothing chosen, whatever the team publishes, else the built-in `small`.
     const result = parseSettings({
       schemaVersion: 2,
       movementEnabled: true,
@@ -113,13 +119,16 @@ describe('settings schema', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.petSize).toBe('large')
+    expect(result.value.petSize).toBeNull()
     // And the v1→v2 work is not undone on the way through.
     expect(result.value.position?.feetY).toBe(420)
     expect(result.value.stretchReminderEnabled).toBe(false)
   })
 
   it('migrates a v4 file forward, leaving the pet in front of things as it was', () => {
+    // `alwaysOnTop` arrives at null rather than `true` after v6 — see the v5→v6 test below. Null still
+    // *resolves* to in-front, because the built-in is `true`; what changes is that a team could now
+    // publish otherwise for anyone who never expressed a view.
     // The shape written by the installed 1.7.x builds. Defaulting `alwaysOnTop` to true is what makes
     // the upgrade invisible: false would send every existing pet behind the user's windows, which
     // looks exactly like the app having stopped working.
@@ -142,16 +151,70 @@ describe('settings schema', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
-    expect(result.value.alwaysOnTop).toBe(true)
-    // And nothing else moves: a free placement, a chosen size, a chosen interval and a seen id are
-    // all things a silent reset would destroy.
-    expect(result.value.petSize).toBe('medium')
+    expect(result.value.alwaysOnTop).toBeNull()
+    // And nothing else moves: a free placement, a chosen interval and a seen id are all things a silent
+    // reset would destroy. `petSize` is the one field this migration deliberately *does* clear — see the
+    // v5 → v6 test.
+    expect(result.value.petSize).toBeNull()
     expect(result.value.position).toEqual({ displayKey: '0,0,1512x945', x: 812.5, feetY: 300 })
     expect(result.value.reminders.waterMinutes).toBe(15)
     expect(result.value.reminders.waterNextDueAt).toBe(1_800_000_000_000)
     expect(result.value.seenBroadcastIds).toEqual(['keycode-on-fire-20260802t1030'])
     expect(result.value.lastKnownRelease).toBe('1.7.1')
     expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
+  })
+
+  it('migrates a v5 file forward, nulling the size but keeping a deliberate always-on-top OFF', () => {
+    // The shape written by v1.8.x and v1.9.0, and the asymmetry is the whole point of this migration.
+    //
+    // Both fields were written eagerly at their built-ins, so both look like choices and neither could
+    // ever receive a team default. They are treated differently on the way out, on whether the stored
+    // value is *distinguishable* from never having chosen:
+    //
+    //   petSize      → nulled always. Everyone has `large`; it was the built-in and, before v1.3.0, the
+    //                  only size. It carries no information.
+    //   alwaysOnTop  → `false` KEPT, `true` nulled. Nobody reaches `false` by accident — it takes a
+    //                  menu click — so it is a real choice and survives.
+    const v5 = (alwaysOnTop: boolean) => ({
+      schemaVersion: 5,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: true,
+      alwaysOnTop,
+      petSize: 'medium',
+      position: { displayKey: '0,0,1512x945', x: 700, feetY: 420 },
+      reminders: {
+        waterNextDueAt: 1_800_000_000_000,
+        stretchNextDueAt: null,
+        waterMinutes: 15,
+        stretchMinutes: null,
+      },
+      seenBroadcastIds: ['keycode-on-fire-20260802t1030'],
+      lastKnownRelease: '1.9.0',
+    })
+
+    const offKept = parseSettings(v5(false))
+    expect(offKept.ok).toBe(true)
+    if (!offKept.ok) return
+    expect(offKept.value.alwaysOnTop).toBe(false)
+
+    const onNulled = parseSettings(v5(true))
+    expect(onNulled.ok).toBe(true)
+    if (!onNulled.ok) return
+    expect(onNulled.value.alwaysOnTop).toBeNull()
+
+    // `medium` is nulled too, which was an explicit call: the alternative was for the new `small`
+    // default to reach nobody, since every install carries some non-null size.
+    expect(onNulled.value.petSize).toBeNull()
+
+    // And nothing else moves. This is the assertion that matters most — `strictObject` turns a missed
+    // migration into a silent reset of somebody's position, intervals and seen-message list.
+    expect(onNulled.value.position).toEqual({ displayKey: '0,0,1512x945', x: 700, feetY: 420 })
+    expect(onNulled.value.reminders.waterMinutes).toBe(15)
+    expect(onNulled.value.reminders.waterNextDueAt).toBe(1_800_000_000_000)
+    expect(onNulled.value.seenBroadcastIds).toEqual(['keycode-on-fire-20260802t1030'])
+    expect(onNulled.value.lastKnownRelease).toBe('1.9.0')
+    expect(onNulled.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
   })
 
   it('chains v1 all the way to the current version', () => {
@@ -169,7 +232,9 @@ describe('settings schema', () => {
     if (!result.ok) return
     expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
     expect(result.value.position?.feetY).toBeNull()
-    expect(result.value.petSize).toBe('large')
+    // v3 set `large`; v6 clears it again so a team default can apply. A file written by the very first
+    // release therefore lands on "nothing chosen", which is the truth about it.
+    expect(result.value.petSize).toBeNull()
   })
 
   it('rejects an unknown pet size', () => {

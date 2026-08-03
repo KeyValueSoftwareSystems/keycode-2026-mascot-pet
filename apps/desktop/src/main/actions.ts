@@ -22,7 +22,7 @@ import type { SettingsStore } from './settings-store.js'
 import type { PetController } from './pet-controller.js'
 import type { DisplayManager } from './display-manager.js'
 import { floorForWorkArea, placementForScale } from './floor-placement.js'
-import { clampReminderMinutes, petScaleFor } from '../config/constants.js'
+import { clampReminderMinutes, petScaleFor, type PetSize } from '../config/constants.js'
 import type { MenuActions } from './menu-template.js'
 
 export interface ActionDeps {
@@ -37,6 +37,14 @@ export interface ActionDeps {
   evaluateReminders: () => void
   /** Put the pet window in or out of the always-on-top band. */
   setAlwaysOnTop: (enabled: boolean) => void
+  /**
+   * The values in force right now, resolving a local choice over a team default over the built-in.
+   *
+   * Injected rather than recomputed here: `app-shell` holds the manifest defaults, and a second copy of
+   * the precedence rule is a second place for it to be wrong.
+   */
+  effectivePetSize: () => PetSize
+  effectiveAlwaysOnTop: () => boolean
   quit: () => void
   log?: (message: string, meta?: unknown) => void
 }
@@ -54,7 +62,7 @@ export function createActions(deps: ActionDeps): MenuActions {
    * Reads the store and writes the inverse — never trusts the menu item's own `checked`, which is a
    * rendering of state and can be stale if a menu rebuild raced a click.
    */
-  const toggle = (key: 'movementEnabled' | 'alwaysOnTop'): boolean => {
+  const toggle = (key: 'movementEnabled'): boolean => {
     const next = !settings.get()[key]
     settings.patch({ [key]: next })
     return next
@@ -70,7 +78,13 @@ export function createActions(deps: ActionDeps): MenuActions {
     },
 
     toggleAlwaysOnTop(): void {
-      const enabled = toggle('alwaysOnTop')
+      // Inverts the **effective** value, not the stored one. `alwaysOnTop` is nullable now, and
+      // `!null` is `true` — so a pet that is already in front because of a team default would have
+      // stayed in front on the first click and only obeyed on the second. Reading the effective value
+      // makes one click do what it looks like it does, and writing a non-null value is what makes the
+      // choice stick against any future default.
+      const enabled = !deps.effectiveAlwaysOnTop()
+      settings.patch({ alwaysOnTop: enabled })
       // Applied here rather than through the settings subscription, so the window changes band on the
       // click instead of on the next menu rebuild. The subscription still refreshes the tick.
       deps.setAlwaysOnTop(enabled)
@@ -78,9 +92,15 @@ export function createActions(deps: ActionDeps): MenuActions {
     },
 
     setPetSize(size): void {
-      if (settings.get().petSize === size) return
+      // Compared against the *effective* size, so picking the size the pet already is still records the
+      // choice. Picking `small` when it is small only because the team publishes small is a meaningful
+      // act — it is how somebody pins it against a default that may change tomorrow.
+      const already = settings.get().petSize === size
+      if (already) return
       settings.patch({ petSize: size })
-      controller.setScale(petScaleFor(size))
+      if (deps.effectivePetSize() !== size || settings.get().petSize !== size) {
+        controller.setScale(petScaleFor(size))
+      }
       log('pet size changed', { size })
     },
 
@@ -119,7 +139,7 @@ export function createActions(deps: ActionDeps): MenuActions {
         display.workArea,
         display.key,
         undefined,
-        placementForScale(petScaleFor(settings.get().petSize)),
+        placementForScale(petScaleFor(deps.effectivePetSize())),
       )
       const target = floor.minX + (floor.maxX - floor.minX) * RESET_POSITION_FRACTION
 

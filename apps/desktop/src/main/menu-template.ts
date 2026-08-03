@@ -33,10 +33,22 @@ export interface ReminderView {
   isDefault: boolean
 }
 
+/**
+ * A setting whose value may have come from a team default rather than from a choice here.
+ *
+ * `isDefault` exists so the menu can say *why* — a pet that is small because the team publishes small
+ * looks identical to one somebody shrank, and leaving that unexplained is how a setting becomes
+ * spooky. The same reasoning already applies to reminder intervals; see `ReminderView`.
+ */
+export interface DefaultableView<T> {
+  value: T
+  isDefault: boolean
+}
+
 export interface MenuViewModel {
   movementEnabled: boolean
-  alwaysOnTop: boolean
-  petSize: PetSize
+  alwaysOnTop: DefaultableView<boolean>
+  petSize: DefaultableView<PetSize>
   water: ReminderView
   stretch: ReminderView
   update: { state: UpdateState; latestVersion: string | null }
@@ -132,9 +144,9 @@ export function buildMenuTemplate(
       click: () => actions.toggleMovement(),
     },
     {
-      label: 'Always on top',
+      label: view.alwaysOnTop.isDefault ? 'Always on top (default)' : 'Always on top',
       type: 'checkbox',
-      checked: view.alwaysOnTop,
+      checked: view.alwaysOnTop.value,
       click: () => actions.toggleAlwaysOnTop(),
     },
     {
@@ -148,11 +160,16 @@ export function buildMenuTemplate(
     {
       label: 'Size',
       submenu: PET_SIZES.map((size) => ({
-        label: petSizeLabel(size),
+        // Marked rather than hidden, so a team default is visible *as* one instead of looking like
+        // something the user picked — the same choice `reminderSubmenu` makes.
+        label:
+          view.petSize.isDefault && view.petSize.value === size
+            ? `${petSizeLabel(size)} (default)`
+            : petSizeLabel(size),
         // `radio`, not `checkbox`: exactly one size is active, and Electron then handles the
         // mutual exclusion display for us.
         type: 'radio' as const,
-        checked: view.petSize === size,
+        checked: view.petSize.value === size,
         // Same rule as the toggles: the handler names the size it wants rather than reading
         // `menuItem.checked`, so the tick is a display of state and never a second source of truth.
         click: () => actions.setPetSize(size),

@@ -21,7 +21,11 @@
     }
   ],
   "defaults": {
-    "pollMinutes": 1
+    "waterMinutes": 5,
+    "stretchMinutes": 15,
+    "pollMinutes": 1,
+    "petSize": "small",
+    "alwaysOnTop": true
   },
   "release": {
     "latestVersion": "1.9.0",

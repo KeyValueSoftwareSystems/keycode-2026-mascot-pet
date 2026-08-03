@@ -54,5 +54,8 @@ jobs:
       # The manifest is remote text that lands above everything on a colleague's screen, and an unknown
       # top-level key makes every client reject the whole file. So it is validated on every push, by the
       # client's own parser, before it can reach Pages.
+      # Fails on a rejected manifest, a dropped notification *and* a dropped default. `notify --list`
+      # only failed on the first of those, and the third did not exist as a concept until clients
+      # started tolerating a bad default instead of rejecting the whole file.
       - name: Manifest is valid
-        run: pnpm build && node scripts/notify.mjs --list
+        run: pnpm manifest:check

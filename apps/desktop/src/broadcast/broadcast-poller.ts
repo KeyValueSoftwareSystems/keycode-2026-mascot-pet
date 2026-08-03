@@ -246,6 +246,11 @@ export function createPoller(url: string, deps: PollerDeps): Poller {
         // should be findable without wondering why nobody saw it.
         log('broadcast manifest had unusable entries', { dropped: parsed.dropped })
       }
+      if (parsed.droppedDefaults.length > 0) {
+        // A default that was published but could not be used. Logged for the same reason as a dropped
+        // entry: the publisher's mistake should be findable, not merely harmless.
+        log('broadcast manifest had unusable defaults', { keys: parsed.droppedDefaults })
+      }
 
       deps.onRelease(parsed.release)
       deps.onDefaults?.(parsed.defaults)

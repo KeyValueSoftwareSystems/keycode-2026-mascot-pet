@@ -29,7 +29,18 @@ export type PetSize = keyof typeof PET_SIZE_SCALES
 
 export const PET_SIZES = Object.keys(PET_SIZE_SCALES) as readonly PetSize[]
 
-export const DEFAULT_PET_SIZE: PetSize = 'large'
+/**
+ * Size a pet starts at when nobody has chosen and no team default has arrived.
+ *
+ * `small` since v1.10.0. It is also the value published in the manifest, and the two matching is what
+ * keeps launch quiet: manifest defaults are held in memory and never persisted, so the window is
+ * created at *this* size and only learns the team's a second later at the first poll. Were they to
+ * differ, the pet would visibly resize once on every launch.
+ */
+export const DEFAULT_PET_SIZE: PetSize = 'small'
+
+/** Whether a pet floats in front of everything when nobody has chosen. */
+export const DEFAULT_ALWAYS_ON_TOP = true
 
 export function isPetSize(value: unknown): value is PetSize {
   return typeof value === 'string' && value in PET_SIZE_SCALES

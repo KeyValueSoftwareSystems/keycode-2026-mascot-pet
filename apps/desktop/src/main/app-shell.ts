@@ -38,16 +38,20 @@ import {
   resolvePollMinutes,
   type Poller,
 } from '../broadcast/broadcast-poller.js'
+import type { SafeDefaults } from '../broadcast/manifest-schema.js'
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
 import { openExternalChecked } from './open-external.js'
 import {
+  DEFAULT_ALWAYS_ON_TOP,
+  DEFAULT_PET_SIZE,
   ISSUES_URL,
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
   WATER_INTERVAL_MS,
   isPetSize,
   petScaleFor,
+  type PetSize,
 } from '../config/constants.js'
 import { bubbleSideFor, floorForWorkArea, placementForScale } from './floor-placement.js'
 import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
@@ -108,13 +112,46 @@ export async function startApp(): Promise<AppShell> {
     backdrop = await createBackdropWindow(displays.primary())
   }
 
+  /**
+   * Team defaults from the last poll, in memory only.
+   *
+   * Deliberately not persisted: nothing the manifest says gets written to disk, so a bad or hostile
+   * default cannot outlive the process that received it, and there is no stale remote policy to reason
+   * about after a restart. The cost is that the built-ins apply for the second or so between launch and
+   * the first poll — irrelevant for a 45-minute reminder, and the reason `DEFAULT_PET_SIZE` matches what
+   * the manifest publishes: if they differed, the pet would visibly resize on every launch.
+   *
+   * Declared here rather than beside the poller because the pet window's *size and z-order* are now
+   * derived from it, and those are decided before the poller exists.
+   */
+  let manifestDefaults: SafeDefaults | null = null
+
+  // ---- The three-way resolution, in one place.
+  //
+  //   a local choice  >  a team default  >  the built-in
+  //
+  // Every one of these reads a nullable settings field, and null means "never chosen here". That is the
+  // whole enforcement of "a default may fill a choice nobody made, never override one somebody did" —
+  // it is a property of `??`, not of anyone remembering the rule.
+
+  const effectiveDefaults = (): { waterMinutes: number; stretchMinutes: number } => ({
+    waterMinutes: manifestDefaults?.waterMinutes ?? WATER_INTERVAL_MS / 60_000,
+    stretchMinutes: manifestDefaults?.stretchMinutes ?? STRETCH_INTERVAL_MS / 60_000,
+  })
+
+  const effectivePetSize = (): PetSize =>
+    settings.get().petSize ?? manifestDefaults?.petSize ?? DEFAULT_PET_SIZE
+
+  const effectiveAlwaysOnTop = (): boolean =>
+    settings.get().alwaysOnTop ?? manifestDefaults?.alwaysOnTop ?? DEFAULT_ALWAYS_ON_TOP
+
   // ---- The pet window.
   //
   // Restore the saved position if its display still exists, else start centre-ish on the primary
   // display. `byKey` returning null is the normal case after a monitor change, not an error.
   const saved = settings.get().position
   const startDisplay = (saved && displays.byKey(saved.displayKey)) || displays.primary()
-  const startScale = petScaleFor(settings.get().petSize)
+  const startScale = petScaleFor(effectivePetSize())
   // The envelope depends on the pet's size, so the placement for the saved size is derived first.
   const startFloor = floorForWorkArea(
     startDisplay.workArea,
@@ -144,7 +181,7 @@ export async function startApp(): Promise<AppShell> {
       startDisplay.workArea,
       startScale,
     ),
-    alwaysOnTop: settings.get().alwaysOnTop,
+    alwaysOnTop: effectiveAlwaysOnTop(),
     log,
     events: {
       onReady(): void {
@@ -277,25 +314,6 @@ export async function startApp(): Promise<AppShell> {
   // See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
   let updates: UpdateService | null = null
 
-  /**
-   * Team defaults from the last poll, in memory only.
-   *
-   * Deliberately not persisted: nothing the manifest says gets written to disk, so a bad or hostile
-   * default cannot outlive the process that received it, and there is no stale remote policy to reason
-   * about after a restart. The cost is that the built-in intervals apply for the second or so between
-   * launch and the first poll — irrelevant for a 45-minute reminder.
-   */
-  let manifestDefaults: {
-    waterMinutes: number | null
-    stretchMinutes: number | null
-    pollMinutes: number | null
-  } | null = null
-
-  const effectiveDefaults = (): { waterMinutes: number; stretchMinutes: number } => ({
-    waterMinutes: manifestDefaults?.waterMinutes ?? WATER_INTERVAL_MS / 60_000,
-    stretchMinutes: manifestDefaults?.stretchMinutes ?? STRETCH_INTERVAL_MS / 60_000,
-  })
-
   const manifestUrl = resolveManifestUrl(
     process.env,
     'https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json',
@@ -324,17 +342,41 @@ export async function startApp(): Promise<AppShell> {
       // null, which is the settings file's way of saying "never chosen here". A user who picked an
       // interval keeps it, and one who turned a reminder off stays off.
       const pollChanged = defaults?.pollMinutes !== manifestDefaults?.pollMinutes
+      // Captured *before* `manifestDefaults` is replaced: these are what the pet is actually doing
+      // right now, and comparing against them afterwards is how we know whether to act.
+      const sizeBefore = effectivePetSize()
+      const onTopBefore = effectiveAlwaysOnTop()
       const changed =
         pollChanged ||
         defaults?.waterMinutes !== manifestDefaults?.waterMinutes ||
-        defaults?.stretchMinutes !== manifestDefaults?.stretchMinutes
+        defaults?.stretchMinutes !== manifestDefaults?.stretchMinutes ||
+        defaults?.petSize !== manifestDefaults?.petSize ||
+        defaults?.alwaysOnTop !== manifestDefaults?.alwaysOnTop
+
       manifestDefaults = defaults
+
       if (changed) {
         log('team defaults from manifest', { defaults })
         // A changed default can move a deadline for anyone who never chose an interval.
         reminders.evaluateNow()
         menu?.refresh()
       }
+
+      // Size and z-order are *applied*, not just read at the next tick — a reminder deadline can wait
+      // for the next evaluation, but a pet that is the wrong size stays the wrong size until something
+      // resizes it. Both are no-ops when the local value is non-null, because `effective*` returns the
+      // same answer before and after.
+      const sizeNow = effectivePetSize()
+      if (sizeNow !== sizeBefore) {
+        controller?.setScale(petScaleFor(sizeNow))
+        log('pet size from team default', { size: sizeNow })
+      }
+      const onTopNow = effectiveAlwaysOnTop()
+      if (onTopNow !== onTopBefore) {
+        pet.setAlwaysOnTopEnabled(onTopNow)
+        log('always-on-top from team default', { enabled: onTopNow })
+      }
+
       if (pollChanged) {
         // Recompute the pending wait, or a shortened interval would not apply until the old, longer
         // one had already elapsed.
@@ -408,8 +450,8 @@ export async function startApp(): Promise<AppShell> {
     const current = settings.get()
     return {
       movementEnabled: current.movementEnabled,
-      alwaysOnTop: current.alwaysOnTop,
-      petSize: current.petSize,
+      alwaysOnTop: { value: effectiveAlwaysOnTop(), isDefault: current.alwaysOnTop === null },
+      petSize: { value: effectivePetSize(), isDefault: current.petSize === null },
       water: {
         enabled: current.waterReminderEnabled,
         minutes: current.reminders.waterMinutes ?? effectiveDefaults().waterMinutes,
@@ -470,6 +512,8 @@ export async function startApp(): Promise<AppShell> {
     getCursorPoint: () => screen.getCursorScreenPoint(),
     evaluateReminders: () => reminders.evaluateNow(),
     setAlwaysOnTop: (enabled) => pet.setAlwaysOnTopEnabled(enabled),
+    effectivePetSize,
+    effectiveAlwaysOnTop,
     showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
     reportProblem,
     checkForUpdates: () => {
