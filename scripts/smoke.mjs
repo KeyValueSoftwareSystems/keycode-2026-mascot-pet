@@ -9,7 +9,7 @@
  *
  *   node scripts/smoke.mjs --name m2-pet-over-dark [--backdrop] [--state waving]
  *                          [--all-states] [--timeout 20000] [--settle 400]
- *                          [--no-assert] [--keep-open] [--no-composite]
+ *                          [--no-assert] [--keep-open] [--no-composite] [--capture-timeout 8000]
  *                          [--place x,feetY] [--size small|medium|large]
  *                          [--callout "text"] [--toast]
  *
@@ -70,6 +70,7 @@ function parseArgs(argv) {
     backdrop: false,
     state: null,
     timeoutMs: 20_000,
+    captureTimeoutMs: 8_000,
     settleMs: Number(process.env.KEYCODE_PET_SMOKE_SETTLE_MS ?? 400),
     assert: true,
     keepOpen: false,
@@ -96,6 +97,9 @@ function parseArgs(argv) {
         break
       case '--timeout':
         opts.timeoutMs = Number(argv[(i += 1)])
+        break
+      case '--capture-timeout':
+        opts.captureTimeoutMs = Number(argv[(i += 1)])
         break
       case '--settle':
         opts.settleMs = Number(argv[(i += 1)])
@@ -345,15 +349,39 @@ function launch(opts) {
 async function captureWindow(session, windowName, outPath, timeoutMs) {
   mkdirSync(dirname(outPath), { recursive: true })
   session.send({ cmd: 'capture-window', window: windowName, path: outPath })
-  const event = await session.wait(
-    (e) => (e.ev === 'capture-written' || e.ev === 'capture-failed') && e.path === outPath,
-    timeoutMs,
-    `a window capture of ${windowName}`,
-  )
+  let event
+  try {
+    event = await session.wait(
+      (e) => (e.ev === 'capture-written' || e.ev === 'capture-failed') && e.path === outPath,
+      timeoutMs,
+      `a window capture of ${windowName}`,
+    )
+  } catch (error) {
+    // **Not fatal.** `capturePage()` does not return on a Windows runner, and this used to abort the run
+    // at exit 3 with every assertion unrun — on an app that was emitting frames the whole time. A stalled
+    // capture now costs the assertions that need alpha and nothing else; the composite path still runs.
+    if (error instanceof SmokeFailure) return { unavailable: error.message }
+    throw error
+  }
   if (event.ev === 'capture-failed') {
-    throw new SmokeFailure(EXIT.capture, `In-process capture failed: ${event.reason}`)
+    return { unavailable: `In-process capture failed: ${event.reason}` }
   }
   return { event, png: decodeOrThrow(outPath) }
+}
+
+/**
+ * Where the pet is, without photographing it.
+ *
+ * Split out from the capture so a composite-only run — which is all Windows can manage today — still
+ * knows the sprite rect it has to index.
+ */
+async function requestGeometry(session, timeoutMs) {
+  session.send({ cmd: 'geometry' })
+  try {
+    return await session.wait((e) => e.ev === 'geometry', timeoutMs, 'a geometry report')
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -365,28 +393,92 @@ async function captureWindow(session, windowName, outPath, timeoutMs) {
  * the run is still valid on the window capture, and the report says what was skipped.
  */
 function captureComposite(outPath, displayIndex) {
-  if (process.platform !== 'darwin') {
-    return { ok: false, reason: 'composite capture is macOS-only (uses /usr/sbin/screencapture)' }
-  }
   mkdirSync(dirname(outPath), { recursive: true })
   rmSync(outPath, { force: true })
 
-  const args = ['-x', '-o', '-t', 'png']
-  if (typeof displayIndex === 'number') args.push('-D', String(displayIndex + 1))
-  args.push(outPath)
+  const backend = COMPOSITE_BACKENDS[process.platform]
+  if (!backend) {
+    return { ok: false, reason: `no composite backend for ${process.platform}` }
+  }
 
-  const result = spawnSync('/usr/sbin/screencapture', args, { encoding: 'utf8' })
+  const { command, args, hint } = backend(outPath, displayIndex)
+  const result = spawnSync(command, args, { encoding: 'utf8' })
   const produced = existsSync(outPath) && statSync(outPath).size > 0
-  if (result.error) return { ok: false, reason: `screencapture could not run: ${result.error.message}` }
+  if (result.error) return { ok: false, reason: `${command} could not run: ${result.error.message}` }
   if (result.status !== 0 || !produced) {
     return {
       ok: false,
       reason:
-        `screencapture exited ${result.status}${result.stderr ? `: ${result.stderr.trim()}` : ''}. ` +
-        'This is almost always a missing Screen Recording permission.',
+        `${command} exited ${result.status}${result.stderr ? `: ${result.stderr.trim()}` : ''}.` +
+        (hint ? ` ${hint}` : ''),
     }
   }
   return { ok: true, path: outPath }
+}
+
+/**
+ * One composite capture, three platforms — the picture taken from *outside* the process.
+ *
+ * This used to be macOS-only, and that was the whole reason Windows had no pixel evidence: the only
+ * other instrument, `capturePage()`, renders the web contents and never sees the window. The Linux lab
+ * proved the point by finding a bubble that was never painted while every in-process assertion passed;
+ * `import -window root` is exactly the command that found it, folded in here so the harness owns it.
+ *
+ * Each backend returns `{ ok: false, reason }` rather than throwing, so a platform that cannot manage
+ * it reports what was skipped and the run stays valid on the window capture. A missing capability must
+ * never be mistaken for a passing gate.
+ */
+const COMPOSITE_BACKENDS = {
+  // `-D <n>` pins one display: without it, a multi-display machine writes several suffixed files and
+  // the path we assert against may not exist. `-x` suppresses the shutter, `-o` omits window shadows.
+  darwin: (outPath, displayIndex) => ({
+    command: '/usr/sbin/screencapture',
+    args: [
+      '-x',
+      '-o',
+      '-t',
+      'png',
+      ...(typeof displayIndex === 'number' ? ['-D', String(displayIndex + 1)] : []),
+      outPath,
+    ],
+    hint: 'This is almost always a missing Screen Recording permission.',
+  }),
+
+  // ImageMagick against the X root window. The same command the Linux lab runs by hand.
+  linux: (outPath) => ({
+    command: 'import',
+    args: ['-window', 'root', outPath],
+    hint: 'Install ImageMagick (`import`), and check DISPLAY is set.',
+  }),
+
+  // .NET via PowerShell: `CopyFromScreen` over the virtual screen. Whether a GitHub Windows runner's
+  // session hands back a real frame or a black one is genuinely unknown until it runs — the CI step is
+  // written to upload whatever it gets and not fail the leg, and A7 is what will say which happened.
+  win32: (outPath) => ({
+    // `powershell.exe`, spelled out: libuv resolves a bare name through PATHEXT, and being explicit
+    // costs nothing on the one platform this branch runs.
+    command: 'powershell.exe',
+    args: [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      [
+        'Add-Type -AssemblyName System.Drawing,System.Windows.Forms;',
+        '$b = [System.Windows.Forms.SystemInformation]::VirtualScreen;',
+        '$bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height;',
+        '$g = [System.Drawing.Graphics]::FromImage($bmp);',
+        '$g.CopyFromScreen($b.X, $b.Y, 0, 0, $bmp.Size);',
+        // Single quotes, so the escape that matters is doubling `'` — **not** backslashes. This first
+        // read `outPath.replace(/\\/g, '\\\\')`, which is the JavaScript instinct and wrong here: inside
+        // a PowerShell single-quoted string a backslash is literal, so it turned `C:\a\b.png` into
+        // `C:\\a\\b.png`. .NET usually collapses doubled separators, which is exactly what makes this
+        // the kind of bug that survives to the one platform nobody can test on.
+        `$bmp.Save('${outPath.replace(/'/g, "''")}', [System.Drawing.Imaging.ImageFormat]::Png);`,
+        '$g.Dispose(); $bmp.Dispose();',
+      ].join(' '),
+    ],
+    hint: 'The runner session may not permit screen capture.',
+  }),
 }
 
 function decodeOrThrow(path) {
@@ -649,6 +741,94 @@ function assertCompositeShowsSprite(png, region, display, label) {
   return ratio
 }
 
+/**
+ * A7 — in the composite, the ring *around* the pet is still the backdrop.
+ *
+ * The transparency claim, in a form that needs no alpha channel. A2 reads alpha out of the window
+ * capture and is the stronger check, but it cannot run at all where `capturePage()` does not return —
+ * which is Windows. Sampling the composite instead asks the same question of the compositor: if the
+ * window were painting an opaque box, the ring would be that box's colour rather than the backdrop's.
+ *
+ * This is the assertion that would have caught a grey box on Windows, and nothing in the project could
+ * make it before the composite backend existed on more than one platform.
+ */
+function assertCompositeRingIsBackdrop(png, spriteRect, display, label, ringPx, bubble = null) {
+  const scale = png.width / display.bounds.width
+  const toPx = (rect) => ({
+    x: Math.round((rect.x - display.bounds.x) * scale),
+    y: Math.round((rect.y - display.bounds.y) * scale),
+    width: Math.round(rect.width * scale),
+    height: Math.round(rect.height * scale),
+  })
+  const sprite = toPx(spriteRect)
+  const pad = Math.round(ringPx * scale)
+
+  // Same exclusions as A2: a bubble legitimately paints in the ring, on whichever side it is on.
+  const above = bubble && bubble.side !== 'below' ? Math.round((bubble.edge - display.bounds.y) * scale) : null
+  const below = bubble && bubble.side === 'below' ? Math.round((bubble.edge - display.bounds.y) * scale) : null
+
+  // Clipped to the **work area**, not the display. The backdrop window is sized to the whole display,
+  // but the OS draws its own furniture on top of it — the macOS menu bar and Dock, a Windows taskbar, a
+  // Linux panel. Sampling those was the first version's mistake: it read 90.9% and blamed the pet for a
+  // band below its feet that was simply the Dock.
+  const work = toPx(display.workArea ?? display.bounds)
+  let backdrop = 0
+  let total = 0
+  // Where the offending pixels are, for the failure message. A bare percentage sent one investigation
+  // through cluster analysis of a whole 3024x1964 screenshot to discover the answer was "the context
+  // menu was open over the pet" — something a human did mid-run, which A7 was right to notice.
+  const off = { minX: Infinity, minY: Infinity, maxX: -1, maxY: -1 }
+  const top = Math.max(sprite.y - pad, work.y, above ?? -Infinity)
+  const bottom = Math.min(
+    sprite.y + sprite.height + pad,
+    work.y + work.height,
+    below ?? Number.POSITIVE_INFINITY,
+  )
+  const left = Math.max(sprite.x - pad, work.x)
+  const right = Math.min(sprite.x + sprite.width + pad, work.x + work.width)
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      // Skip the sprite itself, generously — the point is the surroundings.
+      if (
+        x >= sprite.x - 1 &&
+        y >= sprite.y - 1 &&
+        x < sprite.x + sprite.width + 1 &&
+        y < sprite.y + sprite.height + 1
+      ) {
+        continue
+      }
+      if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue
+      total += 1
+      if (rgbDistance(pixelAt(png, x, y), BACKDROP_RGB) <= 24) {
+        backdrop += 1
+      } else {
+        if (x < off.minX) off.minX = x
+        if (y < off.minY) off.minY = y
+        if (x > off.maxX) off.maxX = x
+        if (y > off.maxY) off.maxY = y
+      }
+    }
+  }
+
+  if (total === 0) {
+    throw new SmokeFailure(
+      EXIT.assertion,
+      `${label}: the ring is empty, so this assertion proves nothing. Check the sprite rect and the ` +
+        'display bounds.',
+    )
+  }
+  const ratio = backdrop / total
+  if (ratio < 0.95) {
+    throw new SmokeFailure(
+      EXIT.assertion,
+      `${label}: only ${(ratio * 100).toFixed(1)}% of the ${total}px ring around the pet is still the ` +
+        'backdrop colour (expected ≥95%). The pet window is painting something where it should be ' +
+        'see-through — the opaque-grey-box failure, seen from outside the process.',
+    )
+  }
+  return ratio
+}
+
 // ---------------------------------------------------------------------------------------
 // One capture-and-assert pass
 // ---------------------------------------------------------------------------------------
@@ -661,18 +841,35 @@ async function assertPass(session, opts, name) {
 
   const windowName = pet ? 'pet' : 'backdrop'
   const windowPath = join(DEMO_DIR, `${name}.window.png`)
-  const { event: captured, png } = await captureWindow(session, windowName, windowPath, 8_000)
 
-  console.log(`  captured window ${png.width}×${png.height} → docs/demo/${name}.window.png`)
+  // Geometry first, and separately. A composite-only run — all Windows can manage while `capturePage()`
+  // stalls there — still needs to know which pixels are the pet.
+  const geometry = await requestGeometry(session, 4_000)
+
+  const capture = await captureWindow(session, windowName, windowPath, opts.captureTimeoutMs)
+  const png = capture.png ?? null
+  // `captured` is the geometry-bearing event: the capture's own copy when there is one, else the
+  // standalone report. Both carry the same fields; see the `geometry` harness command.
+  const captured = capture.event ?? geometry ?? null
+
+  if (png) {
+    console.log(`  captured window ${png.width}×${png.height} → docs/demo/${name}.window.png`)
+  } else {
+    console.log(`  ⚠ no window capture: ${capture.unavailable}`)
+    console.log('    Alpha assertions (A1/A2/A3/A6) need one. The composite checks below do not.')
+  }
 
   const results = []
 
   // Prefer the rect sampled at the moment of capture. `window-ready`'s copy is from startup, and
   // the pet walks: indexing a later capture with it fails when you are lucky and, worse, checks
   // the wrong pixels when you are not. Fall back only for a build with no capture-time rect.
-  const spriteRect = captured.spriteRect ?? pet?.spriteRect ?? null
+  const spriteRect = captured?.spriteRect ?? pet?.spriteRect ?? null
 
-  if (!opts.assert) {
+  if (!png) {
+    // Nothing alpha-based can run. Deliberately not an error: the composite pass below is what carries
+    // the evidence on this platform.
+  } else if (!opts.assert) {
     console.log('  · assertions skipped (--no-assert)')
   } else if (spriteRect) {
     // Sprite rect is reported in screen DIP; convert to capture pixels relative to the window.
@@ -754,19 +951,58 @@ async function assertPass(session, opts, name) {
   let composite = null
   if (opts.composite) {
     const compositePath = join(DEMO_DIR, `${name}.png`)
+
+    // **Freeze the pet first.** A composite is a separate process spawn taking a few hundred
+    // milliseconds; the geometry it is indexed against is sampled in about one. A walking pet moves
+    // ~15px in that gap — most of the width of the ring A7 samples — so it drifts into its own ring and
+    // the assertion reports the pet painting where it should be see-through. That is a measurement
+    // artefact, and loosening the threshold would only hide it. Caught on an `--all-states` run, where
+    // the pet is mid-walk rather than freshly launched and stationary.
+    //
+    // Movement is restored afterwards, so a `--keep-open` session is left as it was found.
+    let frozen = false
+    try {
+      session.send({ cmd: 'set-movement', enabled: false })
+      frozen = true
+      // Long enough for the tick that stops it to land and the sprite to settle.
+      await new Promise((r) => setTimeout(r, 250))
+    } catch {
+      // An older build with no such command: fall through and accept the drift risk.
+    }
+
+    // Re-sample now that it is still, so the rect and the screenshot agree.
+    const settled = frozen ? await requestGeometry(session, 4_000) : null
+    const compositeRect = settled?.spriteRect ?? spriteRect
+
     composite = captureComposite(compositePath, reference.display.index)
+    if (frozen) session.send({ cmd: 'set-movement', enabled: true })
     if (composite.ok) {
       console.log(`  captured composite → docs/demo/${name}.png`)
-      if (opts.assert && spriteRect && pet && opts.backdrop) {
+      if (opts.assert && compositeRect && pet && opts.backdrop) {
         const cpng = decodeOrThrow(compositePath)
         const ratio = assertCompositeShowsSprite(
           cpng,
-          spriteRect,
+          compositeRect,
           pet.display,
           'A5 composite-shows-pet',
         )
         console.log(`  ✓ A5 pet visible over the backdrop (${(ratio * 100).toFixed(1)}%)`)
         results.push('A5')
+
+        const ringRatio = assertCompositeRingIsBackdrop(
+          cpng,
+          compositeRect,
+          pet.display,
+          'A7 composite-ring-is-backdrop',
+          24,
+          captured?.bubbleVisible && captured?.bubbleEdgeY !== undefined
+            ? { edge: captured.bubbleEdgeY, side: captured.bubbleSide ?? 'above' }
+            : null,
+        )
+        console.log(
+          `  ✓ A7 the ring around the pet is still the backdrop (${(ringRatio * 100).toFixed(1)}%)`,
+        )
+        results.push('A7')
       }
     } else {
       console.log(`  ⚠ composite screenshot skipped: ${composite.reason}`)

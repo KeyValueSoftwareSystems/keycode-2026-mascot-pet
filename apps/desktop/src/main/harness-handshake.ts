@@ -75,6 +75,23 @@ export type HandshakeEvent =
       petScale?: number
     }
   | { ev: 'capture-failed'; path: string; reason: string }
+  /**
+   * Where the pet is, with no image attached. See the `geometry` harness command.
+   *
+   * Same fields as `capture-written` minus the file, so an assertion that needs geometry but not the
+   * window's own pixels — anything reading a composite screenshot — no longer depends on
+   * `capturePage()` returning, which on a Windows runner it does not.
+   */
+  | {
+      ev: 'geometry'
+      bounds: HandshakeRect
+      spriteRect?: HandshakeRect
+      floorLocked?: boolean
+      petScale?: number
+      bubbleEdgeY?: number
+      bubbleSide?: 'above' | 'below'
+      bubbleVisible?: boolean
+    }
   | { ev: 'error'; where: string; message: string }
 
 let enabled: boolean | null = null

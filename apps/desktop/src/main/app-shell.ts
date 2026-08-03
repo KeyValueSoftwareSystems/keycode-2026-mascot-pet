@@ -518,6 +518,14 @@ export async function startApp(): Promise<AppShell> {
     backdrop: () => backdrop,
     spriteRect: () => pet.spriteRect(),
     bubbleBand: () => pet.bubbleBand(),
+    setMovement: (enabled) => {
+      // The same three steps `toggleMovement` takes — durable setting, immediate trigger, out-of-phase
+      // tick — so freezing the pet for a screenshot goes through the real path rather than a back door
+      // that could diverge from it.
+      settings.patch({ movementEnabled: enabled })
+      controller?.enqueue({ kind: 'movement-changed', enabled })
+      controller?.tickNow()
+    },
     floorLocked: () => controller?.position().floorLocked ?? true,
     petScale: () => pet.placement.scale,
     place(position): void {

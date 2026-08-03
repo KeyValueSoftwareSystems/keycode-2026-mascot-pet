@@ -90,11 +90,26 @@ opaque window painted the same colour as what is behind it.
 
 It needs no Screen Recording permission, so it runs unattended, on a fresh machine, and in CI.
 
-### 2. Composite screenshot — when permitted
+### 2. Composite screenshot — on all three platforms since v1.9.0
 
-`/usr/sbin/screencapture`, pinned to one display with `-D`. This is the picture a **human**
-judges: the pet sitting on top of a real dark window, at the real z-order, composited by the
-real compositor.
+The picture a **human** judges, and the only one taken from *outside* the process: the pet on top of a
+real dark window, at the real z-order, composited by the real compositor.
+
+| | |
+|---|---|
+| macOS | `/usr/sbin/screencapture`, pinned to one display with `-D` |
+| Linux | `import -window root` — the ImageMagick command the lab found the bubble bug with |
+| Windows | PowerShell `Graphics.CopyFromScreen` over the virtual screen |
+
+This was macOS-only until v1.9.0, and that single fact is why Windows had no pixel evidence for four
+versions: its *other* instrument, `capturePage()`, does not return on a GitHub runner, so when the only
+composite backend refused to run there was nothing left. Two assertions read a composite — **A5** (the
+pet is visible over the backdrop) and **A7** (the ring around it is still the backdrop colour) — and
+neither needs an alpha channel, which is what makes them usable where `capturePage()` is not.
+
+A stalled window capture is also no longer fatal: `--capture-timeout` is configurable, a stall costs
+only the assertions that genuinely need alpha, and the geometry those assertions index comes from a
+separate `geometry` harness command rather than from the capture itself.
 
 It requires a macOS Screen Recording grant. **If the grant is missing the run still passes on
 the window capture and prints exactly what was skipped** — a missing permission must never be
@@ -249,7 +264,7 @@ Stated plainly because a green checklist that silently means "macOS only" is wor
 | **Linux click-through** | **Verified in the lab**, and it is a checked assertion rather than an observation. `xdotool getmouselocation` reports the window the X server routes the pointer to, which is what the shape region decides: pet body → pet, bubble → pet, margins → root, stable across repeated runs. This is the first direct evidence for the `setShape` path, which was previously ported on trust |
 | **Linux bubble below the pet** | **Verified in the lab.** Placed at the highest feet position the work area allows, the band flips under the feet, the tail points up at the shoes, and A2 correctly excludes the band on that side (`down to the feet — a bubble is up below the pet`) |
 | **Windows: boots and runs** | **Verified in CI.** The app reached `app-ready`, `window-ready` and `sprite-ready`, emitted a stream of `frame` events — so the motion engine is ticking — and fetched the Pages manifest, applying `pollMinutes` from it. That is the launch path, the window, the spritesheet decode, the renderer seam and the whole broadcast path, all working on Windows |
-| **Windows: the pixels** | **Not verified.** `webContents.capturePage()` did not return within 8s on the runner, so the run ended at exit 3 with every assertion unrun. The app was demonstrably alive at that point, so this reads as the capture stalling on a session with no real compositor rather than an app fault — but it is the next thing to chase, and until it passes the transparency, always-on-top and click-through claims are macOS-and-Linux only |
+| **Windows: the pixels** | **Attempted for the first time in v1.9.0, outcome pending a release run.** `capturePage()` still does not return there — now with a 30s budget and `--disable-gpu-compositing`, both experiments rather than expected fixes — but that no longer ends the run. The leg takes a desktop composite via PowerShell `CopyFromScreen` and asserts A5 and A7 against it, and uploads the image either way. Two things could still go wrong and the artifact distinguishes them: a runner session may hand back a black frame, or it may work. **Do not read this row as a pass until a release run has been looked at.** |
 | **Windows/Linux input** | **Not verified.** The occlusion-tracker fix, the `HWND_TOPMOST` re-assert interval, the mouse-forwarding retry ladder and Linux's `setShape` are ported from openpets on trust. Their constants live in one named object so a session on either platform can tune them without archaeology |
 | Windows `.exe`, Linux `.AppImage`/`.deb`/`.rpm` | **Built and published.** The v1.7.0 release carries all nine artifacts from the three-OS matrix. `deb`/`rpm` must come from the Ubuntu leg only: fpm on an Apple Silicon host is documented to produce broken packages, which is why `pnpm package` is restricted to `--mac` |
 | Broadcast reaching real clients | **Verified against a real host**, over the internet, with no env vars set. That evidence was gathered against the nginx box the manifest was originally served from; the host has since moved to GitHub Pages, which is **not** yet verified end to end — the first release rehearsal is what confirms it. A message published to the then-live host appeared in the pet (`docs/demo/m6-broadcast-live-host.window.png`), and a restart against the same file showed nothing — A2 reported the *full* transparency ring with no "a bubble is up" qualifier, which is the machine-checkable form of "the message did not re-appear". All nine fault modes were exercised against the dev server, which is where they can be injected |

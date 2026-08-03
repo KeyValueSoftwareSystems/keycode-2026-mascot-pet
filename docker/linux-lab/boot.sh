@@ -48,12 +48,22 @@ start_vnc() {
   x11vnc -display "${DISPLAY}" -forever -shared -nopw -rfbport 5900 -quiet -bg >/dev/null 2>&1
 }
 
-# The harness, backgrounded and left running. `--no-composite` because composite capture is
-# macOS-only (screencapture); `--keep-open` because we want the app alive to photograph.
+# The harness, backgrounded and left running.
+#
+# `--backdrop` and composite capture are both *on* now: the harness grew an `import -window root`
+# backend, so A5 (the pet is visible over the backdrop) and A7 (the ring around it is still the
+# backdrop) run here rather than only on macOS. A7 in particular is the transparency claim in a form
+# that needs no alpha channel, which is the only form available where `capturePage()` cannot be trusted.
+# `--keep-open` leaves the app alive to photograph afterwards.
 start_app() {
   local name="$1"; shift
+  # Whether to expect a grabbable bubble in the pointer probe. Derived from the run's own flags rather
+  # than assumed, so the probe matches what is actually on screen.
+  for arg in "$@"; do
+    [ "$arg" = '--callout' ] && export LAB_EXPECT_BUBBLE=1
+  done
   log "smoke --name ${name} $*"
-  node scripts/smoke.mjs --name "${name}" --no-composite --keep-open "$@" &
+  node scripts/smoke.mjs --name "${name}" --backdrop --keep-open "$@" &
   APP_PID=$!
 }
 
@@ -113,9 +123,16 @@ probe_passthrough() {
   # Window-relative, for the 360×304 window: the body occupies x 126–233, its feet reach the window's
   # bottom edge, and the bubble band spans the full width down to the hair. Everything else must fall
   # through. Note there is no point *below* the feet to test — the window ends at them by design.
+  # The bubble point is only checked when a bubble is actually on screen. It is not otherwise: an empty
+  # band correctly falls through to the root window, and asserting `pet` there failed a run whose only
+  # sin was not asking for a callout.
   log "pointer routing (pet=$pet root=$root)"
   check 'pet body'         180 212 pet
-  check 'bubble'           180  40 pet
+  if [ "${LAB_EXPECT_BUBBLE:-0}" = 1 ]; then
+    check 'bubble'         180  40 pet
+  else
+    printf '  %-22s %-8s skipped (no callout in this run)\n' 'bubble' 'pet'
+  fi
   check 'margin far left'   20 260 through
   check 'margin far right' 340 260 through
   check 'margin beside hip' 40 180 through

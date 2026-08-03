@@ -62,7 +62,8 @@ because a message you cannot read is not a message.
 <tr>
 <td width="52%" valign="top">
 
-**Wellness reminders.** Water and stretch, at intervals you pick from the menu. They are wall-clock
+**Wellness reminders.** Water and stretch, at intervals you pick from the menu — each with its own
+animation: the pet drinks from a bottle, or presses a pair of dumbbells overhead. They are wall-clock
 deadlines rather than timers, so closing your laptop for two hours does not produce a backlog of four
 reminders on wake.
 
@@ -137,10 +138,10 @@ fault-injection modes, and how release announcements work.
 | | |
 |---|---|
 | **macOS** | Verified — transparency, always-on-top, motion, sizes, free placement, broadcast, and installing from a quarantined `.dmg`. |
+| **Windows** | **Pixels now attempted**, for the first time: the harness takes a desktop-level composite screenshot (PowerShell `CopyFromScreen`) and asserts against it, which needs no alpha channel and so does not depend on `capturePage()` — that still stalls on the runner. Whether the runner's session yields a real frame is answered by the uploaded artifact on each release run. |
 | **Linux** | Verified at the X server, not just in-process — `pnpm lab:linux` runs the app on a real X server in a container and screenshots the **root window**, which is the only way to see window shaping and real compositing. The pet, the whole speech bubble, the sleep overlay and click-through all check out. Unverified: the Wayland tray fallback, and **emoji render as tofu** ([an open bug](docs/VERIFICATION.md)). |
-| **Windows** | Boots, animates and polls the manifest — verified in CI. Its **pixels are unverified**: `capturePage()` times out on the runner, so the transparency and always-on-top assertions never ran there. |
 
-437 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
+439 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
 list of what is proven and what is not.
 
 **No telemetry.** One network request — the manifest — and no analytics, identifiers or accounts. The
@@ -171,7 +172,7 @@ KEYCODE_PET_BACKDROP=1 pnpm dev
 |---|---|
 | `pnpm dev` | Run from source |
 | `pnpm build` | Compile main (tsc) and the renderer (Vite) |
-| `pnpm test` | 437 tests, no Electron required |
+| `pnpm test` | 439 tests, no Electron required |
 | `pnpm typecheck` | `tsc --noEmit` over both tsconfigs |
 | `pnpm generate` | Regenerate everything derived from `pet/spritesheet.json` |
 | `pnpm generate:check` | Fail if the committed generated files are stale |

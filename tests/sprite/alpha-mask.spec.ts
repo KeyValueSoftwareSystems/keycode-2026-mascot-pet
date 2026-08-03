@@ -16,6 +16,7 @@ import {
   spriteScreenRect,
   bodyHalfWidth,
 } from '../../apps/desktop/src/sprite/alpha-mask.js'
+import { PET_WINDOW_WIDTH } from '../../apps/desktop/src/main/floor-placement.js'
 
 const REPO = resolve(import.meta.dirname, '..', '..')
 const maskJson = JSON.parse(
@@ -50,22 +51,29 @@ describe('alpha mask generation', () => {
   })
 
   it('separates per-frame fill from union fill', () => {
-    // docs/PROMPT.md §5.4 conflated these. Per-frame is ~21%; the *union* the mask covers is
-    // ~35%, and the coarse cell grid is ~38% set. Asserting the wrong one makes the test a lie.
+    // docs/PROMPT.md §5.4 conflated these, and asserting the wrong one makes the test a lie. The
+    // numbers moved in v1.9.0 when the drink and stretch art landed: a *union* is monotonic in the
+    // number of poses, and the dumbbell press reaches wider than anything before it, so the union grew
+    // from ~35% of the cell to ~45% while per-frame fill barely moved. Those two behaving differently
+    // is the property being pinned — if a future art pack moves per-frame fill as much as the union,
+    // something is being measured across frames that should not be.
     const stats = ALPHA_MASK.stats
     const perFramePct = (stats.perFrameOpaqueMean / stats.cellPixels) * 100
     const unionPct = (stats.unionOpaquePixels / stats.cellPixels) * 100
     const cellPct = (stats.maskSetCells / stats.maskTotalCells) * 100
 
-    expect(perFramePct).toBeGreaterThan(19)
-    expect(perFramePct).toBeLessThan(23)
-    expect(unionPct).toBeGreaterThan(33)
-    expect(unionPct).toBeLessThan(38)
-    expect(cellPct).toBeGreaterThan(35)
-    expect(cellPct).toBeLessThan(41)
+    expect(perFramePct).toBeGreaterThan(20)
+    expect(perFramePct).toBeLessThan(25)
+    expect(unionPct).toBeGreaterThan(42)
+    expect(unionPct).toBeLessThan(48)
+    expect(cellPct).toBeGreaterThan(44)
+    expect(cellPct).toBeLessThan(51)
+
+    // The union must stay comfortably above the average frame, or the mask is not a union at all.
+    expect(unionPct).toBeGreaterThan(perFramePct * 1.5)
 
     expect(stats.perFrameOpaqueMin).toBeGreaterThan(6_500)
-    expect(stats.perFrameOpaqueMax).toBeLessThan(10_500)
+    expect(stats.perFrameOpaqueMax).toBeLessThan(14_000)
   })
 
   it('measures footInset as the gap below the lowest opaque row, identically for every state', () => {
@@ -79,7 +87,20 @@ describe('alpha mask generation', () => {
   })
 
   it('has the measured bounding box', () => {
-    expect(ALPHA_MASK.bbox).toEqual({ x: 42, y: 14, width: 107, height: 178 })
+    // Deliberately a literal: this is the measurement the placement maths is built on, so it should
+    // take an edit and a moment's thought when it changes rather than following the code silently.
+    //
+    // v1.9.0 widened it from `{ x: 42, y: 14, width: 107, height: 178 }` — the stretch pose holds
+    // dumbbells further out than any previous frame, and reaches 1px higher than `review` did. What
+    // matters is what did *not* change:
+    //
+    //   - `footInset` is still 16, so the window is still 304 tall and every placement figure holds.
+    //   - the body centre is still exactly 95.5, so the pet's anchor did not move a pixel.
+    //
+    // All the wider mask costs is that the pet stops ~7px further from each screen edge.
+    expect(ALPHA_MASK.bbox).toEqual({ x: 35, y: 13, width: 121, height: 179 })
+    expect(ALPHA_MASK.footInset).toBe(16)
+    expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2).toBeCloseTo(95.5, 5)
   })
 
   it('measures a per-state head top for every state, at or below the union top', () => {
@@ -107,9 +128,17 @@ describe('alpha mask generation', () => {
   })
 
   it('reports a mostly-horizontal transparent margin, which is why bounds hit-testing is unusable', () => {
-    // 107 of 192 columns used: ~44% of the cell width is empty space beside the character. A
-    // bounds hit-test would swallow clicks across that whole band.
-    expect(ALPHA_MASK.bbox.width).toBeLessThan(sheet.frameWidth * 0.6)
+    // The real claim is about the *window*, not the cell: the window is 360px wide for a body of 120,
+    // so two thirds of it is empty space beside the character and a bounds hit-test would swallow
+    // clicks across all of it. Written against the cell it read `< 0.6 * 192` and broke when the
+    // stretch art widened the body to 120 — a threshold tuned to one art pack rather than to the
+    // property.
+    expect(ALPHA_MASK.bbox.width).toBeLessThan(PET_WINDOW_WIDTH * 0.5)
+    // And the margin really is mostly horizontal: the body uses far more of the cell's height than of
+    // its width, which is what makes a bounding box such a poor stand-in for the mask.
+    const widthUsed = ALPHA_MASK.bbox.width / sheet.frameWidth
+    const heightUsed = ALPHA_MASK.bbox.height / sheet.frameHeight
+    expect(heightUsed).toBeGreaterThan(widthUsed * 1.3)
   })
 
   it('derives few shape rects with no over-cover', () => {
@@ -304,13 +333,23 @@ describe('shapeRectsForFrame', () => {
     const unclipped = shapeRectsForWindow(ALPHA_MASK, layout.spriteOrigin, { scale: 1 })
     expect(rects).toHaveLength(unclipped.length)
 
-    // Not identical, and that is the point of clipping. The 8px hit padding inflates the lowest rect
-    // past the window's bottom edge — the window ends *at the feet*, so there are no rows below them
-    // to inflate into. A region reaching outside the window is not defined behaviour in `setShape`.
-    const last = rects.at(-1)!
-    expect(last.y + last.height).toBe(layout.windowHeight)
-    expect(unclipped.at(-1)!.height).toBeGreaterThan(last.height)
-    expect(rects.slice(0, -1)).toEqual(unclipped.slice(0, -1))
+    // Every rect is its unclipped self, intersected with the window. Written as "only the last one is
+    // clipped", which was true of the old art and stopped being true when the stretch row widened the
+    // mask and changed which rects reach the bottom edge.
+    const clip = (r: { x: number; y: number; width: number; height: number }) => ({
+      x: r.x,
+      y: r.y,
+      width: Math.min(r.width, layout.windowWidth - r.x),
+      height: Math.min(r.height, layout.windowHeight - r.y),
+    })
+    expect(rects).toEqual(unclipped.map(clip))
+
+    // And clipping is not a no-op: the 8px hit padding inflates the lowest rects past the window's
+    // bottom edge, because the window ends *at the feet* and there are no rows below them to inflate
+    // into. A region reaching outside the window is not defined behaviour in `setShape`.
+    const clipped = unclipped.filter((r, i) => r.height !== rects[i]!.height)
+    expect(clipped.length).toBeGreaterThan(0)
+    for (const r of rects) expect(r.y + r.height).toBeLessThanOrEqual(layout.windowHeight)
   })
 
   it('does NOT cover the bubble band when no bubble is up', () => {

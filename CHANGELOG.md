@@ -29,6 +29,7 @@ From `v1.1.0` onward these are real releases:
 | `v1.7.0` | Public repo, GitHub Pages manifest, `pnpm notify`, CI on three OSes |
 | `v1.7.1` | Release announcements from CI, 1-minute polling |
 | `v1.8.0` | Tag only — **no release**. Its Windows leg failed on a test that depended on the host platform, so it published no Windows build and its release was withdrawn. The tag stays as a history marker. |
+| `v1.9.0` | **Real drink and stretch animations** — the two aliased states finally have art. Composite screenshots on all three platforms, so Windows has pixel evidence for the first time |
 | `v1.8.1` | **Linux: the speech bubble is drawn at all.** An "Always on top" toggle. The pet reaches the top of the screen, and the bubble flips below it. Plus coverage for the Windows re-assert workaround the v1.8.0 failure exposed |
 
 Why each decision was made — including the ones that were wrong first — is in

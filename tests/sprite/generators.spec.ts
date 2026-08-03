@@ -154,13 +154,21 @@ describe('generated animation module', () => {
     }
   })
 
-  it('aliases states whose art does not exist yet', () => {
-    // `stretch` is specified but undrawn. The reaction map keeps naming it, so when the art
-    // lands the only change is deleting the alias.
+  it('resolved `stretch` through an alias until its art landed, and now resolves it directly', () => {
+    // The indirection, collected. `stretch` was specified before it was drawn, `ANIMATION_ALIASES`
+    // pointed it at `jumping`, and the reaction map named `stretch` throughout. v1.9.0 drew the art, and
+    // the entire wiring change was deleting one line of spritesheet.json — no code, no mapping edit.
+    // These four assertions are the same four as before with two of them inverted, which is the cheapest
+    // possible record of that having worked.
     expect(SPEC.reactionMap['stretch-reminder']).toBe('stretch')
-    expect(ANIMATION_ALIASES.stretch).toBe('jumping')
-    expect(isAnimationState('stretch')).toBe(false)
-    expect(resolveTrigger('stretch-reminder')).toBe('jumping')
+    expect(ANIMATION_ALIASES.stretch).toBeUndefined()
+    expect(isAnimationState('stretch')).toBe(true)
+    expect(resolveTrigger('stretch-reminder')).toBe('stretch')
+  })
+
+  it('has no aliases left, and still resolves a trigger that names a real state', () => {
+    expect(Object.keys(ANIMATION_ALIASES)).toEqual([])
+    expect(resolveTrigger('water-reminder')).toBe('drink')
   })
 
   it('recognises real states and rejects invented ones', () => {
@@ -223,7 +231,9 @@ describe('spritesheet validation', () => {
   it('rejects an alias whose target does not exist', () => {
     expect(
       loadWith((s) => {
-        s.aliases.stretch = 'imaginary'
+        // A name no state uses — `stretch` was the fixture here until it became real art, at which point
+        // this test started failing on the *shadowing* error instead of the one it is about.
+        s.aliases.moonwalk = 'imaginary'
       }),
     ).toThrow(/points at "imaginary"/)
   })

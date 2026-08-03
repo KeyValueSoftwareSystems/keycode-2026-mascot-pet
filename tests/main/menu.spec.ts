@@ -10,6 +10,7 @@ import { createActions, RESET_POSITION_FRACTION } from '../../apps/desktop/src/m
 import type { MotionTrigger } from '../../apps/desktop/src/motion/types.js'
 import type { Settings } from '../../apps/desktop/src/main/settings-schema.js'
 import { DEFAULT_SETTINGS } from '../../apps/desktop/src/main/settings-schema.js'
+import { ALPHA_MASK } from '../../apps/desktop/src/sprite/alpha-mask.js'
 import {
   PET_SIZES,
   PET_SIZE_SCALES,
@@ -289,8 +290,9 @@ describe('actions', () => {
     const trigger = controller.enqueued[0]
     expect(trigger?.kind).toBe('reset-position')
 
-    // 0.35 across a floor inset by half the pet's body width on each side.
-    const halfBody = 107 / 2
+    // 0.35 across a floor inset by half the pet's body width on each side. Taken from the mask rather
+    // than written as a literal: it was 107 until the stretch art widened the union to 120.
+    const halfBody = ALPHA_MASK.bbox.width / 2
     const minX = 0 + halfBody
     const maxX = 1512 - halfBody
     const expected = minX + (maxX - minX) * RESET_POSITION_FRACTION

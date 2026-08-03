@@ -49,6 +49,16 @@ function applyCommandLineSwitches(): void {
     // still "on top" of a game, it has just stopped being drawn.
     appendToSwitchList('disable-features', 'CalculateNativeWinOcclusion')
   }
+
+  // An escape hatch for the one thing still unverified anywhere: `webContents.capturePage()` does not
+  // return on a Windows CI runner, on an app that is otherwise demonstrably alive and emitting frames.
+  // GPU compositing on a session with no real display is the leading suspect, so the release workflow
+  // can try turning it off for that leg without a code change — and if it turns out to be the cause,
+  // that is a finding about the runner rather than about the app, which is why this is opt-in and not
+  // a default.
+  if (process.env.KEYCODE_PET_DISABLE_GPU_COMPOSITING === '1') {
+    app.commandLine.appendSwitch('disable-gpu-compositing')
+  }
 }
 
 // ---------------------------------------------------------------------------------------

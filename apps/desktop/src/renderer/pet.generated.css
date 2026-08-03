@@ -8,7 +8,7 @@
   width: 192px;
   height: 208px;
   background-repeat: no-repeat;
-  background-size: 1536px 1872px;
+  background-size: 1536px 2080px;
   background-position: 0 0;
   /* REQUIRED, not stylistic: without it the browser smooths the pixel art into mush,
      and it is worst on exactly the HiDPI displays this is developed on. */
@@ -17,17 +17,17 @@
 
 @keyframes kp-drink-0 {
   from { background-position: 0 -1248px; }
-  to { background-position: -960px -1248px; }
+  to { background-position: -1344px -1248px; }
 }
 @keyframes kp-drink-1 {
   from { background-position: 0 -1248px; }
-  to { background-position: -960px -1248px; }
+  to { background-position: -1344px -1248px; }
 }
 .pet-sprite[data-state="drink"][data-nonce="0"] {
-  animation: kp-drink-0 1800ms steps(6, jump-none) 2 forwards;
+  animation: kp-drink-0 2000ms steps(8, jump-none) 2 forwards;
 }
 .pet-sprite[data-state="drink"][data-nonce="1"] {
-  animation: kp-drink-1 1800ms steps(6, jump-none) 2 forwards;
+  animation: kp-drink-1 2000ms steps(8, jump-none) 2 forwards;
 }
 
 @keyframes kp-failed-0 {
@@ -148,6 +148,21 @@
 }
 .pet-sprite[data-state="sleep"][data-nonce="1"] {
   animation: kp-sleep-1 16000ms steps(6, jump-none) infinite forwards;
+}
+
+@keyframes kp-stretch-0 {
+  from { background-position: 0 -1872px; }
+  to { background-position: -1152px -1872px; }
+}
+@keyframes kp-stretch-1 {
+  from { background-position: 0 -1872px; }
+  to { background-position: -1152px -1872px; }
+}
+.pet-sprite[data-state="stretch"][data-nonce="0"] {
+  animation: kp-stretch-0 2200ms steps(7, jump-none) 2 forwards;
+}
+.pet-sprite[data-state="stretch"][data-nonce="1"] {
+  animation: kp-stretch-1 2200ms steps(7, jump-none) 2 forwards;
 }
 
 @keyframes kp-waving-0 {

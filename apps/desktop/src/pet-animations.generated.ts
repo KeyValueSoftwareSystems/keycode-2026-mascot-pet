@@ -15,6 +15,7 @@ export type AnimationState =
   | 'running-left'
   | 'running-right'
   | 'sleep'
+  | 'stretch'
   | 'waving'
 
 /** Every trigger the reaction map knows how to answer. */
@@ -51,7 +52,7 @@ export interface AnimationSpec {
 }
 
 export const ANIMATIONS: { readonly [K in AnimationState]: AnimationSpec } = {
-  'drink': { row: 6, frames: 6, durationMs: 1800, iterations: 2, totalMs: 3600 },
+  'drink': { row: 6, frames: 8, durationMs: 2000, iterations: 2, totalMs: 4000 },
   'failed': { row: 5, frames: 8, durationMs: 1220, iterations: 2, totalMs: 2440 },
   'idle': { row: 0, frames: 6, durationMs: 5500, iterations: 'infinite', totalMs: null },
   'jumping': { row: 4, frames: 5, durationMs: 840, iterations: 2, totalMs: 1680 },
@@ -60,6 +61,7 @@ export const ANIMATIONS: { readonly [K in AnimationState]: AnimationSpec } = {
   'running-left': { row: 2, frames: 8, durationMs: 1060, iterations: 'infinite', totalMs: null },
   'running-right': { row: 1, frames: 8, durationMs: 1060, iterations: 'infinite', totalMs: null },
   'sleep': { row: 0, frames: 6, durationMs: 16000, iterations: 'infinite', totalMs: null },
+  'stretch': { row: 9, frames: 7, durationMs: 2200, iterations: 2, totalMs: 4400 },
   'waving': { row: 3, frames: 4, durationMs: 700, iterations: 2, totalMs: 1400 },
 }
 
@@ -74,6 +76,7 @@ export const ANIMATION_STATES = [
   'running-left',
   'running-right',
   'sleep',
+  'stretch',
   'waving',
 ] as const satisfies readonly AnimationState[]
 
@@ -81,9 +84,9 @@ export const SHEET = {
   frameWidth: 192,
   frameHeight: 208,
   columns: 8,
-  rows: 9,
+  rows: 10,
   width: 1536,
-  height: 1872,
+  height: 2080,
   fileName: "spritesheet.png",
 } as const
 
@@ -93,7 +96,7 @@ export const SHEET = {
  * this table empties — no other code changes.
  */
 export const ANIMATION_ALIASES: Readonly<Record<string, AnimationState>> = {
-  'stretch': 'jumping',
+  // none — every state the reaction map names is real art
 }
 
 /**
@@ -108,7 +111,7 @@ export const REACTION_MAP: { readonly [K in Trigger]: AnimationState } = {
   'update-available': 'jumping',
   'celebrating': 'jumping',
   'water-reminder': 'drink',
-  'stretch-reminder': 'jumping',
+  'stretch-reminder': 'stretch',
   'thinking': 'review',
   'busy': 'running',
   'error': 'failed',

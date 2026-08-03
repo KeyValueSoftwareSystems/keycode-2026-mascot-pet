@@ -135,10 +135,17 @@ describe('png decoder', () => {
   })
 
   it('reads the real pet spritesheet at its documented geometry', () => {
+    // Against spritesheet.json rather than against literals: that file is the declared geometry and the
+    // generators refuse to run when the PNG disagrees, so this checks the decoder against the same
+    // source of truth instead of needing an edit every time a row is added.
+    const declared = JSON.parse(
+      readFileSync(resolve(REPO, 'pet/spritesheet.json'), 'utf8'),
+    ) as { sheet: { width: number; height: number; rows: number; frameHeight: number } }
     const png = decodePng(readFileSync(resolve(REPO, 'pet/spritesheet.png')))
-    expect(png.width).toBe(1536)
-    expect(png.height).toBe(1872)
-    expect(png.data.length).toBe(1536 * 1872 * 4)
+    expect(png.width).toBe(declared.sheet.width)
+    expect(png.height).toBe(declared.sheet.height)
+    expect(png.height).toBe(declared.sheet.rows * declared.sheet.frameHeight)
+    expect(png.data.length).toBe(declared.sheet.width * declared.sheet.height * 4)
   })
 
   it('rejects a non-PNG buffer', () => {

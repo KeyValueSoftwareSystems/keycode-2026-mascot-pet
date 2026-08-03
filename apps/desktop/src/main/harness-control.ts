@@ -42,6 +42,28 @@ export type HarnessCommand =
   | { cmd: 'place'; x: number; feetY: number }
   /** Change the pet's size, so each one can be screenshotted without relaunching. */
   | { cmd: 'set-size'; size: string }
+  /**
+   * Report where the pet is *right now*, without capturing anything.
+   *
+   * Everything `capture-written` carries except the image. It exists because those two facts were
+   * welded together, and on a Windows runner `capturePage()` does not return: the harness timed out
+   * waiting for it and every assertion went unrun, on an app that was demonstrably alive and emitting
+   * frames. Asking where the pet is should not depend on being able to photograph it — and a composite
+   * screenshot taken from outside the process needs the geometry, not the window's own pixels.
+   */
+  | { cmd: 'geometry' }
+  /**
+   * Stop or start the pet walking.
+   *
+   * Needed because a **composite** screenshot is a separate process spawn that takes a few hundred
+   * milliseconds, while the geometry it is indexed against is sampled in about a millisecond. A walking
+   * pet moves ~15px in that gap, which is most of the width of the ring A7 samples — so the pet drifts
+   * into its own ring and the assertion reports the pet painting where it should be see-through. That
+   * is a measurement artefact, and no threshold fixes it honestly.
+   *
+   * The in-process window capture does not need this: it and its geometry come from the same instant.
+   */
+  | { cmd: 'set-movement'; enabled: boolean }
   | { cmd: 'quit' }
 
 export interface HarnessTargets {
@@ -69,6 +91,8 @@ export interface HarnessTargets {
   place?: (position: { x: number; feetY: number }) => void
   /** Change the pet's size. */
   setSize?: (size: string) => void
+  /** Stop or start the pet walking, so a composite capture can be correlated with a geometry sample. */
+  setMovement?: (enabled: boolean) => void
   /** The sprite's current CSS scale, which decides whether the crispness assertion is meaningful. */
   petScale?: () => number
 }
@@ -166,6 +190,35 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           return
         }
         targets.setSize(command.size)
+        return
+      }
+
+      case 'set-movement': {
+        if (!targets.setMovement) {
+          emit({ ev: 'error', where: 'harness:set-movement', message: 'no movement sink registered' })
+          return
+        }
+        targets.setMovement(command.enabled)
+        return
+      }
+
+      case 'geometry': {
+        const win = targets.pet()
+        if (!win || win.isDestroyed()) {
+          emit({ ev: 'error', where: 'harness:geometry', message: 'no pet window' })
+          return
+        }
+        const bubble = targets.bubbleBand?.()
+        emit({
+          ev: 'geometry',
+          bounds: win.getContentBounds(),
+          ...(targets.spriteRect ? { spriteRect: targets.spriteRect() } : {}),
+          ...(targets.floorLocked ? { floorLocked: targets.floorLocked() } : {}),
+          ...(targets.petScale ? { petScale: targets.petScale() } : {}),
+          ...(bubble === undefined
+            ? {}
+            : { bubbleEdgeY: bubble.y, bubbleSide: bubble.side, bubbleVisible: bubble.visible }),
+        })
         return
       }
 

@@ -64,11 +64,23 @@ describe('computePlacement', () => {
 
   it('measures the centre offset from the visible body, not the window', () => {
     const placement = computePlacement()
-    // 84 (cell origin) + 42 (bbox x) + 53.5 (half the 107px body) = 179.5
-    expect(placement.spriteCentreOffset).toBeCloseTo(179.5, 5)
-    // Deliberately not the window's midpoint: the pet's body must be able to reach the screen
-    // edge, and the window is far wider than the character.
-    expect(placement.spriteCentreOffset).not.toBe(PET_WINDOW.width / 2)
+    // Derived, not restated: cell origin + bbox x + half the body width. Written as a literal once, it
+    // had to be edited when the stretch art widened the union mask from 107px to 120px — which is
+    // exactly the kind of edit that turns a test into a transcription of the code.
+    const bbox = ALPHA_MASK.bbox
+    const expected = placement.spriteOrigin.x + bbox.x + bbox.width / 2
+    expect(placement.spriteCentreOffset).toBeCloseTo(expected, 5)
+    // The property this is really about — the offset follows the *body*, not the window — needs a mask
+    // whose body is off-centre to show at all. With the current art the two happen to coincide exactly
+    // (the body is centred in its cell, so 84 + 36 + 60 = 180 = 360/2), and the original assertion here
+    // was `not.toBe(window/2)`, which passed only by the accident of the old 107px width.
+    const offCentre: AlphaMaskData = {
+      ...ALPHA_MASK,
+      bbox: { x: 10, y: ALPHA_MASK.bbox.y, width: 40, height: ALPHA_MASK.bbox.height },
+    }
+    const shifted = computePlacement(offCentre)
+    expect(shifted.spriteCentreOffset).toBeCloseTo(shifted.spriteOrigin.x + 10 + 20, 5)
+    expect(shifted.spriteCentreOffset).not.toBeCloseTo(PET_WINDOW.width / 2, 0)
   })
 
   it('re-derives everything for a differently padded art pack', () => {

@@ -147,8 +147,18 @@ describe('notification entries', () => {
     })
   })
 
-  it('falls back for `stretch`, whose art does not exist yet', () => {
+  it('accepts `stretch`, which had to fall back until its art landed', () => {
+    // This assertion used to be the opposite. `stretch` was aliased to `jumping` and a manifest naming
+    // it resolved to the stand-in; v1.9.0 drew the art, the alias was deleted, and the same name now
+    // resolves to itself. Kept rather than removed because it is the acceptance test for the alias
+    // indirection: a broadcast could always name the state it wanted, before and after.
     expect(parseNotification(entry({ animation: 'stretch' }))).toMatchObject({
+      animation: 'stretch',
+    })
+  })
+
+  it('still falls back for a name no state or alias covers', () => {
+    expect(parseNotification(entry({ animation: 'moonwalk' }))).toMatchObject({
       animation: FALLBACK_ANIMATION,
     })
   })

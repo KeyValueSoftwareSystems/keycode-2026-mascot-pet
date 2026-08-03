@@ -3,19 +3,44 @@
   "sheet": {
     "fileName": "spritesheet.png",
     "width": 1536,
-    "height": 1872,
+    "height": 2080,
     "frameWidth": 192,
     "frameHeight": 208,
     "columns": 8,
-    "rows": 9,
+    "rows": 10,
     "hasAlpha": true
   },
   "states": {
-    "idle": { "row": 0, "frames": 6, "durationMs": 5500, "iterations": "infinite" },
-    "running-right": { "row": 1, "frames": 8, "durationMs": 1060, "iterations": "infinite" },
-    "running-left": { "row": 2, "frames": 8, "durationMs": 1060, "iterations": "infinite" },
-    "waving": { "row": 3, "frames": 4, "durationMs": 700, "iterations": 2 },
-    "jumping": { "row": 4, "frames": 5, "durationMs": 840, "iterations": 2 },
+    "idle": {
+      "row": 0,
+      "frames": 6,
+      "durationMs": 5500,
+      "iterations": "infinite"
+    },
+    "running-right": {
+      "row": 1,
+      "frames": 8,
+      "durationMs": 1060,
+      "iterations": "infinite"
+    },
+    "running-left": {
+      "row": 2,
+      "frames": 8,
+      "durationMs": 1060,
+      "iterations": "infinite"
+    },
+    "waving": {
+      "row": 3,
+      "frames": 4,
+      "durationMs": 700,
+      "iterations": 2
+    },
+    "jumping": {
+      "row": 4,
+      "frames": 5,
+      "durationMs": 840,
+      "iterations": 2
+    },
     "failed": {
       "row": 5,
       "frames": 8,
@@ -25,10 +50,10 @@
     },
     "drink": {
       "row": 6,
-      "frames": 6,
-      "durationMs": 1800,
+      "frames": 8,
+      "durationMs": 2000,
       "iterations": 2,
-      "note": "Reclaimed from the old `waiting` state, which was byte-identical to row 0 and so was never an animation at all. Art is still pending: until it is drawn this plays the idle frames, which keeps the water-reminder trigger path complete and testable today."
+      "note": "Real art as of v1.9.0: picks up a bottle, drinks, lowers it. Row 6 previously held six frames byte-identical to idle, a placeholder from when it was reclaimed from the old `waiting` state. Imported from a generated contact sheet with scripts/import-sheet-rows.mjs — 8 of that row’s 9 spans; the ninth is a bottle standing on the ground beside the character, which is deliberately not taken because a detached object widens the union mask and shifts the pet’s anchor in every other state."
     },
     "running": {
       "row": 7,
@@ -37,7 +62,19 @@
       "iterations": "infinite",
       "note": "In-place busy/working loop, NOT locomotion — locomotion is running-left/running-right. Never wire this to movement."
     },
-    "review": { "row": 8, "frames": 6, "durationMs": 1030, "iterations": "infinite" },
+    "review": {
+      "row": 8,
+      "frames": 6,
+      "durationMs": 1030,
+      "iterations": "infinite"
+    },
+    "stretch": {
+      "row": 9,
+      "frames": 7,
+      "durationMs": 2200,
+      "iterations": 2,
+      "note": "Real art as of v1.9.0: a triceps dumbbell press. 7 of the source row’s 8 frames — the eighth carries a cursor arrow burned over the head by the generator and is the same rest pose as frame 0, so dropping it costs nothing and the loop closes on frame 0. This row is why the sheet grew to ten rows, and why the union mask widened from 107px to 119px: the dumbbells reach wider than any previous pose, so the pet now stops slightly further from a screen edge in every state."
+    },
     "sleep": {
       "row": 0,
       "frames": 6,
@@ -47,29 +84,36 @@
     }
   },
   "aliases": {
-    "$comment": "Substitutions for states the behaviour spec needs but the art does not contain yet. The reactionMap deliberately keeps naming the state it *wants*, so when the art lands the only change is deleting the alias entry — no code edits, no mapping edits. An alias target must be a real declared state; the generator enforces that.",
-    "stretch": "jumping"
-  },
-  "plannedNewStates": {
-    "$comment": "Still absent from the sheet. Requires extending it to 12 rows (1536x2496).",
-    "stretch": {
-      "row": 9,
-      "frames": 6,
-      "durationMs": 2200,
-      "iterations": 2,
-      "status": "todo",
-      "requiresSheetExtension": true,
-      "note": "Aliased to `jumping` until drawn — see the `aliases` block."
-    }
+    "$comment": "Substitutions for states the behaviour spec needs but the art does not contain yet. Empty since v1.9.0, when drink and stretch got real art: `stretch` was aliased to `jumping` and the reactionMap always named `stretch`, so landing the art was a one-line deletion here and no code change anywhere. That was the point of the indirection, and this is the first time it was collected."
   },
   "freeCells": {
     "$comment": "Unused (fully transparent) cells available for new frames without resizing the sheet.",
-    "row0": [6, 7],
-    "row3": [4, 5, 6, 7],
-    "row4": [5, 6, 7],
-    "row6": [6, 7],
-    "row7": [6, 7],
-    "row8": [6, 7]
+    "row0": [
+      6,
+      7
+    ],
+    "row3": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "row4": [
+      5,
+      6,
+      7
+    ],
+    "row7": [
+      6,
+      7
+    ],
+    "row8": [
+      6,
+      7
+    ],
+    "row9": [
+      7
+    ]
   },
   "reactionMap": {
     "$comment": "trigger -> animation state. Keep this indirection so a new trigger is a mapping entry rather than renderer work. A value may name a state or an alias.",

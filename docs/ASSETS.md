@@ -160,3 +160,25 @@ into the renderer output, so shipping the original too would pay for it twice.
 
 `tests/packaging/packaging-config.spec.ts` asserts each of these, because an untested `files` filter
 is exactly how 3MB of reference art ends up in every download.
+
+## Importing generated art
+
+`scripts/import-sheet-rows.mjs` takes rows out of an image-model contact sheet and puts them into
+`pet/spritesheet.png` at the right size, on the right baseline, with real alpha:
+
+```bash
+node scripts/import-sheet-rows.mjs source.png --row drink:6:8 --row stretch:9:7 --preview /tmp/p.png
+```
+
+It is how the `drink` and `stretch` rows landed in v1.9.0. What it expects and what it fixes for you is
+documented in the script's own header; the short version is that the source may have a flat key colour
+instead of transparency, no cell grid, and any resolution, and the two things it will *not* guess are
+which source row goes where and how many of its frames to take.
+
+Afterwards, `pet/spritesheet.json` needs updating by hand — `sheet.rows`/`height`, the state entries,
+any alias that is now redundant — and then `pnpm generate`. Those are decisions rather than
+derivations, which is why the script prints them as a reminder instead of doing them.
+
+**The one invariant to check after any import:** `footInset` must not move. Run `pnpm generate` and
+confirm it still reports `footInset 16`; if it changed, a new frame's feet are off the baseline and
+every placement calculation in the app has moved with them.

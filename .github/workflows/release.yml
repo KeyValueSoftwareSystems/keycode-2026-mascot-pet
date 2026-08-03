@@ -77,17 +77,35 @@ jobs:
       # `continue-on-error` on purpose, for now: these two platforms have never been run, so the first
       # failures are expected to be about the *harness* on a new OS rather than about the app. The
       # screenshots are the deliverable — look at them, then tighten this to a hard gate.
-      - name: Smoke (macOS, Windows)
-        if: matrix.name != 'linux'
+      # `--backdrop` on every platform now, and composite capture left ON. The harness grew a composite
+      # backend per platform, and the two assertions that read a composite — A5 (the pet is visible over
+      # the backdrop) and A7 (the ring around it is still the backdrop) — need no alpha channel. That is
+      # what makes them the only pixel evidence available on Windows, where `capturePage()` stalls.
+      - name: Smoke (macOS)
+        if: matrix.name == 'mac'
         continue-on-error: true
-        run: pnpm smoke --name ci-${{ matrix.name }} --no-composite
+        run: pnpm smoke --name ci-mac --backdrop
+
+      # Two unknowns on this leg, both deliberate experiments rather than expected passes:
+      # whether PowerShell's `CopyFromScreen` returns a real frame on a runner session at all, and
+      # whether disabling GPU compositing lets `capturePage()` finish. The step cannot fail the build,
+      # and the uploaded screenshots are the answer either way.
+      - name: Smoke (Windows)
+        if: matrix.name == 'win'
+        continue-on-error: true
+        env:
+          KEYCODE_PET_DISABLE_GPU_COMPOSITING: '1'
+        run: pnpm smoke --name ci-win --backdrop --capture-timeout 30000
 
       - name: Smoke (Linux, under xvfb)
         if: matrix.name == 'linux'
         continue-on-error: true
         run: |
-          sudo apt-get update && sudo apt-get install -y xvfb
-          xvfb-run --auto-servernum pnpm smoke --name ci-linux --no-composite
+          # `imagemagick` for the composite backend (`import -window root`), `x11-utils` so a failure can
+          # say whether the display came up at all.
+          sudo apt-get update && sudo apt-get install -y xvfb imagemagick x11-utils
+          xvfb-run --auto-servernum --server-args='-screen 0 1440x900x24+32' \
+            pnpm smoke --name ci-linux --backdrop
 
       - name: Upload smoke screenshots
         if: always()
