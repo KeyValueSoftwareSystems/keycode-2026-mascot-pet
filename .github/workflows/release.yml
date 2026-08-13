@@ -132,18 +132,49 @@ jobs:
       # Secrets are passed only on the mac leg — a Mac .p12 must never reach the Windows signer.
       # `secrets` cannot appear in `if:` (GitHub rejects the workflow). Gate on matrix only; skip
       # writing a key file when the secret is empty.
+      #
+      # APPLE_API_KEY must become a real PEM .p8 on disk. Storing the secret as base64 (same habit as
+      # CSC_LINK) or pasting PEM with collapsed newlines both produce notarytool's opaque `invalidAsn1`.
       - name: Prepare Apple API key
         if: matrix.name == 'mac'
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
         run: |
           if [ -z "$APPLE_API_KEY" ]; then
             echo "APPLE_API_KEY not set; skipping notarization key file"
             exit 0
           fi
-          key_path="${RUNNER_TEMP}/AuthKey.p8"
-          printf '%s\n' "$APPLE_API_KEY" > "$key_path"
+          if [ -z "$APPLE_API_KEY_ID" ]; then
+            echo "::error::APPLE_API_KEY_ID is required when APPLE_API_KEY is set" >&2
+            exit 1
+          fi
+
+          key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
+          # Accept raw PEM or base64(PEM). Strip CRs from Windows pastes.
+          raw=$(printf '%s' "$APPLE_API_KEY" | tr -d '\r')
+          if printf '%s' "$raw" | grep -q 'BEGIN PRIVATE KEY'; then
+            printf '%s\n' "$raw" > "$key_path"
+          else
+            # GitHub multiline secrets sometimes lose newlines; try base64 decode.
+            if ! printf '%s' "$raw" | base64 --decode > "$key_path" 2>/dev/null; then
+              echo "::error::APPLE_API_KEY is neither PEM nor valid base64" >&2
+              exit 1
+            fi
+          fi
+
+          if ! grep -q 'BEGIN PRIVATE KEY' "$key_path"; then
+            echo "::error::APPLE_API_KEY did not produce a PEM private key (check secret: paste raw .p8 or base64 of the .p8)" >&2
+            exit 1
+          fi
+          # Fail fast with a clear message instead of notarytool's invalidAsn1.
+          if ! openssl pkey -in "$key_path" -noout 2>/dev/null; then
+            echo "::error::APPLE_API_KEY PEM is not a valid private key (openssl pkey failed)" >&2
+            exit 1
+          fi
+
           echo "APPLE_API_KEY=${key_path}" >> "$GITHUB_ENV"
+          echo "Wrote notarization key to AuthKey_${APPLE_API_KEY_ID}.p8"
 
       - name: Package
         run: pnpm ${{ matrix.script }}
