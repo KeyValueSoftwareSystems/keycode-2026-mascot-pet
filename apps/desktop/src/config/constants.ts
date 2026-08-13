@@ -166,6 +166,6 @@ export const POLL = {
 export const PRODUCT_NAME = 'Keycode Pet'
 
 /** Where the code lives, and where a problem report goes. */
-export const REPO_URL = 'https://github.com/doylefermi-kv/keycode-2026-mascot-pet'
+export const REPO_URL = 'https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet'
 export const ISSUES_URL = `${REPO_URL}/issues/new`
 export const APP_ID = 'systems.keyvalue.keycodepet'

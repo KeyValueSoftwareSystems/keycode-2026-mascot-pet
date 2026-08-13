@@ -1,12 +1,11 @@
 # Installing Keycode Pet
 
 Download the file for your machine from the
-[latest release](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest).
+[latest release](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/latest).
 
-> **This app is not code-signed.** There is no Apple Developer certificate and no Windows
-> code-signing certificate behind it, so **both operating systems will warn you the first time you
-> open it.** That is expected and is described below. It is not a sign that something is wrong with
-> the download — it means nobody has paid a certificate authority to vouch for it.
+**macOS** builds are signed with a Developer ID and notarized by Apple — open the `.dmg` and run the
+app normally. **Windows** has no Authenticode certificate yet, so SmartScreen may warn once (see
+below).
 
 ---
 
@@ -22,32 +21,9 @@ Take the `.dmg` for your chip:
 Not sure? Apple menu → About This Mac. "Apple M…" means arm64.
 
 1. Open the `.dmg` and drag **Keycode Pet** into **Applications**.
-2. **Do not double-click it yet.** Instead, open Applications, **right-click** (or Control-click)
-   Keycode Pet and choose **Open**. Confirm at the prompt.
+2. Open it from Applications (double-click is fine).
 3. The pet appears at the bottom of your screen. A tray icon gives you the menu; so does right-clicking
    the pet itself.
-
-You only do the right-click step **once**. After that it opens normally.
-
-### If you double-clicked first
-
-You will see:
-
-> **"Keycode Pet" Not Opened** — Apple could not verify "Keycode Pet" is free of malware that may harm
-> your Mac or compromise your privacy.
-
-Click **Done** — *not* "Move to Bin" — and then either:
-
-- right-click the app → **Open**, as above; or
-- **System Settings › Privacy & Security**, scroll to the message about Keycode Pet, and click
-  **Open Anyway**.
-
-### Why
-
-macOS quarantines anything downloaded from the internet and refuses to run it unless it is signed by a
-registered Apple developer *and* notarized by Apple. This app is ad-hoc signed, which is what triggers
-the dialog. Nothing about the app changes when you approve it — you are telling macOS that you trust
-this particular download.
 
 ---
 
@@ -55,10 +31,9 @@ this particular download.
 
 Take `Keycode Pet Setup <version>.exe` and run it.
 
-SmartScreen will say **"Windows protected your PC"** or that the publisher is unrecognised. Click
-**More info**, then **Run anyway**.
-
-Same reason as macOS: no code-signing certificate, so Windows has no publisher name to show you.
+SmartScreen may say **"Windows protected your PC"** or that the publisher is unrecognised. Click
+**More info**, then **Run anyway**. That is expected until an Authenticode certificate is added —
+it is not a sign the download is corrupt.
 
 ---
 

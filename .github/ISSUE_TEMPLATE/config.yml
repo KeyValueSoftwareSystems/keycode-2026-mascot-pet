@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Installing, and the security warnings
-    url: https://github.com/doylefermi-kv/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md
-    about: The app is unsigned, so macOS and Windows warn on first launch. That is expected — here is what to do.
+  - name: Installing Keycode Pet
+    url: https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md
+    about: How to install on macOS, Windows and Linux. macOS is signed; Windows may show SmartScreen once.
   - name: Report a security vulnerability
-    url: https://github.com/doylefermi-kv/keycode-2026-mascot-pet/security/advisories/new
+    url: https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/security/advisories/new
     about: Please report privately rather than in a public issue.
