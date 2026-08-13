@@ -130,11 +130,17 @@ jobs:
       #   APPLE_API_ISSUER      Issuer UUID from App Store Connect
       #   APPLE_TEAM_ID         10-character Team ID
       # Secrets are passed only on the mac leg — a Mac .p12 must never reach the Windows signer.
+      # `secrets` cannot appear in `if:` (GitHub rejects the workflow). Gate on matrix only; skip
+      # writing a key file when the secret is empty.
       - name: Prepare Apple API key
-        if: matrix.name == 'mac' && secrets.APPLE_API_KEY != ''
+        if: matrix.name == 'mac'
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         run: |
+          if [ -z "$APPLE_API_KEY" ]; then
+            echo "APPLE_API_KEY not set; skipping notarization key file"
+            exit 0
+          fi
           key_path="${RUNNER_TEMP}/AuthKey.p8"
           printf '%s\n' "$APPLE_API_KEY" > "$key_path"
           echo "APPLE_API_KEY=${key_path}" >> "$GITHUB_ENV"
@@ -144,6 +150,7 @@ jobs:
         env:
           # Without this, electron-builder tries to auto-discover a Developer ID on a runner that has
           # none and fails — except when CSC_LINK is set for the mac leg, where discovery must stay on.
+          # Empty secrets expand to ""; compare in the expression (allowed in `env:`, not in `if:`).
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.name == 'mac' && secrets.CSC_LINK != '' && 'true' || 'false' }}
           CSC_LINK: ${{ matrix.name == 'mac' && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.name == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
@@ -220,14 +227,15 @@ jobs:
       # build does not tell users to fight Gatekeeper.
       - name: Write release install notes
         env:
-          HAS_MAC_CERT: ${{ secrets.CSC_LINK != '' }}
+          # Pass the secret itself; bash checks non-empty. Do not use `secrets` in `if:`.
+          HAS_MAC_CERT: ${{ secrets.CSC_LINK }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
           {
             echo '## Install'
             echo ''
-            if [ "$HAS_MAC_CERT" = 'true' ]; then
+            if [ -n "$HAS_MAC_CERT" ]; then
               echo '**macOS** — open the `.dmg` and drag Keycode Pet to Applications.'
             else
               echo '**macOS — this app is not signed by Apple, so macOS will refuse to open it the first time.**'
@@ -241,7 +249,7 @@ jobs:
             echo ''
             echo '### Verify your download'
             echo ''
-            if [ "$HAS_MAC_CERT" = 'true' ]; then
+            if [ -n "$HAS_MAC_CERT" ]; then
               echo 'Compare against `SHA256SUMS-<platform>.txt` below:'
             else
               echo 'The app is unsigned, so a checksum is the only integrity check available. Compare against'
