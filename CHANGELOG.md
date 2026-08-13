@@ -1,6 +1,6 @@
 # Changelog
 
-Every release is on the **[Releases page](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases)**,
+Every release is on the **[Releases page](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases)**,
 with its artifacts and generated notes. This file records only the shape of the history, so nothing has
 to be kept in sync by hand.
 

@@ -6,20 +6,19 @@
 whatever you are working on, reminds you to drink water, and the whole team can make every installed
 pet say something by editing one file.
 
-[![CI](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/doylefermi-kv/keycode-2026-mascot-pet?label=download)](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest)
+[![CI](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/actions/workflows/ci.yml/badge.svg)](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/KeyValueSoftwareSystems/keycode-2026-mascot-pet?label=download)](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**[Download for macOS, Windows or Linux →](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/releases/latest)**
+**[Download for macOS, Windows or Linux →](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/latest)**
 
 ![The pet running, jumping and settling along the bottom of the screen](docs/demo/m3-motion-strip.png)
 
 </div>
 
-> [!IMPORTANT]
-> **The app is not code-signed**, so macOS and Windows both warn you the first time you open it. On
-> macOS, **right-click the app and choose Open** rather than double-clicking — you only do it once.
-> [Full install instructions →](docs/INSTALL.md)
+> **macOS builds are Developer ID signed and notarized.** Open the `.dmg`, drag to Applications, and
+> double-click. Windows may still show SmartScreen once (no Authenticode cert).
+> [Install instructions →](docs/INSTALL.md)
 
 > **The character is a placeholder.** `pixel-coder` is a pixel-art chibi human, not the Keycode mascot.
 > Swapping it is a file swap plus a JSON edit, with no code changes — see [docs/ASSETS.md](docs/ASSETS.md).
@@ -93,7 +92,7 @@ Every installed pet polls one JSON file every minute. Publishing to it is how yo
 
 ### From the browser — no checkout needed
 
-**[Actions → Notify → Run workflow](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/actions/workflows/notify.yml)**
+**[Actions → Notify → Run workflow](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/actions/workflows/notify.yml)**
 
 Type the message, pick a tone and an expiry, run it. Every pet has it within about a minute. No clone,
 no Node, no shell — which is the point: publishing should not be limited to whoever has the repo
@@ -253,7 +252,7 @@ made every install think a phantom `0.6.0` was available.
 
 | | |
 |---|---|
-| [docs/INSTALL.md](docs/INSTALL.md) | Installing, including what each unsigned-app warning looks like |
+| [docs/INSTALL.md](docs/INSTALL.md) | Installing on macOS, Windows and Linux |
 | [docs/BROADCAST.md](docs/BROADCAST.md) | Manifest schema, every limit, how to publish |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | The seams, the two clocks, and what would break at scale |
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | The screenshot loop, and **what is not verified** |

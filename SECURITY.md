@@ -4,7 +4,7 @@
 
 Please **do not** open a public issue. Use GitHub's private reporting:
 
-**[Report a vulnerability →](https://github.com/doylefermi-kv/keycode-2026-mascot-pet/security/advisories/new)**
+**[Report a vulnerability →](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/security/advisories/new)**
 
 This is an internal tool maintained on a best-effort basis, so expect a reply in days rather than hours.
 
@@ -31,7 +31,7 @@ downloads it. Both are repository-write problems rather than application ones.
 
 ## Known, accepted weaknesses
 
-- **The app is not code-signed or notarized.** Users must click through an OS warning, and a tampered
-  build would not be detected by the OS. `SHA256SUMS-*.txt` on each Release is the only integrity check
-  available; verifying it is worth the ten seconds.
+- **macOS builds are Developer ID signed and notarized.** Gatekeeper trusts the GitHub Release `.dmg`.
+  Windows builds are still unsigned (no Authenticode certificate), so SmartScreen may warn once.
+  `SHA256SUMS-*.txt` on each Release remains a useful integrity check for every platform.
 - **The manifest is world-readable.** Anything published to it is public.
