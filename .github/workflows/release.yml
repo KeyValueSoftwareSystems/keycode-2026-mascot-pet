@@ -130,33 +130,52 @@ jobs:
       #   APPLE_API_ISSUER      Issuer UUID from App Store Connect
       #   APPLE_TEAM_ID         10-character Team ID
       # Secrets are passed only on the mac leg — a Mac .p12 must never reach the Windows signer.
-      # `secrets` cannot appear in `if:` (GitHub rejects the workflow). Gate on matrix only; skip
-      # writing a key file when the secret is empty.
+      # `secrets` cannot appear in `if:` (GitHub rejects the workflow). Gate on matrix only.
       #
-      # APPLE_API_KEY must become a real PEM .p8 on disk. Storing the secret as base64 (same habit as
-      # CSC_LINK) or pasting PEM with collapsed newlines both produce notarytool's opaque `invalidAsn1`.
+      # Locally APPLE_API_KEY is a path to a .p8 file. In GitHub it must be the file *contents*
+      # (raw PEM) or base64 of those contents — same idea as CSC_LINK. A path string or mangled
+      # PEM produces notarytool's opaque `invalidAsn1` after signing succeeds.
       - name: Prepare Apple API key
+        id: apple_api_key
         if: matrix.name == 'mac'
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
         run: |
-          if [ -z "$APPLE_API_KEY" ]; then
-            echo "APPLE_API_KEY not set; skipping notarization key file"
+          set -euo pipefail
+
+          if [ -z "${APPLE_API_KEY:-}" ]; then
+            if [ -n "${CSC_LINK:-}" ]; then
+              echo "::error::CSC_LINK is set but APPLE_API_KEY is empty — signing without notarization is not useful" >&2
+              exit 1
+            fi
+            echo "APPLE_API_KEY not set; unsigned/ad-hoc mac build"
             exit 0
           fi
-          if [ -z "$APPLE_API_KEY_ID" ]; then
+          if [ -z "${APPLE_API_KEY_ID:-}" ]; then
             echo "::error::APPLE_API_KEY_ID is required when APPLE_API_KEY is set" >&2
             exit 1
           fi
 
           key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
-          # Accept raw PEM or base64(PEM). Strip CRs from Windows pastes.
           raw=$(printf '%s' "$APPLE_API_KEY" | tr -d '\r')
+
+          # Someone pasted a local path by mistake (works on a laptop, never on the runner).
+          if [ -e "$raw" ]; then
+            echo "::error::APPLE_API_KEY looks like a filesystem path. Store the .p8 contents or base64 of the file, not a path." >&2
+            exit 1
+          fi
+
+          # Escaped newlines from a one-line paste: turn literal \n into real newlines.
+          if printf '%s' "$raw" | grep -q '\\n'; then
+            raw=$(printf '%s' "$raw" | awk '{gsub(/\\n/,"\n")}1')
+          fi
+
           if printf '%s' "$raw" | grep -q 'BEGIN PRIVATE KEY'; then
             printf '%s\n' "$raw" > "$key_path"
           else
-            # GitHub multiline secrets sometimes lose newlines; try base64 decode.
+            # base64 of the .p8 (recommended for GitHub secrets — mirrors CSC_LINK).
             if ! printf '%s' "$raw" | base64 --decode > "$key_path" 2>/dev/null; then
               echo "::error::APPLE_API_KEY is neither PEM nor valid base64" >&2
               exit 1
@@ -164,27 +183,31 @@ jobs:
           fi
 
           if ! grep -q 'BEGIN PRIVATE KEY' "$key_path"; then
-            echo "::error::APPLE_API_KEY did not produce a PEM private key (check secret: paste raw .p8 or base64 of the .p8)" >&2
+            echo "::error::Decoded APPLE_API_KEY is not a PEM private key" >&2
             exit 1
           fi
-          # Fail fast with a clear message instead of notarytool's invalidAsn1.
-          if ! openssl pkey -in "$key_path" -noout 2>/dev/null; then
-            echo "::error::APPLE_API_KEY PEM is not a valid private key (openssl pkey failed)" >&2
+          if ! openssl pkey -in "$key_path" -noout; then
+            echo "::error::APPLE_API_KEY failed openssl pkey (notarytool would report invalidAsn1)" >&2
             exit 1
           fi
 
-          echo "APPLE_API_KEY=${key_path}" >> "$GITHUB_ENV"
-          echo "Wrote notarization key to AuthKey_${APPLE_API_KEY_ID}.p8"
+          # Absolute path for @electron/notarize (--key). Pass via output so Package does not rely
+          # on GITHUB_ENV alone (and cannot accidentally keep the raw secret as APPLE_API_KEY).
+          echo "key_path=${key_path}" >> "$GITHUB_OUTPUT"
+          echo "Prepared AuthKey_${APPLE_API_KEY_ID}.p8 ($(wc -c < "$key_path" | tr -d ' ') bytes)"
+          head -1 "$key_path"
+          tail -1 "$key_path"
 
       - name: Package
         run: pnpm ${{ matrix.script }}
         env:
           # Without this, electron-builder tries to auto-discover a Developer ID on a runner that has
           # none and fails — except when CSC_LINK is set for the mac leg, where discovery must stay on.
-          # Empty secrets expand to ""; compare in the expression (allowed in `env:`, not in `if:`).
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.name == 'mac' && secrets.CSC_LINK != '' && 'true' || 'false' }}
           CSC_LINK: ${{ matrix.name == 'mac' && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.name == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
+          # Must be a path to the .p8 from the prepare step — never the raw secret string.
+          APPLE_API_KEY: ${{ steps.apple_api_key.outputs.key_path }}
           APPLE_API_KEY_ID: ${{ matrix.name == 'mac' && secrets.APPLE_API_KEY_ID || '' }}
           APPLE_API_ISSUER: ${{ matrix.name == 'mac' && secrets.APPLE_API_ISSUER || '' }}
           APPLE_TEAM_ID: ${{ matrix.name == 'mac' && secrets.APPLE_TEAM_ID || '' }}
