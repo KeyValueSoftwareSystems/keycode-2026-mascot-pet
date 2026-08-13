@@ -26,6 +26,11 @@ const config = require(resolve(REPO, 'electron-builder.config.cjs')) as {
   linux: Record<string, unknown>
   directories: Record<string, string>
 }
+const { createConfig } = require(resolve(REPO, 'electron-builder.create-config.cjs')) as {
+  createConfig: (env?: NodeJS.Dict<string>) => {
+    mac: Record<string, unknown>
+  }
+}
 
 /** Flatten the allow-list into plain glob strings plus explicit from/to entries. */
 const globs = config.files.filter((entry): entry is string => typeof entry === 'string')
@@ -124,12 +129,39 @@ describe('macOS target', () => {
     }
   })
 
-  it('is ad-hoc signed', () => {
+  it('defaults to ad-hoc signing without credentials', () => {
     // Without any signature, Gatekeeper on Apple Silicon reports "damaged and can't be opened",
-    // which reads as a broken build rather than an unsigned one.
-    expect(config.mac.identity).toBe('-')
-    expect(config.mac.hardenedRuntime).toBe(false)
-    expect(config.mac.gatekeeperAssess).toBe(false)
+    // which reads as a broken build rather than an unsigned one. Signing is env-gated so Windows
+    // and Linux CI (and unsigned local builds) keep this path. Pass an empty env so a developer's
+    // shell CSC_LINK cannot flip this assertion.
+    const unsigned = createConfig({})
+    expect(unsigned.mac.identity).toBe('-')
+    expect(unsigned.mac.hardenedRuntime).toBe(false)
+    expect(unsigned.mac.gatekeeperAssess).toBe(false)
+    expect(unsigned.mac.notarize).toBeUndefined()
+  })
+
+  it('enables Developer ID signing when CSC_LINK is set', () => {
+    const signed = createConfig({ CSC_LINK: 'file.p12' })
+    expect(signed.mac.identity).toBeUndefined()
+    expect(signed.mac.hardenedRuntime).toBe(true)
+    expect(signed.mac.entitlements).toBe('build/entitlements.mac.plist')
+    expect(signed.mac.entitlementsInherit).toBe('build/entitlements.mac.plist')
+    expect(signed.mac.notarize).toBe(false)
+    expect(existsSync(resolve(REPO, 'build/entitlements.mac.plist'))).toBe(true)
+  })
+
+  it('notarizes only when Apple credentials accompany signing', () => {
+    expect(
+      createConfig({
+        CSC_LINK: 'file.p12',
+        APPLE_API_KEY: '/tmp/key.p8',
+        APPLE_API_KEY_ID: 'KEYID',
+        APPLE_API_ISSUER: 'issuer-uuid',
+      }).mac.notarize,
+    ).toBe(true)
+    // Notarize creds alone must not flip signing on — that would break unsigned CI.
+    expect(createConfig({ APPLE_API_KEY: '/tmp/key.p8' }).mac.identity).toBe('-')
   })
 
   it('declares LSUIElement so no dock icon flashes at launch', () => {
@@ -187,6 +219,10 @@ describe('general', () => {
   it('never auto-publishes', () => {
     // Publishing is a deliberate act, not a side effect of a build.
     expect(config.publish).toBeNull()
+  })
+
+  it('does not export createConfig, which electron-builder 26.15 rejects as an unknown key', () => {
+    expect(Object.getOwnPropertyNames(config)).not.toContain('createConfig')
   })
 
   it('names artifacts with product, version, os and arch', () => {

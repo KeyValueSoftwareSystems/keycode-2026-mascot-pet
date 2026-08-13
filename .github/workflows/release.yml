@@ -120,12 +120,36 @@ jobs:
       # output went to `dist/` instead of `release/`, and the artifacts were named after the workspace
       # package (`keycode-pet-workspace-1.7.0-arm64.dmg`). Calling the script removes the whole class of
       # CI-versus-local drift.
+      #
+      # Mac signing/notarization (optional). Set these repository secrets to produce a Gatekeeper-
+      # clean DMG; leave them unset and the macOS leg stays ad-hoc signed (Windows/Linux unchanged):
+      #   CSC_LINK              base64 of the Developer ID Application .p12
+      #   CSC_KEY_PASSWORD      password for that .p12
+      #   APPLE_API_KEY         raw contents of the App Store Connect .p8
+      #   APPLE_API_KEY_ID      Key ID for that .p8
+      #   APPLE_API_ISSUER      Issuer UUID from App Store Connect
+      #   APPLE_TEAM_ID         10-character Team ID
+      # Secrets are passed only on the mac leg — a Mac .p12 must never reach the Windows signer.
+      - name: Prepare Apple API key
+        if: matrix.name == 'mac' && secrets.APPLE_API_KEY != ''
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          key_path="${RUNNER_TEMP}/AuthKey.p8"
+          printf '%s\n' "$APPLE_API_KEY" > "$key_path"
+          echo "APPLE_API_KEY=${key_path}" >> "$GITHUB_ENV"
+
       - name: Package
         run: pnpm ${{ matrix.script }}
         env:
-          # Without this electron-builder tries to auto-discover a Developer ID on a runner that has
-          # none and fails the build — a CI-only failure that never reproduces locally.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Without this, electron-builder tries to auto-discover a Developer ID on a runner that has
+          # none and fails — except when CSC_LINK is set for the mac leg, where discovery must stay on.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.name == 'mac' && secrets.CSC_LINK != '' && 'true' || 'false' }}
+          CSC_LINK: ${{ matrix.name == 'mac' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.name == 'mac' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.name == 'mac' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ matrix.name == 'mac' && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_TEAM_ID: ${{ matrix.name == 'mac' && secrets.APPLE_TEAM_ID || '' }}
 
       - name: Artifact sizes
         shell: bash
@@ -192,9 +216,46 @@ jobs:
           cat "$out"
           [ -s "$out" ] || { echo "::error::$out is empty" >&2; exit 1; }
 
-      # Attach to the tag's Release. The app is UNSIGNED, so the body leads with the macOS approval
-      # step — most people never open a docs file, and without it the first thing a new user sees is
-      # "Apple could not verify this app".
+      # Attach to the tag's Release. Install notes adapt when CSC_LINK is configured so a notarized
+      # build does not tell users to fight Gatekeeper.
+      - name: Write release install notes
+        env:
+          HAS_MAC_CERT: ${{ secrets.CSC_LINK != '' }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          {
+            echo '## Install'
+            echo ''
+            if [ "$HAS_MAC_CERT" = 'true' ]; then
+              echo '**macOS** — open the `.dmg` and drag Keycode Pet to Applications.'
+            else
+              echo '**macOS — this app is not signed by Apple, so macOS will refuse to open it the first time.**'
+              echo 'Right-click the app in Applications and choose **Open**, then confirm. Or:'
+              echo 'System Settings › Privacy & Security › **Open Anyway**. You only do this once.'
+            fi
+            echo ''
+            echo '**Windows** — SmartScreen will warn about an unrecognised app: **More info** → **Run anyway**.'
+            echo ''
+            echo '**Linux** — the AppImage needs `chmod +x`; `.deb`/`.rpm` install normally.'
+            echo ''
+            echo '### Verify your download'
+            echo ''
+            if [ "$HAS_MAC_CERT" = 'true' ]; then
+              echo 'Compare against `SHA256SUMS-<platform>.txt` below:'
+            else
+              echo 'The app is unsigned, so a checksum is the only integrity check available. Compare against'
+              echo '`SHA256SUMS-<platform>.txt` below:'
+            fi
+            echo ''
+            echo '```'
+            echo 'shasum -a 256 -c SHA256SUMS-mac.txt        # macOS / Linux'
+            echo 'certutil -hashfile "<file>" SHA256          # Windows'
+            echo '```'
+            echo ''
+            echo "Full instructions: [docs/INSTALL.md](https://github.com/${REPO}/blob/main/docs/INSTALL.md)"
+          } > release-body.md
+
       - name: Attach to the release
         uses: softprops/action-gh-release@v2
         with:
@@ -202,6 +263,7 @@ jobs:
           fail_on_unmatched_files: false
           # GitHub's own "What's Changed" from the commits, appended below the install steps.
           generate_release_notes: true
+          body_path: release-body.md
           files: |
             release/SHA256SUMS-*.txt
             release/*.dmg
@@ -211,28 +273,6 @@ jobs:
             release/*.deb
             release/*.rpm
             release/*.tar.gz
-          body: |
-            ## Install
-
-            **macOS — this app is not signed by Apple, so macOS will refuse to open it the first time.**
-            Right-click the app in Applications and choose **Open**, then confirm. Or:
-            System Settings › Privacy & Security › **Open Anyway**. You only do this once.
-
-            **Windows** — SmartScreen will warn about an unrecognised app: **More info** → **Run anyway**.
-
-            **Linux** — the AppImage needs `chmod +x`; `.deb`/`.rpm` install normally.
-
-            ### Verify your download
-
-            The app is unsigned, so a checksum is the only integrity check available. Compare against
-            `SHA256SUMS-<platform>.txt` below:
-
-            ```
-            shasum -a 256 -c SHA256SUMS-mac.txt        # macOS / Linux
-            certutil -hashfile "<file>" SHA256          # Windows
-            ```
-
-            Full instructions, including what each warning looks like: [docs/INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/INSTALL.md)
 
   # ---------------------------------------------------------------------------------------
   # Announce the release to every installed pet.

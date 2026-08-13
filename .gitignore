@@ -12,3 +12,4 @@ reference/
 
 # Harness output that is regenerated, not evidence
 docs/demo/tmp/
+.pnpm-store/
