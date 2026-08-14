@@ -1,7 +1,8 @@
 /**
  * The reminder shell: one short interval, the persistence, and the power hooks.
  *
- * All the rules live in `reminders/reminder-scheduler.ts`. This is the part that cannot be pure.
+ * Interval rules live in reminder-scheduler.ts; clock slots in clock-reminders.ts; greetings in
+ * greetings.ts. This is the part that cannot be pure.
  */
 
 import { powerMonitor } from 'electron'
@@ -12,6 +13,16 @@ import {
   type ReminderDeadlines,
   type ReminderKind,
 } from '../reminders/reminder-scheduler.js'
+import {
+  evaluateClockReminders,
+  CLOCK_REMINDER_MESSAGES,
+  type ClockReminderKind,
+} from '../reminders/clock-reminders.js'
+import {
+  evaluateGreeting,
+  GREETING_MESSAGES,
+  type GreetingPeriod,
+} from '../reminders/greetings.js'
 import { REMINDER_TICK_MS } from '../config/constants.js'
 import { REMINDER_INTERVALS } from '../reminders/reminder-scheduler.js'
 import type { SettingsStore } from './settings-store.js'
@@ -27,6 +38,8 @@ export interface ReminderService {
 export interface ReminderServiceOptions {
   settings: SettingsStore
   onFire: (kind: ReminderKind, message: string) => void
+  onClockFire: (kind: ClockReminderKind, message: string) => void
+  onGreeting: (period: GreetingPeriod, message: string) => void
   now?: () => number
   log?: (message: string, meta?: unknown) => void
 }
@@ -44,8 +57,9 @@ export function createReminderService(options: ReminderServiceOptions): Reminder
 
   const evaluate = (): void => {
     const current = settings.get()
+    const timestamp = now()
     const result = evaluateReminders({
-      now: now(),
+      now: timestamp,
       enabled: {
         water: current.waterReminderEnabled,
         stretch: current.stretchReminderEnabled,
@@ -54,24 +68,38 @@ export function createReminderService(options: ReminderServiceOptions): Reminder
         ? { water: current.reminders.waterNextDueAt, stretch: current.reminders.stretchNextDueAt }
         : { water: null, stretch: null },
       intervals: {
-        // null means "never chosen", so the built-in interval applies — and the install stays
-        // eligible for a team default from the manifest.
         water: minutesToMs(current.reminders?.waterMinutes) ?? REMINDER_INTERVALS.water,
         stretch: minutesToMs(current.reminders?.stretchMinutes) ?? REMINDER_INTERVALS.stretch,
       },
     })
 
-    // Gate the write on `changed`. The tick runs 5,760 times a day; marking settings dirty every
-    // time would turn the debounce into a disk write every 15 seconds forever.
-    if (result.changed) {
+    const clock = evaluateClockReminders({
+      now: timestamp,
+      enabled: {
+        coffee: current.coffeeReminderEnabled,
+        lunch: current.lunchReminderEnabled,
+      },
+      deadlines: {
+        coffee: current.reminders?.coffeeNextDueAt ?? null,
+        lunch: current.reminders?.lunchNextDueAt ?? null,
+      },
+    })
+
+    const greeting = evaluateGreeting({
+      now: timestamp,
+      lastKey: current.lastGreetingKey,
+    })
+
+    if (result.changed || clock.changed || greeting.changed) {
       settings.patch({
         reminders: {
-          // Spread first: `reminders` is a whole object in the schema, so writing only the two
-          // deadlines would erase the chosen intervals every 15 seconds.
           ...current.reminders,
           waterNextDueAt: result.deadlines.water,
           stretchNextDueAt: result.deadlines.stretch,
+          coffeeNextDueAt: clock.deadlines.coffee,
+          lunchNextDueAt: clock.deadlines.lunch,
         },
+        ...(greeting.changed ? { lastGreetingKey: greeting.lastKey } : {}),
       })
     }
 
@@ -79,18 +107,22 @@ export function createReminderService(options: ReminderServiceOptions): Reminder
       log('reminder fired', { kind })
       options.onFire(kind, REMINDER_MESSAGES[kind])
     }
+    for (const kind of clock.fired) {
+      log('clock reminder fired', { kind })
+      options.onClockFire(kind, CLOCK_REMINDER_MESSAGES[kind])
+    }
+    if (greeting.fired) {
+      log('greeting fired', { period: greeting.fired })
+      options.onGreeting(greeting.fired, GREETING_MESSAGES[greeting.fired])
+    }
   }
 
   const onResume = (): void => {
-    // `evaluateReminders` is idempotent, so waking needs no separate code path — just re-evaluate and
-    // let the miss rule decide whether the gap was a sleep.
     log('power resume: re-evaluating reminders')
     evaluate()
   }
 
   const onSuspend = (): void => {
-    // Persist the deadline *before* the lid closes. This is the only reason the miss rule has data to
-    // work with on the other side: a deadline still sitting in a debounce buffer is a deadline lost.
     log('power suspend: flushing reminder deadlines')
     void settings.flush()
   }

@@ -109,11 +109,15 @@ describe('generated sprite CSS', () => {
     }
   })
 
-  it('keeps `failed` at 8 steps even though only 6 frames are distinct', () => {
-    // The repeated tail frames are what hold the final slumped pose; "optimising" to 6 changes
-    // the timing and loses the beat.
-    expect(ANIMATIONS.failed.frames).toBe(8)
-    expect(CSS).toContain('steps(8, jump-none)')
+  it('keeps every Argus jumping-jacks frame on the stretch/jump rows', () => {
+    // Partial pack: stretch and jumping share the 19-frame jacks row. Do not "optimise" the
+    // count down — the design deliverable is all frames, and columns were widened to hold them.
+    expect(ANIMATIONS.stretch.frames).toBe(19)
+    expect(ANIMATIONS.jumping.frames).toBe(19)
+    expect(ANIMATIONS['jumping-right'].frames).toBe(19)
+    expect(ANIMATIONS['jumping-left'].frames).toBe(19)
+    expect(ANIMATIONS['jumping-left'].row).not.toBe(ANIMATIONS['jumping-right'].row)
+    expect(CSS).toContain('steps(19, jump-none)')
   })
 
   it('requires image-rendering: pixelated', () => {
@@ -167,6 +171,8 @@ describe('generated animation module', () => {
   })
 
   it('has no aliases left, and still resolves a trigger that names a real state', () => {
+    // Undrawn Argus poses are real states that share a drawn row (same pattern as sleep→idle),
+    // not aliases — so the AnimationState union stays complete for motion and broadcasts.
     expect(Object.keys(ANIMATION_ALIASES)).toEqual([])
     expect(resolveTrigger('water-reminder')).toBe('drink')
   })
@@ -179,10 +185,9 @@ describe('generated animation module', () => {
   })
 
   it('no longer declares the duplicate `waiting` row', () => {
-    // Row 6 was byte-identical to row 0, so it was never an animation. `drink` reclaimed it, and
-    // leaving both would have had `waiting` silently play a drinking animation.
     expect(ANIMATION_STATES).not.toContain('waiting')
-    expect(ANIMATIONS.drink.row).toBe(6)
+    expect(ANIMATIONS.drink.row).toBe(4)
+    expect(ANIMATIONS.drink.frames).toBe(11)
   })
 })
 
@@ -208,7 +213,7 @@ describe('spritesheet validation', () => {
   })
 
   it('rejects more frames than there are columns', () => {
-    expect(loadWith((s) => (s.states.idle.frames = 99))).toThrow(/only has 8 columns/)
+    expect(loadWith((s) => (s.states.idle.frames = 99))).toThrow(/only has 19 columns/)
   })
 
   it('rejects fewer than two frames', () => {
@@ -259,8 +264,8 @@ describe('spritesheet validation', () => {
     ).toThrow(/kebab-case/)
   })
 
-  it('accepts an extended 12-row sheet with a real `stretch` state', () => {
-    // The art-swap path, tested: adding rows and deleting the alias must need no code change.
+  it('accepts an extended sheet that moves stretch onto a new row', () => {
+    // The art-swap path, tested: adding rows must need no code change.
     const load = loadWith((s) => {
       s.sheet.rows = 12
       s.sheet.height = 12 * 208

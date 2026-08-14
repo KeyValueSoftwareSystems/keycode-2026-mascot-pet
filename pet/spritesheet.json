@@ -1,119 +1,116 @@
 {
-  "$comment": "Animation state map for the pixel-coder placeholder pet. THIS FILE IS THE SINGLE SOURCE OF TRUTH for animation geometry: `pnpm generate` turns it into the renderer's CSS keyframes and into the AnimationState TypeScript union. Never hand-write a row offset, frame count or duration anywhere else. Geometry matches openpets' defaultPetSprite exactly.",
+  "$comment": "Animation state map for the Argus mascot (partial demo pack). THIS FILE IS THE SINGLE SOURCE OF TRUTH for animation geometry: `pnpm generate` turns it into the renderer's CSS keyframes and into the AnimationState TypeScript union. Never hand-write a row offset, frame count or duration anywhere else.",
   "sheet": {
     "fileName": "spritesheet.png",
-    "width": 1536,
-    "height": 2080,
+    "width": 3648,
+    "height": 1248,
     "frameWidth": 192,
     "frameHeight": 208,
-    "columns": 8,
-    "rows": 10,
+    "columns": 19,
+    "rows": 6,
     "hasAlpha": true
   },
   "states": {
     "idle": {
       "row": 0,
-      "frames": 6,
-      "durationMs": 5500,
+      "frames": 2,
+      "durationMs": 2000,
       "iterations": "infinite"
     },
     "running-right": {
       "row": 1,
-      "frames": 8,
-      "durationMs": 1060,
+      "frames": 6,
+      "durationMs": 800,
       "iterations": "infinite"
     },
     "running-left": {
       "row": 2,
-      "frames": 8,
-      "durationMs": 1060,
+      "frames": 6,
+      "durationMs": 800,
       "iterations": "infinite"
     },
     "waving": {
-      "row": 3,
-      "frames": 4,
-      "durationMs": 700,
-      "iterations": 2
+      "row": 0,
+      "frames": 2,
+      "durationMs": 1400,
+      "iterations": 2,
+      "note": "Placeholder: reuses idle until wave art lands."
     },
     "jumping": {
-      "row": 4,
-      "frames": 5,
-      "durationMs": 840,
-      "iterations": 2
+      "row": 3,
+      "frames": 19,
+      "durationMs": 4800,
+      "iterations": 1,
+      "note": "Jumping-jacks facing right. Broadcasts and the reaction map still name `jumping`; locomotion picks jumping-left/jumping-right from facing. One pass only: a second CSS iteration snapped 19→1 and stuttered."
+    },
+    "jumping-right": {
+      "row": 3,
+      "frames": 19,
+      "durationMs": 4800,
+      "iterations": 1,
+      "note": "Jumping-jacks facing right. Same frames as `jumping` / `stretch`."
+    },
+    "jumping-left": {
+      "row": 5,
+      "frames": 19,
+      "durationMs": 4800,
+      "iterations": 1,
+      "note": "Horizontal flip of jumping-jacks right, same pattern as running-left."
     },
     "failed": {
-      "row": 5,
-      "frames": 8,
+      "row": 0,
+      "frames": 2,
       "durationMs": 1220,
       "iterations": 2,
-      "note": "8 declared frames but only 6 distinct: the last three repeat, which is what holds the final slumped pose. Do NOT 'optimise' this to 6 frames — that changes the timing and loses the beat."
+      "note": "Placeholder: reuses idle until fail art lands."
     },
     "drink": {
-      "row": 6,
-      "frames": 8,
-      "durationMs": 2000,
-      "iterations": 2,
-      "note": "Real art as of v1.9.0: picks up a bottle, drinks, lowers it. Row 6 previously held six frames byte-identical to idle, a placeholder from when it was reclaimed from the old `waiting` state. Imported from a generated contact sheet with scripts/import-sheet-rows.mjs — 8 of that row’s 9 spans; the ninth is a bottle standing on the ground beside the character, which is deliberately not taken because a detached object widens the union mask and shifts the pet’s anchor in every other state."
-    },
-    "running": {
-      "row": 7,
-      "frames": 6,
-      "durationMs": 820,
-      "iterations": "infinite",
-      "note": "In-place busy/working loop, NOT locomotion — locomotion is running-left/running-right. Never wire this to movement."
-    },
-    "review": {
-      "row": 8,
-      "frames": 6,
-      "durationMs": 1030,
-      "iterations": "infinite"
-    },
-    "stretch": {
-      "row": 9,
-      "frames": 7,
+      "row": 4,
+      "frames": 11,
       "durationMs": 2200,
       "iterations": 2,
-      "note": "Real art as of v1.9.0: a triceps dumbbell press. 7 of the source row’s 8 frames — the eighth carries a cursor arrow burned over the head by the generator and is the same rest pose as frame 0, so dropping it costs nothing and the loop closes on frame 0. This row is why the sheet grew to ten rows, and why the union mask widened from 107px to 119px: the dumbbells reach wider than any previous pose, so the pet now stops slightly further from a screen edge in every state."
+      "note": "All 11 drinking-water frames from the Argus pack."
+    },
+    "running": {
+      "row": 0,
+      "frames": 2,
+      "durationMs": 820,
+      "iterations": "infinite",
+      "note": "Placeholder busy loop: reuses idle. NOT locomotion — that is running-left/running-right."
+    },
+    "review": {
+      "row": 0,
+      "frames": 2,
+      "durationMs": 1030,
+      "iterations": "infinite",
+      "note": "Placeholder: reuses idle until review art lands."
+    },
+    "stretch": {
+      "row": 3,
+      "frames": 19,
+      "durationMs": 5600,
+      "iterations": 1,
+      "note": "All 19 jumping-jacks frames. Tuned to ~295ms/frame (was 147ms — looked like vibration). iterations:1 so the 19→1 restart hitch does not play mid-reminder; the sheet already contains two visual reps."
     },
     "sleep": {
       "row": 0,
-      "frames": 6,
+      "frames": 2,
       "durationMs": 16000,
       "iterations": "infinite",
-      "note": "The idle frames re-timed very slow, paired with a pure-CSS 'Z' overlay. Ships with no new art at all; two states sharing one row is deliberate and allowed."
+      "note": "The idle frames re-timed very slow, paired with a pure-CSS 'Z' overlay."
     }
   },
   "aliases": {
-    "$comment": "Substitutions for states the behaviour spec needs but the art does not contain yet. Empty since v1.9.0, when drink and stretch got real art: `stretch` was aliased to `jumping` and the reactionMap always named `stretch`, so landing the art was a one-line deletion here and no code change anywhere. That was the point of the indirection, and this is the first time it was collected."
+    "$comment": "Empty for the Argus partial pack: undrawn behaviours are real states that share a drawn row (same pattern as sleep→idle), so the AnimationState union and motion engine stay complete."
   },
   "freeCells": {
     "$comment": "Unused (fully transparent) cells available for new frames without resizing the sheet.",
-    "row0": [
-      6,
-      7
-    ],
-    "row3": [
-      4,
-      5,
-      6,
-      7
-    ],
-    "row4": [
-      5,
-      6,
-      7
-    ],
-    "row7": [
-      6,
-      7
-    ],
-    "row8": [
-      6,
-      7
-    ],
-    "row9": [
-      7
-    ]
+    "row0": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    "row1": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    "row2": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    "row3": [],
+    "row4": [11, 12, 13, 14, 15, 16, 17, 18],
+    "row5": []
   },
   "reactionMap": {
     "$comment": "trigger -> animation state. Keep this indirection so a new trigger is a mapping entry rather than renderer work. A value may name a state or an alias.",
@@ -125,6 +122,13 @@
     "celebrating": "jumping",
     "water-reminder": "drink",
     "stretch-reminder": "stretch",
+    "coffee-reminder": "drink",
+    "lunch-reminder": "waving",
+    "greeting-morning": "waving",
+    "greeting-afternoon": "waving",
+    "greeting-evening": "waving",
+    "hover-wave": "waving",
+    "hover-look": "review",
     "thinking": "review",
     "busy": "running",
     "error": "failed",

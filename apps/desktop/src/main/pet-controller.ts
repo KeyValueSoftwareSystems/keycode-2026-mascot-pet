@@ -182,7 +182,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
       // Recompute the floor every tick from the display nearest the pet. Cheap (the display list is
       // cached) and it is what makes a monitor unplug or a Dock resize self-correcting rather than
       // needing its own recovery path.
-      const display = displays.nearest({ x: state.x, y: floor.y - 1 })
+      let display = displays.nearest({ x: state.x, y: floor.y - 1 })
       // The placement is passed in because it decides both how close to the edge the pet may go
       // (body half-width) and how high it may be lifted (window height) — and both change with size.
       floor = floorForWorkArea(display.workArea, display.key, undefined, pet.placement)
@@ -194,6 +194,10 @@ export function createPetController(options: PetControllerOptions): PetControlle
         const cursor = screen.getCursorScreenPoint()
         const draggedX = dragOrigin.petCentreX + (cursor.x - dragOrigin.cursorX)
         const draggedY = dragOrigin.feetY + (cursor.y - dragOrigin.cursorY)
+        // Resolve from the *intended* position, not the already-clamped one: clamp-then-nearest can
+        // never leave the current display, so a drag toward a connected monitor would stick.
+        display = displays.nearest({ x: draggedX, y: draggedY - 1 })
+        floor = floorForWorkArea(display.workArea, display.key, undefined, pet.placement)
         state = {
           ...state,
           x: clampToFloor(draggedX, floor),
@@ -289,14 +293,18 @@ export function createPetController(options: PetControllerOptions): PetControlle
       // Read the live cursor rather than `state`: the drop may land between ticks, and using the
       // last tick's position drops the pet up to one tick's worth of travel away from the cursor.
       const cursor = dragOrigin ? screen.getCursorScreenPoint() : null
-      const feetY =
-        dragOrigin && cursor
-          ? clampFeetY(dragOrigin.feetY + (cursor.y - dragOrigin.cursorY), floor)
-          : state.feetY
-      const petCentreX =
-        dragOrigin && cursor
-          ? clampToFloor(dragOrigin.petCentreX + (cursor.x - dragOrigin.cursorX), floor)
-          : state.x
+      let feetY = state.feetY
+      let petCentreX = state.x
+      if (dragOrigin && cursor) {
+        const draggedX = dragOrigin.petCentreX + (cursor.x - dragOrigin.cursorX)
+        const draggedY = dragOrigin.feetY + (cursor.y - dragOrigin.cursorY)
+        // Same intended-position rule as the drag tick — otherwise a drop on another monitor
+        // would still clamp into the floor that was current when the drag began.
+        const display = displays.nearest({ x: draggedX, y: draggedY - 1 })
+        floor = floorForWorkArea(display.workArea, display.key, undefined, pet.placement)
+        feetY = clampFeetY(draggedY, floor)
+        petCentreX = clampToFloor(draggedX, floor)
+      }
 
       this.enqueue({
         kind: 'drag-end',
@@ -311,6 +319,9 @@ export function createPetController(options: PetControllerOptions): PetControlle
     },
 
     place(position: { x: number; feetY: number }): void {
+      // Harness / absolute placement can target another display; resolve that floor first.
+      const display = displays.nearest({ x: position.x, y: position.feetY - 1 })
+      floor = floorForWorkArea(display.workArea, display.key, undefined, pet.placement)
       const feetY = clampFeetY(position.feetY, floor)
       pending.push({
         kind: 'drag-end',

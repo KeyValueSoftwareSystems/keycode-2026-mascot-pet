@@ -51,6 +51,8 @@ export interface MenuViewModel {
   petSize: DefaultableView<PetSize>
   water: ReminderView
   stretch: ReminderView
+  coffee: boolean
+  lunch: boolean
   update: { state: UpdateState; latestVersion: string | null }
 }
 
@@ -60,6 +62,7 @@ export interface MenuActions {
   setPetSize(size: PetSize): void
   /** `minutes: null` means off. Anything else enables the reminder at that interval. */
   setReminder(kind: 'water' | 'stretch', minutes: number | null): void
+  toggleClockReminder(kind: 'coffee' | 'lunch'): void
   resetPosition(): void
   checkForUpdates(): void
   showAbout(): void
@@ -158,6 +161,18 @@ export function buildMenuTemplate(
       submenu: reminderSubmenu('stretch', view.stretch, actions),
     },
     {
+      label: 'Coffee reminder (11:00, 15:00)',
+      type: 'checkbox',
+      checked: view.coffee,
+      click: () => actions.toggleClockReminder('coffee'),
+    },
+    {
+      label: 'Lunch reminder (12:30)',
+      type: 'checkbox',
+      checked: view.lunch,
+      click: () => actions.toggleClockReminder('lunch'),
+    },
+    {
       label: 'Size',
       submenu: PET_SIZES.map((size) => ({
         // Marked rather than hidden, so a team default is visible *as* one instead of looking like
@@ -197,6 +212,8 @@ export const MENU_ITEM_ORDER = [
   'alwaysOnTop',
   'water',
   'stretch',
+  'coffee',
+  'lunch',
   'size',
   'separator',
   'reset',

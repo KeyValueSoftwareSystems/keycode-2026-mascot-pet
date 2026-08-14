@@ -23,6 +23,7 @@ import {
   planAct,
   planSleepCycle,
   runAnimationFor,
+  jumpAnimationFor,
   hasRoomToRun,
   type PlanChoice,
 } from './run-planner.js'
@@ -90,6 +91,14 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+/** `jumping` (and either directional row) plays the jacks row that matches facing. */
+function directedJump(state: AnimationState, facing: Facing): AnimationState {
+  if (state === 'jumping' || state === 'jumping-left' || state === 'jumping-right') {
+    return jumpAnimationFor(facing)
+  }
+  return state
+}
+
 /**
  * Settle the vertical position against the envelope that arrived this tick.
  *
@@ -108,9 +117,15 @@ function settleFeetY(state: MotionState, input: MotionInput): MotionState {
 function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionInput, config: MotionConfig): MotionState {
   switch (trigger.kind) {
     case 'reaction': {
-      const choice = planAct(state.rngSeed, input.now, state.facing, trigger.state, {
-        ...(trigger.holdMs === undefined ? {} : { holdMs: trigger.holdMs }),
-      })
+      const choice = planAct(
+        state.rngSeed,
+        input.now,
+        state.facing,
+        directedJump(trigger.state, state.facing),
+        {
+          ...(trigger.holdMs === undefined ? {} : { holdMs: trigger.holdMs }),
+        },
+      )
       return adopt(state, choice)
     }
 
@@ -131,9 +146,15 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
         feetY: trigger.floorLocked ? input.floor.maxFeetY : trigger.feetY,
         floorLocked: trigger.floorLocked,
       }
-      const choice = planAct(dropped.rngSeed, input.now, dropped.facing, config.dropAnimation, {
-        playful: true,
-      })
+      const choice = planAct(
+        dropped.rngSeed,
+        input.now,
+        dropped.facing,
+        directedJump(config.dropAnimation, dropped.facing),
+        {
+          playful: true,
+        },
+      )
       return adopt(dropped, choice)
     }
 
@@ -308,7 +329,7 @@ function advanceInPlace(
       const direction = next.facing === 'left' ? -1 : 1
       next = adopt(
         { ...next, rngSeed: roll.seed },
-        planAct(roll.seed, input.now, next.facing, 'jumping', {
+        planAct(roll.seed, input.now, next.facing, jumpAnimationFor(next.facing), {
           driftPxPerSec: direction * next.plan.speedPxPerSec * config.jumpDriftFactor,
           playful: true,
         }),

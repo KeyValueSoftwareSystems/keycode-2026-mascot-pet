@@ -85,6 +85,15 @@ export const REMINDER_TICK_MS = 15_000
  */
 export const REMINDER_MISS_FACTOR = 2
 
+/**
+ * How late a clock-time reminder (coffee, lunch) may still fire. Past this it was slept through
+ * and is skipped rather than dumped on wake.
+ */
+export const CLOCK_REMINDER_GRACE_MS = 20 * 60_000
+
+/** How often a hover may start a reaction, so waving does not loop under a parked cursor. */
+export const HOVER_REACTION_COOLDOWN_MS = 8_000
+
 // ---------------------------------------------------------------------------------------
 // Callouts
 // ---------------------------------------------------------------------------------------

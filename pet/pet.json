@@ -1,6 +1,6 @@
 {
-  "id": "pixel-coder",
-  "displayName": "Pixel Coder",
-  "description": "A friendly pixel coder companion with spiky hair, blue eyes, and a green hoodie.",
+  "id": "argus",
+  "displayName": "Argus",
+  "description": "Keycode's unicorn mascot in streetwear — purple horn, black hoodie, ready to stretch and hydrate.",
   "spritesheetPath": "spritesheet.png"
 }

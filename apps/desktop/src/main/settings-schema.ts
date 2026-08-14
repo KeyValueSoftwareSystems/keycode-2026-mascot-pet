@@ -19,7 +19,7 @@
 import { z } from 'zod'
 import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 6 as const
+export const SETTINGS_SCHEMA_VERSION = 7 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -30,6 +30,8 @@ export const settingsSchema = z.strictObject({
   movementEnabled: z.boolean(),
   waterReminderEnabled: z.boolean(),
   stretchReminderEnabled: z.boolean(),
+  coffeeReminderEnabled: z.boolean(),
+  lunchReminderEnabled: z.boolean(),
 
   /**
    * Whether the pet floats in front of everything, or **null for "never chosen here"**.
@@ -70,6 +72,8 @@ export const settingsSchema = z.strictObject({
     /** Epoch ms deadlines. Wall-clock, not intervals — see reminders/reminder-scheduler.ts. */
     waterNextDueAt: z.number().int().nullable(),
     stretchNextDueAt: z.number().int().nullable(),
+    coffeeNextDueAt: z.number().int().nullable(),
+    lunchNextDueAt: z.number().int().nullable(),
     /**
      * Chosen intervals in minutes, or **null meaning "never chosen"**.
      *
@@ -81,6 +85,11 @@ export const settingsSchema = z.strictObject({
     waterMinutes: z.number().int().min(1).max(1_440).nullable(),
     stretchMinutes: z.number().int().min(1).max(1_440).nullable(),
   }),
+
+  /**
+   * Last greeting shown (`YYYY-MM-DD-morning` etc.), so each period greets once per local day.
+   */
+  lastGreetingKey: z.string().max(32).nullable(),
 
   /**
    * Broadcast ids already shown. "Exactly once per install, ever" is a durability claim, so
@@ -103,6 +112,8 @@ export const DEFAULT_SETTINGS: Settings = {
   movementEnabled: true,
   waterReminderEnabled: true,
   stretchReminderEnabled: true,
+  coffeeReminderEnabled: true,
+  lunchReminderEnabled: true,
   // Null, not the built-in value. Writing the built-in eagerly is what made every install look like it
   // had *chosen* `large`, which is why v1.10.0 needs a migration to undo it — see below.
   alwaysOnTop: null,
@@ -111,9 +122,12 @@ export const DEFAULT_SETTINGS: Settings = {
   reminders: {
     waterNextDueAt: null,
     stretchNextDueAt: null,
+    coffeeNextDueAt: null,
+    lunchNextDueAt: null,
     waterMinutes: null,
     stretchMinutes: null,
   },
+  lastGreetingKey: null,
   seenBroadcastIds: [],
   lastKnownRelease: null,
 }
@@ -195,6 +209,23 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
       schemaVersion: 6,
       petSize: null,
       alwaysOnTop: out['alwaysOnTop'] === false ? false : null,
+    }
+  }
+
+  // v6 → v7: coffee, lunch, and greetings. Existing installs never chose these, so they start on
+  // with no deadline — the scheduler will pick the next clock slot without firing immediately.
+  if (out['schemaVersion'] === 6) {
+    const reminders = out['reminders']
+    out = {
+      ...out,
+      schemaVersion: 7,
+      coffeeReminderEnabled: true,
+      lunchReminderEnabled: true,
+      lastGreetingKey: null,
+      reminders:
+        reminders && typeof reminders === 'object'
+          ? { ...(reminders as Record<string, unknown>), coffeeNextDueAt: null, lunchNextDueAt: null }
+          : reminders,
     }
   }
 
