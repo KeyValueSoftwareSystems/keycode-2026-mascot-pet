@@ -32,6 +32,9 @@ import { createReminderService, type ReminderService } from './reminder-service.
 import { createCalloutHost, type CalloutHost } from './callout-host.js'
 import { createToastManager, type ToastManager } from './toast.js'
 import { REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
+import { CLOCK_REMINDER_TRIGGERS } from '../reminders/clock-reminders.js'
+import { GREETING_TRIGGERS } from '../reminders/greetings.js'
+import type { Trigger } from '../pet-animations.generated.js'
 import {
   createPoller,
   resolveManifestUrl,
@@ -49,6 +52,7 @@ import {
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
   WATER_INTERVAL_MS,
+  HOVER_REACTION_COOLDOWN_MS,
   isPetSize,
   petScaleFor,
   type PetSize,
@@ -145,6 +149,9 @@ export async function startApp(): Promise<AppShell> {
   const effectiveAlwaysOnTop = (): boolean =>
     settings.get().alwaysOnTop ?? manifestDefaults?.alwaysOnTop ?? DEFAULT_ALWAYS_ON_TOP
 
+  let lastHoverReactionAt = 0
+  let hoverReactionFlip = 0
+
   // ---- The pet window.
   //
   // Restore the saved position if its display still exists, else start centre-ish on the primary
@@ -189,9 +196,16 @@ export async function startApp(): Promise<AppShell> {
         pet.emitWindowReady(startDisplay)
         controller?.tickNow()
       },
-      onPointerOverPet(): void {
-        // The passthrough switch is pet-window's job and already applied. Nothing behavioural
-        // hangs off hover today; M5 may use it to hold a bubble open under the cursor.
+      onPointerOverPet(over): void {
+        if (!over) return
+        const now = Date.now()
+        if (now - lastHoverReactionAt < HOVER_REACTION_COOLDOWN_MS) return
+        lastHoverReactionAt = now
+        hoverReactionFlip = 1 - hoverReactionFlip
+        // Placeholders until wave / look-up art lands: waving reuses idle; review is the chin-in-hand pose.
+        const trigger: Trigger = hoverReactionFlip === 0 ? 'hover-wave' : 'hover-look'
+        controller?.react(trigger)
+        controller?.tickNow()
       },
       onContextMenu(): void {
         menu.popupOverPet()
@@ -293,6 +307,24 @@ export async function startApp(): Promise<AppShell> {
         tone: 'info',
         priority: 'normal',
         animation: resolveTrigger(REMINDER_TRIGGERS[kind]),
+      })
+    },
+    onClockFire(kind, message) {
+      callouts.show({
+        sourceId: 'reminder',
+        text: message,
+        tone: 'info',
+        priority: 'normal',
+        animation: resolveTrigger(CLOCK_REMINDER_TRIGGERS[kind]),
+      })
+    },
+    onGreeting(period, message) {
+      callouts.show({
+        sourceId: 'reminder',
+        text: message,
+        tone: 'info',
+        priority: 'low',
+        animation: resolveTrigger(GREETING_TRIGGERS[period]),
       })
     },
   })
@@ -462,6 +494,8 @@ export async function startApp(): Promise<AppShell> {
         minutes: current.reminders.stretchMinutes ?? effectiveDefaults().stretchMinutes,
         isDefault: current.reminders.stretchMinutes === null,
       },
+      coffee: current.coffeeReminderEnabled,
+      lunch: current.lunchReminderEnabled,
       update: updateState,
     }
   }
@@ -552,7 +586,12 @@ export async function startApp(): Promise<AppShell> {
     menu.refresh()
     // Enabling a reminder must schedule it now rather than at the next 15s tick, and disabling must
     // clear its deadline immediately.
-    if (changed.includes('waterReminderEnabled') || changed.includes('stretchReminderEnabled')) {
+    if (
+      changed.includes('waterReminderEnabled') ||
+      changed.includes('stretchReminderEnabled') ||
+      changed.includes('coffeeReminderEnabled') ||
+      changed.includes('lunchReminderEnabled')
+    ) {
       reminders.evaluateNow()
     }
   })

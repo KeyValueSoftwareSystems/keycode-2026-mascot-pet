@@ -237,6 +237,34 @@ describe('settings schema', () => {
     expect(result.value.petSize).toBeNull()
   })
 
+  it('migrates a v6 file forward, turning on coffee and lunch without firing', () => {
+    const result = parseSettings({
+      schemaVersion: 6,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: true,
+      alwaysOnTop: null,
+      petSize: null,
+      position: null,
+      reminders: {
+        waterNextDueAt: null,
+        stretchNextDueAt: null,
+        waterMinutes: null,
+        stretchMinutes: null,
+      },
+      seenBroadcastIds: [],
+      lastKnownRelease: null,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.schemaVersion).toBe(7)
+    expect(result.value.coffeeReminderEnabled).toBe(true)
+    expect(result.value.lunchReminderEnabled).toBe(true)
+    expect(result.value.reminders.coffeeNextDueAt).toBeNull()
+    expect(result.value.reminders.lunchNextDueAt).toBeNull()
+    expect(result.value.lastGreetingKey).toBeNull()
+  })
+
   it('rejects an unknown pet size', () => {
     expect(parseSettings({ ...DEFAULT_SETTINGS, petSize: 'enormous' }).ok).toBe(false)
   })
@@ -396,10 +424,14 @@ describe('SettingsStore', () => {
 
   it('compares nested values structurally so an equal object is not a change', async () => {
     const store = await openStore()
-    store.patch({ reminders: { waterNextDueAt: 5, stretchNextDueAt: null } })
+    store.patch({
+      reminders: { ...DEFAULT_SETTINGS.reminders, waterNextDueAt: 5, stretchNextDueAt: null },
+    })
     const seen: string[] = []
     store.onChange((_n, _p, changed) => seen.push(...changed))
-    store.patch({ reminders: { waterNextDueAt: 5, stretchNextDueAt: null } })
+    store.patch({
+      reminders: { ...DEFAULT_SETTINGS.reminders, waterNextDueAt: 5, stretchNextDueAt: null },
+    })
     expect(seen).toEqual([])
     await store.flush()
   })

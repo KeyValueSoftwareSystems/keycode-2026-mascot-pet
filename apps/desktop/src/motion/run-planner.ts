@@ -27,6 +27,11 @@ export function runAnimationFor(facing: Facing): AnimationState {
   return facing === 'left' ? 'running-left' : 'running-right'
 }
 
+/** Jumping-jacks row for a direction. Same rule as running: a row, not a CSS flip. */
+export function jumpAnimationFor(facing: Facing): AnimationState {
+  return facing === 'left' ? 'jumping-left' : 'jumping-right'
+}
+
 function scaled(seed: number, range: { min: number; max: number }): { value: number; seed: number } {
   const draw = nextFloat(seed)
   return { value: range.min + draw.value * (range.max - range.min), seed: draw.seed }

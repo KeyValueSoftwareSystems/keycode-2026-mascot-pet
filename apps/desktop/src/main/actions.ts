@@ -92,15 +92,17 @@ export function createActions(deps: ActionDeps): MenuActions {
     },
 
     setPetSize(size): void {
-      // Compared against the *effective* size, so picking the size the pet already is still records the
+      // Compared against the *stored* size, so picking the size the pet already is still records the
       // choice. Picking `small` when it is small only because the team publishes small is a meaningful
       // act — it is how somebody pins it against a default that may change tomorrow.
       const already = settings.get().petSize === size
       if (already) return
+      const previousScale = petScaleFor(deps.effectivePetSize())
       settings.patch({ petSize: size })
-      if (deps.effectivePetSize() !== size || settings.get().petSize !== size) {
-        controller.setScale(petScaleFor(size))
-      }
+      const nextScale = petScaleFor(size)
+      // Apply immediately. The previous condition compared *after* the patch, when stored and
+      // effective already matched `size`, so the window never resized until the next launch.
+      if (nextScale !== previousScale) controller.setScale(nextScale)
       log('pet size changed', { size })
     },
 
@@ -127,6 +129,24 @@ export function createActions(deps: ActionDeps): MenuActions {
       // away instead of arriving whenever the next 15s tick happens to notice.
       deps.evaluateReminders()
       log('reminder set', { kind, minutes })
+    },
+
+    toggleClockReminder(kind): void {
+      const current = settings.get()
+      const enabledKey = kind === 'coffee' ? 'coffeeReminderEnabled' : 'lunchReminderEnabled'
+      const deadlineKey = kind === 'coffee' ? 'coffeeNextDueAt' : 'lunchNextDueAt'
+      const enabled = !current[enabledKey]
+      settings.patch({
+        [enabledKey]: enabled,
+        reminders: {
+          ...current.reminders,
+          // Clear so re-enable schedules the next clock slot from now, rather than inheriting a
+          // deadline computed while the reminder was off.
+          [deadlineKey]: null,
+        },
+      })
+      deps.evaluateReminders()
+      log('clock reminder set', { kind, enabled })
     },
 
     resetPosition(): void {

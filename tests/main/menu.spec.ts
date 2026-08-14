@@ -27,6 +27,8 @@ function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
     petSize: { value: 'small', isDefault: false },
     water: { enabled: true, minutes: 45, isDefault: true },
     stretch: { enabled: true, minutes: 60, isDefault: true },
+    coffee: true,
+    lunch: true,
     update: { state: 'idle', latestVersion: null },
     ...overrides,
   }
@@ -38,6 +40,7 @@ function noopActions(): MenuActions {
     toggleAlwaysOnTop: () => {},
     setPetSize: () => {},
     setReminder: () => {},
+    toggleClockReminder: () => {},
     resetPosition: () => {},
     checkForUpdates: () => {},
     showAbout: () => {},
@@ -62,6 +65,8 @@ describe('menu template', () => {
       'Always on top',
       'Drink water reminder',
       'Stretch reminder',
+      'Coffee reminder (11:00, 15:00)',
+      'Lunch reminder (12:30)',
       'Size',
       'separator',
       'Reset position',
@@ -118,6 +123,7 @@ describe('menu template', () => {
       toggleAlwaysOnTop: vi.fn(),
       setPetSize: vi.fn(),
       setReminder: vi.fn(),
+      toggleClockReminder: vi.fn(),
       resetPosition: vi.fn(),
       checkForUpdates: vi.fn(),
       showAbout: vi.fn(),
@@ -190,8 +196,10 @@ function fakeSettings(initial: Settings = DEFAULT_SETTINGS) {
 function fakeController() {
   const enqueued: MotionTrigger[] = []
   let tickNowCalls = 0
+  const scales: number[] = []
   return {
     enqueued,
+    scales,
     get tickNowCalls() {
       return tickNowCalls
     },
@@ -199,6 +207,9 @@ function fakeController() {
       enqueue: (trigger: MotionTrigger) => enqueued.push(trigger),
       tickNow: () => {
         tickNowCalls += 1
+      },
+      setScale: (scale: number) => {
+        scales.push(scale)
       },
     },
   }
@@ -337,6 +348,31 @@ describe('actions', () => {
     expect(showAbout).toHaveBeenCalledOnce()
     expect(checkForUpdates).toHaveBeenCalledOnce()
     expect(quit).toHaveBeenCalledOnce()
+  })
+
+  it('applies a size change to the live window, not only to settings', () => {
+    const { actions, settings, controller } = makeActions()
+    actions.setPetSize('large')
+    expect(settings.patches).toEqual([{ petSize: 'large' }])
+    expect(controller.scales).toEqual([PET_SIZE_SCALES.large])
+  })
+
+  it('does not resize when pinning the size the pet already is', () => {
+    const { actions, controller } = makeActions({
+      effectivePetSize: () => 'small',
+    })
+    actions.setPetSize('small')
+    expect(controller.scales).toEqual([])
+  })
+
+  it('toggles a clock reminder and re-evaluates immediately', () => {
+    const { actions, settings, evaluations } = makeActions()
+    actions.toggleClockReminder('coffee')
+    expect(settings.patches.at(-1)).toMatchObject({
+      coffeeReminderEnabled: false,
+      reminders: { coffeeNextDueAt: null },
+    })
+    expect(evaluations()).toBe(1)
   })
 })
 

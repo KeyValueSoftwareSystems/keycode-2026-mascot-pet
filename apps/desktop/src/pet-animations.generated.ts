@@ -10,6 +10,8 @@ export type AnimationState =
   | 'failed'
   | 'idle'
   | 'jumping'
+  | 'jumping-left'
+  | 'jumping-right'
   | 'review'
   | 'running'
   | 'running-left'
@@ -28,6 +30,13 @@ export type Trigger =
   | 'celebrating'
   | 'water-reminder'
   | 'stretch-reminder'
+  | 'coffee-reminder'
+  | 'lunch-reminder'
+  | 'greeting-morning'
+  | 'greeting-afternoon'
+  | 'greeting-evening'
+  | 'hover-wave'
+  | 'hover-look'
   | 'thinking'
   | 'busy'
   | 'error'
@@ -52,17 +61,19 @@ export interface AnimationSpec {
 }
 
 export const ANIMATIONS: { readonly [K in AnimationState]: AnimationSpec } = {
-  'drink': { row: 6, frames: 8, durationMs: 2000, iterations: 2, totalMs: 4000 },
-  'failed': { row: 5, frames: 8, durationMs: 1220, iterations: 2, totalMs: 2440 },
-  'idle': { row: 0, frames: 6, durationMs: 5500, iterations: 'infinite', totalMs: null },
-  'jumping': { row: 4, frames: 5, durationMs: 840, iterations: 2, totalMs: 1680 },
-  'review': { row: 8, frames: 6, durationMs: 1030, iterations: 'infinite', totalMs: null },
-  'running': { row: 7, frames: 6, durationMs: 820, iterations: 'infinite', totalMs: null },
-  'running-left': { row: 2, frames: 8, durationMs: 1060, iterations: 'infinite', totalMs: null },
-  'running-right': { row: 1, frames: 8, durationMs: 1060, iterations: 'infinite', totalMs: null },
-  'sleep': { row: 0, frames: 6, durationMs: 16000, iterations: 'infinite', totalMs: null },
-  'stretch': { row: 9, frames: 7, durationMs: 2200, iterations: 2, totalMs: 4400 },
-  'waving': { row: 3, frames: 4, durationMs: 700, iterations: 2, totalMs: 1400 },
+  'drink': { row: 4, frames: 11, durationMs: 2200, iterations: 2, totalMs: 4400 },
+  'failed': { row: 0, frames: 2, durationMs: 1220, iterations: 2, totalMs: 2440 },
+  'idle': { row: 0, frames: 2, durationMs: 2000, iterations: 'infinite', totalMs: null },
+  'jumping': { row: 3, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'jumping-left': { row: 5, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'jumping-right': { row: 3, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'review': { row: 0, frames: 2, durationMs: 1030, iterations: 'infinite', totalMs: null },
+  'running': { row: 0, frames: 2, durationMs: 820, iterations: 'infinite', totalMs: null },
+  'running-left': { row: 2, frames: 6, durationMs: 800, iterations: 'infinite', totalMs: null },
+  'running-right': { row: 1, frames: 6, durationMs: 800, iterations: 'infinite', totalMs: null },
+  'sleep': { row: 0, frames: 2, durationMs: 16000, iterations: 'infinite', totalMs: null },
+  'stretch': { row: 3, frames: 19, durationMs: 5600, iterations: 1, totalMs: 5600 },
+  'waving': { row: 0, frames: 2, durationMs: 1400, iterations: 2, totalMs: 2800 },
 }
 
 /** Declaration order is sorted, so this is stable across regenerations. */
@@ -71,6 +82,8 @@ export const ANIMATION_STATES = [
   'failed',
   'idle',
   'jumping',
+  'jumping-left',
+  'jumping-right',
   'review',
   'running',
   'running-left',
@@ -83,10 +96,10 @@ export const ANIMATION_STATES = [
 export const SHEET = {
   frameWidth: 192,
   frameHeight: 208,
-  columns: 8,
-  rows: 10,
-  width: 1536,
-  height: 2080,
+  columns: 19,
+  rows: 6,
+  width: 3648,
+  height: 1248,
   fileName: "spritesheet.png",
 } as const
 
@@ -112,6 +125,13 @@ export const REACTION_MAP: { readonly [K in Trigger]: AnimationState } = {
   'celebrating': 'jumping',
   'water-reminder': 'drink',
   'stretch-reminder': 'stretch',
+  'coffee-reminder': 'drink',
+  'lunch-reminder': 'waving',
+  'greeting-morning': 'waving',
+  'greeting-afternoon': 'waving',
+  'greeting-evening': 'waving',
+  'hover-wave': 'waving',
+  'hover-look': 'review',
   'thinking': 'review',
   'busy': 'running',
   'error': 'failed',

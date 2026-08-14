@@ -209,7 +209,20 @@ describe('ten minutes of pet life', () => {
   it('uses both locomotion rows and at least one in-place act', () => {
     expect(result.animationsSeen.has('running-left')).toBe(true)
     expect(result.animationsSeen.has('running-right')).toBe(true)
-    expect(result.animationsSeen.has('jumping')).toBe(true)
+    expect(
+      result.animationsSeen.has('jumping-left') || result.animationsSeen.has('jumping-right'),
+      'expected a directional jumping-jacks row',
+    ).toBe(true)
+  })
+
+  it('plays the jumping-jacks row that matches facing', () => {
+    const jumps = result.frames.filter(
+      (f) => f.state.animation === 'jumping-left' || f.state.animation === 'jumping-right',
+    )
+    expect(jumps.length).toBeGreaterThan(0)
+    for (const jump of jumps) {
+      expect(jump.state.animation).toBe(jump.state.facing === 'left' ? 'jumping-left' : 'jumping-right')
+    }
   })
 })
 
@@ -225,7 +238,7 @@ describe('determinism', () => {
   it('matches the committed golden hash', () => {
     // A behavioural regression becomes a one-line diff in review. Regenerate deliberately when the
     // change to the pet's behaviour is the intended change.
-    expect(simulate({ seed: 42 }).hash).toBe('4fd548ea')
+    expect(simulate({ seed: 42 }).hash).toBe('787c33fc')
   })
 
   it('holds every invariant across twenty seeds', () => {
@@ -406,7 +419,7 @@ describe('drag', () => {
     })
     expect(state.dragging).toBe(false)
     expect(state.x).toBe(300)
-    expect(state.animation).toBe(DEFAULT_MOTION_CONFIG.dropAnimation)
+    expect(state.animation).toBe('jumping-right')
   })
 
   it('repositions on drop even while movement is off', () => {
@@ -506,7 +519,8 @@ describe('reactions', () => {
       settings: { movementEnabled: true },
       pending: [{ kind: 'reaction', state: 'jumping' }],
     })
-    expect(state.animationEndsAt).toBe(60 + ANIMATIONS.jumping.totalMs!)
+    expect(state.animation).toBe('jumping-right')
+    expect(state.animationEndsAt).toBe(60 + ANIMATIONS['jumping-right'].totalMs!)
   })
 })
 

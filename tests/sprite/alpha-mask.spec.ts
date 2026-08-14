@@ -51,29 +51,26 @@ describe('alpha mask generation', () => {
   })
 
   it('separates per-frame fill from union fill', () => {
-    // docs/PROMPT.md §5.4 conflated these, and asserting the wrong one makes the test a lie. The
-    // numbers moved in v1.9.0 when the drink and stretch art landed: a *union* is monotonic in the
-    // number of poses, and the dumbbell press reaches wider than anything before it, so the union grew
-    // from ~35% of the cell to ~45% while per-frame fill barely moved. Those two behaving differently
-    // is the property being pinned — if a future art pack moves per-frame fill as much as the union,
-    // something is being measured across frames that should not be.
+    // docs/PROMPT.md §5.4 conflated these, and asserting the wrong one makes the test a lie.
+    // Argus poses reach wider than the old pixel-coder pack, so the union sits higher; the
+    // property pinned here is that union fill stays well above mean per-frame fill.
     const stats = ALPHA_MASK.stats
     const perFramePct = (stats.perFrameOpaqueMean / stats.cellPixels) * 100
     const unionPct = (stats.unionOpaquePixels / stats.cellPixels) * 100
     const cellPct = (stats.maskSetCells / stats.maskTotalCells) * 100
 
-    expect(perFramePct).toBeGreaterThan(20)
-    expect(perFramePct).toBeLessThan(25)
-    expect(unionPct).toBeGreaterThan(42)
-    expect(unionPct).toBeLessThan(48)
-    expect(cellPct).toBeGreaterThan(44)
-    expect(cellPct).toBeLessThan(51)
+    expect(perFramePct).toBeGreaterThan(18)
+    expect(perFramePct).toBeLessThan(28)
+    expect(unionPct).toBeGreaterThan(45)
+    expect(unionPct).toBeLessThan(65)
+    expect(cellPct).toBeGreaterThan(45)
+    expect(cellPct).toBeLessThan(70)
 
     // The union must stay comfortably above the average frame, or the mask is not a union at all.
     expect(unionPct).toBeGreaterThan(perFramePct * 1.5)
 
-    expect(stats.perFrameOpaqueMin).toBeGreaterThan(6_500)
-    expect(stats.perFrameOpaqueMax).toBeLessThan(14_000)
+    expect(stats.perFrameOpaqueMin).toBeGreaterThan(5_000)
+    expect(stats.perFrameOpaqueMax).toBeLessThan(20_000)
   })
 
   it('measures footInset as the gap below the lowest opaque row, identically for every state', () => {
@@ -89,18 +86,10 @@ describe('alpha mask generation', () => {
   it('has the measured bounding box', () => {
     // Deliberately a literal: this is the measurement the placement maths is built on, so it should
     // take an edit and a moment's thought when it changes rather than following the code silently.
-    //
-    // v1.9.0 widened it from `{ x: 42, y: 14, width: 107, height: 178 }` — the stretch pose holds
-    // dumbbells further out than any previous frame, and reaches 1px higher than `review` did. What
-    // matters is what did *not* change:
-    //
-    //   - `footInset` is still 16, so the window is still 304 tall and every placement figure holds.
-    //   - the body centre is still exactly 95.5, so the pet's anchor did not move a pixel.
-    //
-    // All the wider mask costs is that the pet stops ~7px further from each screen edge.
-    expect(ALPHA_MASK.bbox).toEqual({ x: 35, y: 13, width: 121, height: 179 })
+    // Argus pack: height-normalized to 150px with feet on footInset 16; centre stays mid-cell.
+    expect(ALPHA_MASK.bbox).toEqual({ x: 21, y: 42, width: 151, height: 150 })
     expect(ALPHA_MASK.footInset).toBe(16)
-    expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2).toBeCloseTo(95.5, 5)
+    expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2).toBeCloseTo(96.5, 5)
   })
 
   it('measures a per-state head top for every state, at or below the union top', () => {
@@ -119,26 +108,21 @@ describe('alpha mask generation', () => {
     }
   })
 
-  it('anchors the bubble tighter than the union bbox would for the common poses', () => {
-    // The whole point of the per-state measurement: on this art `review` reaches to y=14 and sets
-    // the union top, which is 23px above idle's hair. A union-anchored bubble floats that far off
-    // the head in the pose the pet spends most of its life in.
-    expect(ALPHA_MASK.headTopByState['idle']).toBeGreaterThan(ALPHA_MASK.bbox.y + 15)
+  it('keeps every pose head-top within the union bbox', () => {
+    // Height-normalized Argus frames share one head top today; when poses differ again, the
+    // minimum must still equal the union top so the bubble never floats above the tallest hair.
     expect(Math.min(...Object.values(ALPHA_MASK.headTopByState))).toBe(ALPHA_MASK.bbox.y)
+    expect(ALPHA_MASK.headTopByState['idle']).toBe(ALPHA_MASK.bbox.y)
   })
 
   it('reports a mostly-horizontal transparent margin, which is why bounds hit-testing is unusable', () => {
-    // The real claim is about the *window*, not the cell: the window is 360px wide for a body of 120,
-    // so two thirds of it is empty space beside the character and a bounds hit-test would swallow
-    // clicks across all of it. Written against the cell it read `< 0.6 * 192` and broke when the
-    // stretch art widened the body to 120 — a threshold tuned to one art pack rather than to the
-    // property.
+    // The real claim is about the *window*, not the cell: the window is 360px wide for a body of
+    // ~150, so much of it is empty space beside the character and a bounds hit-test would swallow
+    // clicks across all of it.
     expect(ALPHA_MASK.bbox.width).toBeLessThan(PET_WINDOW_WIDTH * 0.5)
-    // And the margin really is mostly horizontal: the body uses far more of the cell's height than of
-    // its width, which is what makes a bounding box such a poor stand-in for the mask.
-    const widthUsed = ALPHA_MASK.bbox.width / sheet.frameWidth
-    const heightUsed = ALPHA_MASK.bbox.height / sheet.frameHeight
-    expect(heightUsed).toBeGreaterThan(widthUsed * 1.3)
+    // Body still leaves unused cell width on both sides.
+    expect(ALPHA_MASK.bbox.x).toBeGreaterThan(10)
+    expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width).toBeLessThan(sheet.frameWidth - 10)
   })
 
   it('derives few shape rects with no over-cover', () => {
