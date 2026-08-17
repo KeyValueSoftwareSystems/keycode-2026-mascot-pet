@@ -165,7 +165,7 @@
         </p>
 
         <div class="dl">
-          <a class="btn primary" id="dl-primary" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/download/v1.12.2/Argus-1.12.2-mac-arm64.dmg">Download Argus for Mac</a>
+          <a class="btn primary" id="dl-primary" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/download/v1.12.3/Argus-1.12.3-mac-arm64.dmg">Download Argus for Mac</a>
           <p class="dl-meta" id="dl-cap">For your computer</p>
           <p class="dl-meta" id="dl-others" hidden></p>
           <p class="dl-meta">
@@ -293,11 +293,15 @@
         var PAGES_MANIFEST = 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json'
         // Used immediately so the button is a file URL before any fetch. Keep in sync with
         // site/manifest.json release.latestVersion.
-        var VERSION = '1.12.2'
+        var VERSION = '1.12.3'
         var primary = document.getElementById('dl-primary')
         var cap = document.getElementById('dl-cap')
         var others = document.getElementById('dl-others')
         if (!primary || !cap || !others) return
+        // OTA bubble and "Check for updates…" land here with ?download=1 so the right installer
+        // starts, instead of dumping people on the GitHub tag page to pick a file.
+        var wantDownload = new URLSearchParams(location.search).has('download')
+        var downloadStarted = false
 
         var ua = navigator.userAgent || ''
         var platform = navigator.platform || ''
@@ -342,12 +346,25 @@
             .map(function (item) { return { href: all[item.id].href, label: item.label } })
         }
 
+        function startDownload(href) {
+          if (!wantDownload || downloadStarted || !href) return
+          downloadStarted = true
+          var a = document.createElement('a')
+          a.href = href
+          a.rel = 'noopener'
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+        }
+
         function paint(id, version) {
           var all = files(version)
           var chosen = all[id]
           primary.textContent = chosen.label
           primary.href = chosen.href
-          cap.textContent = chosen.platform + ' · Version ' + version
+          cap.textContent = wantDownload
+            ? chosen.platform + ' · Version ' + version + ' — your download should begin shortly'
+            : chosen.platform + ' · Version ' + version
           others.replaceChildren()
           others.appendChild(document.createTextNode('Other platforms: '))
           otherLinks(id, all).forEach(function (item, i) {
@@ -406,8 +423,12 @@
           paint(id, VERSION)
           return loadVersion()
         }).then(function (version) {
-          if (version) paint(id, version)
-        }).catch(function () {})
+          var v = version || VERSION
+          paint(id, v)
+          startDownload(files(v)[id].href)
+        }).catch(function () {
+          startDownload(files(VERSION)[id].href)
+        })
       })()
     </script>
   </body>

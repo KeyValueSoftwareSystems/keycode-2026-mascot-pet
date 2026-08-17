@@ -231,6 +231,20 @@ describe('general', () => {
     }
   })
 
+  it('announces the download page, not the GitHub tag listing', () => {
+    // The tag page is a pile of .dmg/.exe/.zip/.AppImage files. The Pages site already picks the
+    // installer for the device that opened it — same idea as Chrome's download button.
+    const downloadPage =
+      'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/?download=1'
+    const yml = readFileSync(resolve(REPO, '.github/workflows/release.yml'), 'utf8')
+    const manifest = JSON.parse(readFileSync(resolve(REPO, 'site/manifest.json'), 'utf8')) as {
+      release?: { notesUrl?: string }
+    }
+    expect(yml).toContain(downloadPage)
+    expect(yml).not.toMatch(/releases\/tag\//)
+    expect(manifest.release?.notesUrl).toBe(downloadPage)
+  })
+
   it('has a stable app id', () => {
     expect(config.appId).toBe('systems.keyvalue.keycodepet')
   })

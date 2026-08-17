@@ -340,9 +340,9 @@ jobs:
   # Announce the release to every installed pet.
   # ---------------------------------------------------------------------------------------
   #
-  # Runs only after every artifact is attached, because the announcement links to the Release page and
-  # a clickable "update available" bubble pointing at a page with no downloads on it is worse than no
-  # announcement. That ordering is the whole reason this is a separate job.
+  # Runs only after every artifact is attached, because the announcement opens the download page
+  # which starts the installer for this OS — a bubble pointing at a page with no files yet is worse
+  # than no announcement. That ordering is the whole reason this is a separate job.
   #
   # CI writes `latestVersion` rather than a human, because the one time it was set by hand it declared
   # 0.6.0 against an app reporting 0.0.0 and handed every install an update bubble pointing at
@@ -365,7 +365,6 @@ jobs:
       - name: Write the release block
         env:
           TAG: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
         run: |
           python3 - <<'PY'
           import json, os, collections
@@ -376,7 +375,9 @@ jobs:
               m = json.load(f, object_pairs_hook=collections.OrderedDict)
           m['release'] = collections.OrderedDict([
               ('latestVersion', version),
-              ('notesUrl', f"https://github.com/{os.environ['REPO']}/releases/tag/{tag}"),
+              # The Pages download page, not the GitHub tag listing: it picks the .dmg/.exe/AppImage
+              # for the device that opened it. `?download=1` starts that file, Chrome-style.
+              ('notesUrl', 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/?download=1'),
               # `mandatory` pins a sticky, high-priority callout — the pet nags until clicked. Reserved
               # for emergencies and never set automatically.
               ('mandatory', False),
