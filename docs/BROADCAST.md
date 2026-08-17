@@ -161,9 +161,20 @@ Optional, and **applied only where the user never made that choice locally**:
   "stretchMinutes": 15,
   "pollMinutes": 1,         // how often clients re-fetch THIS file
   "petSize": "small",       // small | medium | large
-  "alwaysOnTop": true
+  "alwaysOnTop": true,
+  "analyticsMinutes": 30    // 0 switches analytics off for EVERY install
 }
 ```
+
+`analyticsMinutes` is the odd one out and deliberately so. Every other key here fills in a choice
+nobody made; this one can **withdraw a capability from the whole fleet**. Publishing `0` stops every
+install capturing at its next poll, with no build to ship and no version to wait for — which is what
+makes shipping analytics on by default defensible in the first place.
+
+It is one-directional. No value here can switch analytics back *on* for somebody who unticked it
+locally: `analyticsEnabled` is a plain boolean in the settings file rather than a nullable one, so
+there is no "unchosen" state for a default to fill. A default may take back what the app granted
+itself. It still may not overturn a choice a person made.
 
 | | resolves as |
 |---|---|

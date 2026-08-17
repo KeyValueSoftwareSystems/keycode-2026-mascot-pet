@@ -566,6 +566,7 @@ describe('manifest team defaults', () => {
     pollMinutes: null,
     petSize: null,
     alwaysOnTop: null,
+    analyticsMinutes: null,
   }
 
   it('parses every default when present', () => {
@@ -575,6 +576,7 @@ describe('manifest team defaults', () => {
       pollMinutes: 1,
       petSize: 'medium',
       alwaysOnTop: false,
+      analyticsMinutes: 60,
     })
     expect(parsed?.defaults).toEqual({
       waterMinutes: 30,
@@ -582,7 +584,18 @@ describe('manifest team defaults', () => {
       pollMinutes: 1,
       petSize: 'medium',
       alwaysOnTop: false,
+      analyticsMinutes: 60,
     })
+  })
+
+  it('carries a fleet-wide analytics off switch as zero', () => {
+    // Zero has to survive parsing as zero rather than being coerced to "unset" — it is the only way
+    // to withdraw analytics from every install without shipping a build.
+    expect(wrap({ analyticsMinutes: 0 })?.defaults).toEqual({ ...none, analyticsMinutes: 0 })
+  })
+
+  it('drops a negative analytics interval without taking the manifest with it', () => {
+    expect(wrap({ analyticsMinutes: -5 })?.defaults).toEqual(none)
   })
 
   it('is null when the manifest carries none, so nothing is implied', () => {
@@ -682,8 +695,14 @@ describe('manifest team defaults', () => {
     const parsed = wrap({ waterEnabled: true, waterMinutes: 20 })
     expect(parsed?.defaults).toEqual({ ...none, waterMinutes: 20 })
     // And the contract itself has no enable-like key to grow into one by accident.
+    //
+    // `analyticsMinutes` is the one key that can switch a capability off, and it is deliberately
+    // one-directional: `0` disables analytics everywhere, and no value here can re-enable it for
+    // somebody who opted out locally. A default may take away what the app granted itself; it still
+    // may not overturn a choice a person made.
     expect(Object.keys(defaultsSchema.shape).sort()).toEqual([
       'alwaysOnTop',
+      'analyticsMinutes',
       'petSize',
       'pollMinutes',
       'stretchMinutes',

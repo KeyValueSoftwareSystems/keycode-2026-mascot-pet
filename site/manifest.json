@@ -17,7 +17,8 @@
     "stretchMinutes": 15,
     "pollMinutes": 1,
     "petSize": "small",
-    "alwaysOnTop": true
+    "alwaysOnTop": true,
+    "analyticsMinutes": 30
   },
   "release": {
     "latestVersion": "1.12.5",

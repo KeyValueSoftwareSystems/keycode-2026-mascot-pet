@@ -17,8 +17,9 @@
  *    long drag still persists progressively rather than only on mouse-up.
  */
 
-import { readFile, writeFile, rename, mkdir, open, readdir, unlink } from 'node:fs/promises'
+import { readFile, rename, mkdir, readdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import { atomicWrite } from './atomic-write.js'
 import {
   DEFAULT_SETTINGS,
   parseSettings,
@@ -81,11 +82,22 @@ export class SettingsStore {
   #pending: Promise<void> | null = null
   /** Whether the state has changed since the last write took its snapshot. */
   #dirty = false
-  /** Makes each temp filename unique. Belt and braces now that writes are serialised. */
-  #tempSeq = 0
   #listeners = new Set<SettingsChangeListener>()
 
   readonly recovery: RecoveryInfo | null
+
+  /**
+   * Whether this launch found no settings file at all.
+   *
+   * Load-bearing for analytics: it is the difference between a genuinely new install and an existing
+   * one that merely migrated forward. Without it, the version that introduces analytics reports every
+   * user who has had the pet for months as a brand-new install on the day they upgrade, and the
+   * install count is wrong exactly once, at the only moment anyone is looking at it.
+   *
+   * A quarantined (corrupt) file is *not* a first run — something was there. See `#fresh`, which is
+   * reached by both paths and is why this is passed in rather than derived from `recovery`.
+   */
+  readonly firstRun: boolean
 
   private constructor(
     options: Required<Pick<SettingsStoreOptions, 'dir'>> & {
@@ -96,6 +108,7 @@ export class SettingsStore {
     },
     state: Settings,
     recovery: RecoveryInfo | null,
+    firstRun: boolean,
   ) {
     this.#dir = options.dir
     this.#path = join(options.dir, SETTINGS_FILENAME)
@@ -105,6 +118,7 @@ export class SettingsStore {
     this.#now = options.now
     this.#log = options.log
     this.recovery = recovery
+    this.firstRun = firstRun
   }
 
   static async open(options: SettingsStoreOptions): Promise<SettingsStore> {
@@ -131,7 +145,7 @@ export class SettingsStore {
 
     if (raw === null) {
       // First run. Not a recovery — nothing was lost.
-      return SettingsStore.#fresh(resolved, null)
+      return SettingsStore.#fresh(resolved, null, true)
     }
 
     let parsedJson: unknown
@@ -139,16 +153,16 @@ export class SettingsStore {
       parsedJson = JSON.parse(raw)
     } catch (error) {
       const recovery = await quarantine(path, resolved, `invalid JSON: ${(error as Error).message}`)
-      return SettingsStore.#fresh(resolved, recovery)
+      return SettingsStore.#fresh(resolved, recovery, false)
     }
 
     const result = parseSettings(parsedJson)
     if (!result.ok) {
       const recovery = await quarantine(path, resolved, result.reason)
-      return SettingsStore.#fresh(resolved, recovery)
+      return SettingsStore.#fresh(resolved, recovery, false)
     }
 
-    return new SettingsStore(resolved, result.value, null)
+    return new SettingsStore(resolved, result.value, null, false)
   }
 
   /**
@@ -167,8 +181,9 @@ export class SettingsStore {
       log: (message: string, meta?: unknown) => void
     },
     recovery: RecoveryInfo | null,
+    firstRun: boolean,
   ): Promise<SettingsStore> {
-    const store = new SettingsStore(options, structuredClone(DEFAULT_SETTINGS), recovery)
+    const store = new SettingsStore(options, structuredClone(DEFAULT_SETTINGS), recovery, firstRun)
     await store.#write()
     return store
   }
@@ -299,43 +314,13 @@ export class SettingsStore {
     this.#dirty = false
 
     const snapshot = `${JSON.stringify(this.#state, null, 2)}\n`
-    const temp = `${this.#path}.${process.pid}.${(this.#tempSeq += 1)}.tmp`
 
     try {
-      const handle = await open(temp, 'w')
-      try {
-        await handle.writeFile(snapshot, 'utf8')
-        // fsync before rename: rename is atomic with respect to the directory entry, but
-        // without a flush the *contents* may not have reached the device yet, so a power
-        // loss can leave a correctly-named, empty file.
-        await handle.sync()
-      } finally {
-        await handle.close()
-      }
-      await renameWithRetry(temp, this.#path)
+      // Temp file, fsync, rename-with-retry — see atomic-write.ts for why each step is there.
+      await atomicWrite(this.#path, snapshot)
     } catch (error) {
       // Losing a settings write is annoying; crashing the pet over it is worse.
       this.#log('settings: write failed', { error: String(error) })
-      await unlink(temp).catch(() => {})
-    }
-  }
-}
-
-/**
- * Windows antivirus and indexers transiently lock a destination file, which surfaces as
- * EPERM/EBUSY/EACCES from rename. Three quick retries turn a spurious failure into a
- * non-event; a persistent one still surfaces.
- */
-async function renameWithRetry(from: string, to: string, attempts = 3): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await rename(from, to)
-      return
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      const retryable = code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
-      if (!retryable || attempt >= attempts) throw error
-      await new Promise((resolve) => setTimeout(resolve, 50 * attempt))
     }
   }
 }

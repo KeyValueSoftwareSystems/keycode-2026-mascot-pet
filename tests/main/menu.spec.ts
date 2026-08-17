@@ -29,6 +29,7 @@ function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
     stretch: { enabled: true, minutes: 60, isDefault: true },
     coffee: true,
     lunch: true,
+    analyticsEnabled: true,
     update: { state: 'idle', latestVersion: null },
     ...overrides,
   }
@@ -46,6 +47,7 @@ function noopActions(): MenuActions {
     resetPosition: () => {},
     checkForUpdates: () => {},
     showAbout: () => {},
+    toggleAnalytics: () => {},
     reportProblem: () => {},
     quit: () => {},
   }
@@ -74,10 +76,20 @@ describe('menu template', () => {
       'Reset position',
       'Check for updates…',
       'About',
+      'Share anonymous usage data',
       'Report a problem…',
       'separator',
       'Quit',
     ])
+  })
+
+  it('shows the analytics tick as unchecked once it is switched off', () => {
+    // The tick renders state and is never a second source of truth — same contract as every other
+    // checkbox here, and the reason handlers never read `menuItem.checked`.
+    const off = buildMenuTemplate(view({ analyticsEnabled: false }), noopActions())
+    const item = off.find((entry) => entry.label === 'Share anonymous usage data')
+    expect(item?.type).toBe('checkbox')
+    expect(item?.checked).toBe(false)
   })
 
   it('hides the Dev fire-now items unless asked', () => {
@@ -161,6 +173,7 @@ describe('menu template', () => {
       resetPosition: vi.fn(),
       checkForUpdates: vi.fn(),
       showAbout: vi.fn(),
+      toggleAnalytics: vi.fn(),
       reportProblem: vi.fn(),
       quit: vi.fn(),
     }
@@ -173,6 +186,7 @@ describe('menu template', () => {
     expect(actions.resetPosition).toHaveBeenCalledOnce()
     expect(actions.checkForUpdates).toHaveBeenCalledOnce()
     expect(actions.showAbout).toHaveBeenCalledOnce()
+    expect(actions.toggleAnalytics).toHaveBeenCalledOnce()
     expect(actions.reportProblem).toHaveBeenCalledOnce()
     expect(actions.quit).toHaveBeenCalledOnce()
   })

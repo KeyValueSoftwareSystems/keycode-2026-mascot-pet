@@ -141,12 +141,15 @@ fault-injection modes, and how release announcements work.
 | **Windows** | **Pixels now attempted**, for the first time: the harness takes a desktop-level composite screenshot (PowerShell `CopyFromScreen`) and asserts against it, which needs no alpha channel and so does not depend on `capturePage()` — that still stalls on the runner. Whether the runner's session yields a real frame is answered by the uploaded artifact on each release run. |
 | **Linux** | Verified at the X server, not just in-process — `pnpm lab:linux` runs the app on a real X server in a container and screenshots the **root window**, which is the only way to see window shaping and real compositing. The pet, the whole speech bubble, the sleep overlay and click-through all check out. Unverified: the Wayland tray fallback, and **emoji render as tofu** ([an open bug](docs/VERIFICATION.md)). |
 
-446 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
+519 tests, no Electron required to run them. [docs/VERIFICATION.md](docs/VERIFICATION.md) is the honest
 list of what is proven and what is not.
 
-**No telemetry.** One network request — the manifest — and no analytics, identifiers or accounts. The
-"Report a problem…" menu item copies a report and reveals the log for you to attach; nothing is ever
-uploaded by the app itself.
+**Anonymous usage data, off in one click.** The app reports launches, a periodic "still running", its
+version and your OS, against a random per-install id. No accounts, no names, no file paths, nothing
+tied to a person. It is on by default because an opt-in nobody sees answers nothing, and it is one
+untick away in the right-click menu — *Share anonymous usage data*. Events queue on disk while
+offline so a week away from the network is not misread as an uninstall. The "Report a problem…" item
+still uploads nothing by itself: it copies a report and reveals the log for you to attach.
 
 ---
 

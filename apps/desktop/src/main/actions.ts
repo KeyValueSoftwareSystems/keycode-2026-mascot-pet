@@ -38,6 +38,14 @@ export interface ActionDeps {
   /** Put the pet window in or out of the always-on-top band. */
   setAlwaysOnTop: (enabled: boolean) => void
   /**
+   * Record an analytics event, and send what is queued.
+   *
+   * Both are needed by the opt-out path specifically: the "they left" event has to go out *before*
+   * the flag flips, or it can never be sent at all.
+   */
+  captureEvent?: (event: string, properties?: Record<string, unknown>) => Promise<void>
+  flushAnalytics?: () => Promise<void>
+  /**
    * The values in force right now, resolving a local choice over a team default over the built-in.
    *
    * Injected rather than recomputed here: `app-shell` holds the manifest defaults, and a second copy of
@@ -65,7 +73,7 @@ export function createActions(deps: ActionDeps): MenuActions {
    * Reads the store and writes the inverse — never trusts the menu item's own `checked`, which is a
    * rendering of state and can be stale if a menu rebuild raced a click.
    */
-  const toggle = (key: 'movementEnabled'): boolean => {
+  const toggle = (key: 'movementEnabled' | 'analyticsEnabled'): boolean => {
     const next = !settings.get()[key]
     settings.patch({ [key]: next })
     return next
@@ -189,6 +197,25 @@ export function createActions(deps: ActionDeps): MenuActions {
 
     showAbout(): void {
       deps.showAbout()
+    },
+
+    toggleAnalytics(): void {
+      const wasEnabled = settings.get().analyticsEnabled
+
+      if (wasEnabled) {
+        // Order is the whole trick. Capture and send the departure *before* flipping the flag,
+        // because every capture path checks the flag and a single tick later this event becomes
+        // unsendable forever. Without it, opting out is invisible: the install simply goes quiet,
+        // which is indistinguishable from an uninstall or a laptop in a drawer — so the opt-out
+        // rate, the one number that says whether this feature is welcome, could never be known.
+        void deps
+          .captureEvent?.('analytics_opted_out')
+          .then(() => deps.flushAnalytics?.())
+          .catch(() => {})
+      }
+
+      const enabled = toggle('analyticsEnabled')
+      log('analytics toggled', { enabled })
     },
 
     reportProblem(): void {

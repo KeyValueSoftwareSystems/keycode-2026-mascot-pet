@@ -257,12 +257,48 @@ describe('settings schema', () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.value.schemaVersion).toBe(7)
+    // Chains straight through v7 → v8, so this asserts the current version, not 7.
+    expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
     expect(result.value.coffeeReminderEnabled).toBe(true)
     expect(result.value.lunchReminderEnabled).toBe(true)
     expect(result.value.reminders.coffeeNextDueAt).toBeNull()
     expect(result.value.reminders.lunchNextDueAt).toBeNull()
     expect(result.value.lastGreetingKey).toBeNull()
+  })
+
+  it('migrates a v7 file forward with analytics on and no install id yet', () => {
+    const result = parseSettings({
+      schemaVersion: 7,
+      movementEnabled: true,
+      waterReminderEnabled: true,
+      stretchReminderEnabled: true,
+      coffeeReminderEnabled: true,
+      lunchReminderEnabled: true,
+      alwaysOnTop: null,
+      petSize: null,
+      position: null,
+      reminders: {
+        waterNextDueAt: null,
+        stretchNextDueAt: null,
+        coffeeNextDueAt: null,
+        lunchNextDueAt: null,
+        waterMinutes: null,
+        stretchMinutes: null,
+      },
+      lastGreetingKey: null,
+      seenBroadcastIds: ['already-seen'],
+      lastKnownRelease: '1.12.5',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.schemaVersion).toBe(SETTINGS_SCHEMA_VERSION)
+    expect(result.value.analyticsEnabled).toBe(true)
+    // Minted at first launch, not in the migration — `migrate` is pure and the id needs a forced
+    // flush to be worth anything.
+    expect(result.value.installId).toBeNull()
+    // The upgrade must not disturb anything that was already there.
+    expect(result.value.seenBroadcastIds).toEqual(['already-seen'])
+    expect(result.value.lastKnownRelease).toBe('1.12.5')
   })
 
   it('rejects an unknown pet size', () => {

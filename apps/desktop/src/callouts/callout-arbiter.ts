@@ -56,6 +56,14 @@ export interface CalloutRequest {
   holdMs?: number
   /** Which reminder this bubble belongs to, for snooze. */
   reminderKind?: 'water' | 'stretch' | 'coffee' | 'lunch'
+  /**
+   * Manifest notification id, for broadcasts only.
+   *
+   * Carried so a click can be attributed to the announcement that caused it. Deliberately the id and
+   * not the URL: the id is a slug the team wrote, where the URL is the one field in a manifest entry
+   * that could be made specific to a person.
+   */
+  broadcastId?: string
 }
 
 export interface ActiveCallout extends CalloutRequest {

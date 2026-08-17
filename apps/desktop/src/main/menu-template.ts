@@ -53,6 +53,7 @@ export interface MenuViewModel {
   stretch: ReminderView
   coffee: boolean
   lunch: boolean
+  analyticsEnabled: boolean
   update: { state: UpdateState; latestVersion: string | null }
   /**
    * Unpackaged builds only. Adds a Dev submenu that fires reminders immediately so they can be
@@ -75,6 +76,7 @@ export interface MenuActions {
   resetPosition(): void
   checkForUpdates(): void
   showAbout(): void
+  toggleAnalytics(): void
   reportProblem(): void
   quit(): void
 }
@@ -203,8 +205,17 @@ export function buildMenuTemplate(
     { label: 'Reset position', click: () => actions.resetPosition() },
     { label: update.label, enabled: update.enabled, click: () => actions.checkForUpdates() },
     { label: 'About', click: () => actions.showAbout() },
-    // The whole of "crash reporting": nothing is uploaded automatically, so a problem only reaches us
-    // if a person chooses to send it. This makes that one click instead of finding a log by hand.
+    // Sits next to About and "Report a problem…" because those are the other two items about what
+    // leaves the machine. Worded as what it does rather than as a policy noun: "Share anonymous
+    // usage data" is checkable at a glance, where "Telemetry" or "Privacy…" would need opening.
+    {
+      label: 'Share anonymous usage data',
+      type: 'checkbox',
+      checked: view.analyticsEnabled,
+      click: () => actions.toggleAnalytics(),
+    },
+    // Nothing is uploaded automatically here: a problem only reaches us if a person chooses to send
+    // it. This makes that one click instead of finding a log by hand.
     { label: 'Report a problem…', click: () => actions.reportProblem() },
     { type: 'separator' },
     // No `role: 'quit'`. The role quits immediately, skipping our before-quit handler — which is
@@ -246,6 +257,7 @@ export const MENU_ITEM_ORDER = [
   'reset',
   'update',
   'about',
+  'analytics',
   'report',
   'separator',
   'quit',
