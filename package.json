@@ -1,8 +1,8 @@
 {
   "name": "keycode-pet-workspace",
-  "version": "1.12.4",
+  "version": "1.12.5",
   "private": true,
-  "description": "Argus \u2014 Keycode mascot desktop companion",
+  "description": "Argus — Keycode mascot desktop companion",
   "license": "MIT",
   "author": {
     "name": "KeyValue Systems",
