@@ -2,22 +2,14 @@
   "version": 1,
   "notifications": [
     {
-      "id": "hey-how-are-you-doing-20260802T1615",
-      "text": "Hey, how are you doing",
-      "tone": "warning",
-      "priority": "high",
+      "id": "test-20260817T0654",
+      "text": "Test",
+      "tone": "info",
+      "priority": "normal",
       "animation": "jumping",
-      "startsAt": "2026-08-02T16:14:24Z",
-      "expiresAt": "2026-08-02T17:15:24Z"
-    },
-    {
-      "id": "keycode-on-fire-20260802T0851",
-      "text": "Keycode on Fire 🔥",
-      "tone": "warning",
-      "priority": "high",
-      "animation": "jumping",
-      "startsAt": "2026-08-02T08:50:33Z",
-      "expiresAt": "2026-08-02T09:51:33Z"
+      "startsAt": "2026-08-17T06:53:22Z",
+      "expiresAt": "2026-08-17T06:59:22Z",
+      "url": "https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/"
     }
   ],
   "defaults": {
