@@ -87,7 +87,8 @@ describe('alpha mask generation', () => {
     // Deliberately a literal: this is the measurement the placement maths is built on, so it should
     // take an edit and a moment's thought when it changes rather than following the code silently.
     // Argus pack: height-normalized to 150px with feet on footInset 16; centre stays mid-cell.
-    expect(ALPHA_MASK.bbox).toEqual({ x: 39, y: 42, width: 115, height: 150 })
+    // Width tightened after assemble strips the export smoke/matte fringe from every pose.
+    expect(ALPHA_MASK.bbox).toEqual({ x: 40, y: 42, width: 113, height: 150 })
     expect(ALPHA_MASK.footInset).toBe(16)
     expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2).toBeCloseTo(96.5, 5)
   })
