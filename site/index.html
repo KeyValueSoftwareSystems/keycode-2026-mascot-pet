@@ -298,10 +298,6 @@
         var cap = document.getElementById('dl-cap')
         var others = document.getElementById('dl-others')
         if (!primary || !cap || !others) return
-        // OTA bubble and "Check for updates…" land here with ?download=1 so the right installer
-        // starts, instead of dumping people on the GitHub tag page to pick a file.
-        var wantDownload = new URLSearchParams(location.search).has('download')
-        var downloadStarted = false
 
         var ua = navigator.userAgent || ''
         var platform = navigator.platform || ''
@@ -346,25 +342,12 @@
             .map(function (item) { return { href: all[item.id].href, label: item.label } })
         }
 
-        function startDownload(href) {
-          if (!wantDownload || downloadStarted || !href) return
-          downloadStarted = true
-          var a = document.createElement('a')
-          a.href = href
-          a.rel = 'noopener'
-          document.body.appendChild(a)
-          a.click()
-          a.remove()
-        }
-
         function paint(id, version) {
           var all = files(version)
           var chosen = all[id]
           primary.textContent = chosen.label
           primary.href = chosen.href
-          cap.textContent = wantDownload
-            ? chosen.platform + ' · Version ' + version + ' — your download should begin shortly'
-            : chosen.platform + ' · Version ' + version
+          cap.textContent = chosen.platform + ' · Version ' + version
           others.replaceChildren()
           others.appendChild(document.createTextNode('Other platforms: '))
           otherLinks(id, all).forEach(function (item, i) {
@@ -423,12 +406,8 @@
           paint(id, VERSION)
           return loadVersion()
         }).then(function (version) {
-          var v = version || VERSION
-          paint(id, v)
-          startDownload(files(v)[id].href)
-        }).catch(function () {
-          startDownload(files(VERSION)[id].href)
-        })
+          if (version) paint(id, version)
+        }).catch(function () {})
       })()
     </script>
   </body>
