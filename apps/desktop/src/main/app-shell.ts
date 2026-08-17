@@ -53,13 +53,12 @@ import {
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
   WATER_INTERVAL_MS,
-  HOVER_REACTION_COOLDOWN_MS,
   isPetSize,
   petScaleFor,
   type PetSize,
 } from '../config/constants.js'
 import { bubbleSideFor, floorForWorkArea, placementForScale } from './floor-placement.js'
-import { ANIMATIONS, isAnimationState, resolveTrigger, type Trigger } from '../pet-animations.generated.js'
+import { ANIMATIONS, isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { env } from '../config/env.js'
 import { log as fileLog, logFilePath } from './logger.js'
@@ -150,8 +149,50 @@ export async function startApp(): Promise<AppShell> {
   const effectiveAlwaysOnTop = (): boolean =>
     settings.get().alwaysOnTop ?? manifestDefaults?.alwaysOnTop ?? DEFAULT_ALWAYS_ON_TOP
 
-  let lastHoverReactionAt = 0
-  let hoverReactionFlip = 0
+  let pointerOverPet = false
+  /** Hover quick-menu + idle-freeze currently applied. */
+  let hoverMenuOpen = false
+  /** True only between a real drag-start and its matching drag-end. */
+  let petDragging = false
+  /**
+   * After a speech bubble (ok / snooze / dismiss), require the pointer to leave and re-enter
+   * before showing the zap menu again — otherwise the click that closed the bubble immediately
+   * opens the hover chip on top of where the buttons were.
+   */
+  let hoverNeedsReenter = false
+  let hoverLeaveTimer: ReturnType<typeof setTimeout> | null = null
+  /** Bubble unmount looks like a leave; wait this long off the pet before treating it as real. */
+  const HOVER_LEAVE_CONFIRM_MS = 200
+
+  const clearHoverLeaveTimer = (): void => {
+    if (!hoverLeaveTimer) return
+    clearTimeout(hoverLeaveTimer)
+    hoverLeaveTimer = null
+  }
+
+  const syncHoverMenu = (): void => {
+    const want = pointerOverPet && !callouts?.showing() && !hoverNeedsReenter
+    if (want === hoverMenuOpen) return
+    hoverMenuOpen = want
+    if (want) {
+      controller?.setQuickActions(['zap'])
+      controller?.enqueue({ kind: 'hover-start' })
+    } else {
+      controller?.setQuickActions([])
+      controller?.enqueue({ kind: 'hover-end' })
+    }
+    controller?.tickNow()
+  }
+
+  const confirmHoverLeft = (): void => {
+    clearHoverLeaveTimer()
+    hoverLeaveTimer = setTimeout(() => {
+      hoverLeaveTimer = null
+      hoverNeedsReenter = false
+      syncHoverMenu()
+    }, HOVER_LEAVE_CONFIRM_MS)
+    hoverLeaveTimer.unref?.()
+  }
 
   // ---- The pet window.
   //
@@ -198,26 +239,25 @@ export async function startApp(): Promise<AppShell> {
         controller?.tickNow()
       },
       onPointerOverPet(over): void {
-        if (!over) return
-        if (callouts?.showing()?.holdMs != null) return
-        const now = Date.now()
-        if (now - lastHoverReactionAt < HOVER_REACTION_COOLDOWN_MS) return
-        lastHoverReactionAt = now
-        hoverReactionFlip = 1 - hoverReactionFlip
-        // Placeholders until wave / look-up art lands: waving reuses idle; review is the chin-in-hand pose.
-        const trigger: Trigger = hoverReactionFlip === 0 ? 'hover-wave' : 'hover-look'
-        controller?.react(trigger)
-        controller?.tickNow()
+        clearHoverLeaveTimer()
+        pointerOverPet = over
+        if (!over) confirmHoverLeft()
+        syncHoverMenu()
       },
       onContextMenu(): void {
         menu.popupOverPet()
       },
       onDragStart(): void {
+        petDragging = true
+        hoverMenuOpen = false
+        controller?.setQuickActions([])
         pet.setDragging(true)
         controller?.enqueue({ kind: 'drag-start' })
         controller?.tickNow()
       },
       onDragEnd(): void {
+        if (!petDragging) return
+        petDragging = false
         pet.setDragging(false)
         // The controller owns the snap-to-floor rule, so it builds the trigger.
         controller?.endDrag()
@@ -254,6 +294,11 @@ export async function startApp(): Promise<AppShell> {
         if (!showing?.actions?.includes(action)) return
         if (action === 'snooze' && showing.reminderKind) reminders.snooze(showing.reminderKind)
         callouts?.dismissShowing()
+      },
+      onQuickAction(action): void {
+        if (action !== 'zap') return
+        controller?.react('zap')
+        controller?.tickNow()
       },
     },
   })
@@ -300,6 +345,11 @@ export async function startApp(): Promise<AppShell> {
             }
           : null,
       )
+      // Zap must not appear on the click that closed a bubble, or on the leave/enter flicker
+      // when the bubble rect vanishes under the cursor. Require a confirmed leave first.
+      hoverNeedsReenter = true
+      if (!showing && !pointerOverPet) confirmHoverLeft()
+      syncHoverMenu()
       if (!showing && holdingCalloutPose) {
         holdingCalloutPose = false
         controller?.enqueue({ kind: 'reaction', state: 'idle' })
@@ -307,7 +357,10 @@ export async function startApp(): Promise<AppShell> {
       }
     },
     onAnimation(animation) {
-      const holdMs = callouts.showing()?.holdMs
+      const showing = callouts.showing()
+      // Finite waves otherwise end mid-greeting and locomotion resumes while the bubble is still up.
+      const holdMs =
+        showing?.holdMs ?? (animation === 'waving' ? Number.MAX_SAFE_INTEGER : undefined)
       if (holdMs !== undefined) holdingCalloutPose = true
       controller?.enqueue({
         kind: 'reaction',

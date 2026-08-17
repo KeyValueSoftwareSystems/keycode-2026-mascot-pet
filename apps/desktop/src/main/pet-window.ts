@@ -40,6 +40,7 @@ export interface PetWindowEvents {
   onDragEnd(): void
   onBubbleClicked(): void
   onBubbleAction(action: 'ok' | 'snooze'): void
+  onQuickAction(action: 'zap'): void
 }
 
 export interface PetWindow {
@@ -184,6 +185,8 @@ export async function createPetWindow(options: {
   let lastBubbleVisible = false
   /** Whether the last frame carried a CSS overlay — the sleep Z's. Drives the shape region. */
   let lastOverlayVisible = false
+  /** Whether the hover quick-action menu is up. Drives the shape region on Linux. */
+  let lastQuickMenuVisible = false
 
   /**
    * The Linux input-and-drawing region for what is currently on screen.
@@ -205,6 +208,7 @@ export async function createPetWindow(options: {
         animation: lastAnimation ?? 'idle',
         bubbleVisible: lastBubbleVisible,
         overlayVisible: lastOverlayVisible,
+        quickMenuVisible: lastQuickMenuVisible,
         bubbleSide: placement.bubbleSide,
       },
     )
@@ -259,6 +263,12 @@ export async function createPetWindow(options: {
     options.events.onBubbleAction(action)
   }
 
+  const onQuickAction = (event: Electron.IpcMainEvent, action: unknown): void => {
+    if (!isFromThisWindow(event)) return
+    if (action !== 'zap') return
+    options.events.onQuickAction(action)
+  }
+
   ipcMain.on(IPC.pointerOverPet, onPointerOverPet)
   ipcMain.on(IPC.rendererReady, onReady)
   ipcMain.on(IPC.contextMenu, onContextMenu)
@@ -266,6 +276,7 @@ export async function createPetWindow(options: {
   ipcMain.on(IPC.dragEnd, onDragEnd)
   ipcMain.on(IPC.bubbleClicked, onBubbleClicked)
   ipcMain.on(IPC.bubbleAction, onBubbleAction)
+  ipcMain.on(IPC.quickAction, onQuickAction)
 
   win.webContents.on('did-finish-load', () => {
     forwarding.afterNavigate()
@@ -321,12 +332,15 @@ export async function createPetWindow(options: {
         })
         return
       }
-      const previous = { lastAnimation, lastBubbleVisible, lastOverlayVisible }
+      const previous = { lastAnimation, lastBubbleVisible, lastOverlayVisible, lastQuickMenuVisible }
       lastAnimation = parsed.data.animation
       lastBubbleVisible = parsed.data.bubble !== null
       lastOverlayVisible = parsed.data.overlay !== 'none'
+      lastQuickMenuVisible = parsed.data.quickActions.length > 0
       win.webContents.send(IPC.frame, parsed.data)
-      forwarding.setForceInteractive((parsed.data.bubble?.actions.length ?? 0) > 0)
+      forwarding.setForceInteractive(
+        (parsed.data.bubble?.actions.length ?? 0) > 0 || lastQuickMenuVisible,
+      )
 
       // On Linux the shape region decides what gets *painted*, so it has to follow the frame: the
       // bubble band belongs in it only while a bubble is up, and the pose changes where that band
@@ -335,7 +349,8 @@ export async function createPetWindow(options: {
       if (
         previous.lastAnimation !== lastAnimation ||
         previous.lastBubbleVisible !== lastBubbleVisible ||
-        previous.lastOverlayVisible !== lastOverlayVisible
+        previous.lastOverlayVisible !== lastOverlayVisible ||
+        previous.lastQuickMenuVisible !== lastQuickMenuVisible
       ) {
         forwarding.setShapeRects(currentShapeRects())
       }
@@ -451,6 +466,7 @@ export async function createPetWindow(options: {
       ipcMain.removeListener(IPC.dragEnd, onDragEnd)
       ipcMain.removeListener(IPC.bubbleClicked, onBubbleClicked)
       ipcMain.removeListener(IPC.bubbleAction, onBubbleAction)
+      ipcMain.removeListener(IPC.quickAction, onQuickAction)
       forwarding.dispose()
       keeper?.dispose()
       if (!win.isDestroyed()) win.destroy()

@@ -102,15 +102,17 @@ describe('sustained poses', () => {
     for (const act of DEFAULT_MOTION_CONFIG.idleActs) {
       expect(ANIMATIONS[act].iterations, `idleAct ${act} must loop`).toBe('infinite')
     }
-    // The drop beat is deliberately finite: it plays once and settles.
+    // The drop / sleep-enter / sleep-exit beats are deliberately finite.
     expect(ANIMATIONS[DEFAULT_MOTION_CONFIG.dropAnimation].iterations).not.toBe('infinite')
+    expect(ANIMATIONS[DEFAULT_MOTION_CONFIG.sleepEnterAnimation].iterations).not.toBe('infinite')
+    expect(ANIMATIONS[DEFAULT_MOTION_CONFIG.sleepExitAnimation].iterations).not.toBe('infinite')
   })
 
   it('never uses the in-place busy loop for locomotion', () => {
-    // Row 7 is named `running` but is an in-place animation. Wiring it to movement would show the
-    // pet jogging on the spot while sliding sideways.
+    // `running` is the in-place busy/drag alias. Wiring it to a run plan would jog in place
+    // while sliding sideways; locomotion uses running-left/running-right instead.
     expect(DEFAULT_MOTION_CONFIG.dragAnimation).toBe('running')
-    expect(DEFAULT_MOTION_CONFIG.idleActs).toContain('running')
+    expect(DEFAULT_MOTION_CONFIG.idleActs).not.toContain('running')
     const state = initialState({ seed: 3, x: 300, now: 0, movementEnabled: true })
     expect(state.animation).not.toBe('running')
   })

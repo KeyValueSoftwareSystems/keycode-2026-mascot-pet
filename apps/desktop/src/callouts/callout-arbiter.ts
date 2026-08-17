@@ -115,6 +115,19 @@ function newestEnqueued(state: ArbiterState): ActiveCallout | null {
   return newest ?? state.current
 }
 
+/** Whether this reminder kind is already on screen or waiting. */
+function hasOutstandingReminderKind(
+  state: ArbiterState,
+  kind: NonNullable<ActiveCallout['reminderKind']>,
+): boolean {
+  if (state.current?.reminderKind === kind) return true
+  if (state.pinned?.reminderKind === kind) return true
+  for (const entry of state.queue) {
+    if (entry.reminderKind === kind) return true
+  }
+  return false
+}
+
 export function submit(state: ArbiterState, request: CalloutRequest, now: number): ArbiterState {
   const entry: ActiveCallout = {
     ...request,
@@ -125,6 +138,13 @@ export function submit(state: ArbiterState, request: CalloutRequest, now: number
   const base: ArbiterState = { ...state, nextSeq: state.nextSeq + 1 }
 
   if (request.pin) return takePinnedSlot(base, entry)
+
+  // Sticky water/stretch wait to be clicked. Without this, every interval that elapses while the
+  // bubble is still open queues another of the same kind — leave the desk for twenty minutes and
+  // come back to water, stretch, water again.
+  if (entry.reminderKind && hasOutstandingReminderKind(base, entry.reminderKind)) {
+    return { ...base, dropped: base.dropped + 1 }
+  }
 
   // Coalesce identical back-to-back text from the same source. Two reminders firing in the same
   // evaluation, or a manifest re-announcing the same line, should not queue a duplicate.

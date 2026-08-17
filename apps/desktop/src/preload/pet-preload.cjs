@@ -25,6 +25,7 @@ const IPC = {
   dragEnd: 'keycode-pet:drag-end',
   bubbleClicked: 'keycode-pet:bubble-clicked',
   bubbleAction: 'keycode-pet:bubble-action',
+  quickAction: 'keycode-pet:quick-action',
 }
 
 /** Last reported hover state, so only transitions cross the process boundary. */
@@ -82,5 +83,10 @@ contextBridge.exposeInMainWorld('keycodePet', {
   /** @param {string} action */
   bubbleAction(action) {
     ipcRenderer.send(IPC.bubbleAction, action)
+  },
+
+  /** @param {string} action */
+  quickAction(action) {
+    ipcRenderer.send(IPC.quickAction, action)
   },
 })

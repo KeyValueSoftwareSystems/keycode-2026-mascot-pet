@@ -19,6 +19,7 @@ export interface KeycodePetBridge {
   endDrag(): void
   bubbleClicked(): void
   bubbleAction(action: string): void
+  quickAction(action: string): void
 }
 
 declare global {

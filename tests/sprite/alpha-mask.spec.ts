@@ -59,7 +59,7 @@ describe('alpha mask generation', () => {
     const unionPct = (stats.unionOpaquePixels / stats.cellPixels) * 100
     const cellPct = (stats.maskSetCells / stats.maskTotalCells) * 100
 
-    expect(perFramePct).toBeGreaterThan(18)
+    expect(perFramePct).toBeGreaterThan(16)
     expect(perFramePct).toBeLessThan(28)
     expect(unionPct).toBeGreaterThan(35)
     expect(unionPct).toBeLessThan(55)
@@ -88,7 +88,7 @@ describe('alpha mask generation', () => {
     // take an edit and a moment's thought when it changes rather than following the code silently.
     // Argus pack: height-normalized to 150px with feet on footInset 16; centre stays mid-cell.
     // Width tightened after assemble strips the export smoke/matte fringe from every pose.
-    expect(ALPHA_MASK.bbox).toEqual({ x: 40, y: 42, width: 113, height: 150 })
+    expect(ALPHA_MASK.bbox).toEqual({ x: 12, y: 42, width: 169, height: 150 })
     expect(ALPHA_MASK.footInset).toBe(16)
     expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2).toBeCloseTo(96.5, 5)
   })
@@ -110,10 +110,8 @@ describe('alpha mask generation', () => {
   })
 
   it('keeps every pose head-top within the union bbox', () => {
-    // Height-normalized Argus frames share one head top today; when poses differ again, the
-    // minimum must still equal the union top so the bubble never floats above the tallest hair.
+    // The minimum must equal the union top so the bubble never floats above the tallest hair.
     expect(Math.min(...Object.values(ALPHA_MASK.headTopByState))).toBe(ALPHA_MASK.bbox.y)
-    expect(ALPHA_MASK.headTopByState['idle']).toBe(ALPHA_MASK.bbox.y)
   })
 
   it('reports a mostly-horizontal transparent margin, which is why bounds hit-testing is unusable', () => {

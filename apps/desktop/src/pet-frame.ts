@@ -95,6 +95,12 @@ export const petFrameSchema = z.strictObject({
     })
     .nullable(),
 
+  /**
+   * Hover quick-actions (e.g. zap). Main decides when they are available; the renderer only paints
+   * them and reports which chip was pressed.
+   */
+  quickActions: z.array(z.enum(['zap'])),
+
   /** Pure-CSS overlays. `sleep-z` is what lets `sleep` ship with no new art. */
   overlay: z.enum(['none', 'sleep-z']),
 })
@@ -121,4 +127,5 @@ export const IPC = {
   dragEnd: 'keycode-pet:drag-end',
   bubbleClicked: 'keycode-pet:bubble-clicked',
   bubbleAction: 'keycode-pet:bubble-action',
+  quickAction: 'keycode-pet:quick-action',
 } as const

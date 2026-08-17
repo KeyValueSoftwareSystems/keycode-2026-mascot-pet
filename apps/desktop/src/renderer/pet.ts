@@ -21,12 +21,18 @@ function required<T extends Element>(selector: string): T {
 const sprite = required<HTMLDivElement>('#sprite')
 const bubble = required<HTMLDivElement>('#bubble')
 const bubbleText = required<HTMLSpanElement>('#bubble-text')
+const quickMenu = required<HTMLDivElement>('#quick-menu')
 const root = document.documentElement
 
 /** Where the sprite cell sits in the window. Main tells us; we never assume. */
 let spriteOrigin = { x: 0, y: 0 }
 /** Rendered scale, needed to map a screen-space hit back into unscaled mask coordinates. */
 let petScale = 1
+
+function hitBox(el: Element, clientX: number, clientY: number): boolean {
+  const box = el.getBoundingClientRect()
+  return clientX >= box.left && clientX <= box.right && clientY >= box.top && clientY <= box.bottom
+}
 
 function applyFrame(frame: PetFrame): void {
   spriteOrigin = frame.sprite
@@ -65,6 +71,8 @@ function applyFrame(frame: PetFrame): void {
 
   root.dataset.overlay = frame.overlay
   bubble.dataset.side = frame.bubbleSide
+  quickMenu.dataset.actions = frame.quickActions.join(' ')
+  quickMenu.hidden = frame.quickActions.length === 0
 
   if (frame.bubble) {
     // textContent, never innerHTML. Manifest text is remote input rendered into a window that
@@ -87,20 +95,12 @@ function applyFrame(frame: PetFrame): void {
  * Is this window-local point on the pet?
  *
  * The visible character fills only ~21% of its cell and the transparent margin is mostly
- * horizontal, so this is mask geometry rather than a bounding box. A visible bubble counts too.
+ * horizontal, so this is mask geometry rather than a bounding box. A visible bubble or hover
+ * quick-menu counts too, so moving onto those chips does not drop the hover.
  */
 function isOverPet(clientX: number, clientY: number): boolean {
-  if (!bubble.hidden) {
-    const box = bubble.getBoundingClientRect()
-    if (
-      clientX >= box.left &&
-      clientX <= box.right &&
-      clientY >= box.top &&
-      clientY <= box.bottom
-    ) {
-      return true
-    }
-  }
+  if (!bubble.hidden && hitBox(bubble, clientX, clientY)) return true
+  if (!quickMenu.hidden && hitBox(quickMenu, clientX, clientY)) return true
   return isOpaqueAt(
     ALPHA_MASK,
     clientX - spriteOrigin.x,
@@ -140,35 +140,33 @@ document.addEventListener('contextmenu', (event) => {
   window.keycodePet.requestContextMenu()
 })
 
-// A left click on a bubble button is reported as that action; a click on the bubble itself is
-// reported as a bubble click; anything else on the pet starts a drag. Capture phase so the
-// sprite cell sitting under the bubble cannot steal the press.
+// A left click on a bubble / quick-menu chip is reported as that action; a click on the bubble
+// itself is a bubble click; anything else on the pet starts a drag. Capture phase so the sprite
+// cell sitting under those chips cannot steal the press.
 document.addEventListener(
   'pointerdown',
   (event) => {
     if (event.button !== 0) return
+    if (!quickMenu.hidden) {
+      for (const chip of quickMenu.querySelectorAll('[data-action]')) {
+        if (hitBox(chip, event.clientX, event.clientY)) {
+          event.preventDefault()
+          event.stopPropagation()
+          window.keycodePet.quickAction(chip.getAttribute('data-action') ?? '')
+          return
+        }
+      }
+    }
     if (!bubble.hidden) {
       for (const chip of bubble.querySelectorAll('[data-action]')) {
-        const box = chip.getBoundingClientRect()
-        if (
-          event.clientX >= box.left &&
-          event.clientX <= box.right &&
-          event.clientY >= box.top &&
-          event.clientY <= box.bottom
-        ) {
+        if (hitBox(chip, event.clientX, event.clientY)) {
           event.preventDefault()
           event.stopPropagation()
           window.keycodePet.bubbleAction(chip.getAttribute('data-action') ?? '')
           return
         }
       }
-      const box = bubble.getBoundingClientRect()
-      if (
-        event.clientX >= box.left &&
-        event.clientX <= box.right &&
-        event.clientY >= box.top &&
-        event.clientY <= box.bottom
-      ) {
+      if (hitBox(bubble, event.clientX, event.clientY)) {
         event.stopPropagation()
         window.keycodePet.bubbleClicked()
         return

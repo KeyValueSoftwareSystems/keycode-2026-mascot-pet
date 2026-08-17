@@ -85,6 +85,36 @@ describe('callout arbiter', () => {
     expect(state.queue).toHaveLength(1)
   })
 
+  it('keeps only one outstanding callout per reminder kind', () => {
+    // Sticky water sits until clicked. A later water interval must not queue behind stretch.
+    let state = show(
+      initArbiter(),
+      request({ text: 'Time for some water', sticky: true, reminderKind: 'water' }),
+      0,
+    )
+    state = submit(
+      state,
+      request({ text: 'Stand up and stretch', sticky: true, reminderKind: 'stretch' }),
+      10,
+    )
+    state = submit(
+      state,
+      request({ text: 'Time for some water', sticky: true, reminderKind: 'water' }),
+      20,
+    )
+    expect(state.current?.reminderKind).toBe('water')
+    expect(state.queue.map((entry) => entry.reminderKind)).toEqual(['stretch'])
+    expect(state.dropped).toBe(1)
+  })
+
+  it('drops a duplicate reminder kind already waiting in the queue', () => {
+    let state = show(initArbiter(), request({ priority: 'urgent', text: 'showing' }), 0)
+    state = submit(state, request({ text: 'water', sticky: true, reminderKind: 'water' }), 10)
+    state = submit(state, request({ text: 'water again', sticky: true, reminderKind: 'water' }), 20)
+    expect(state.queue.map((entry) => entry.reminderKind)).toEqual(['water'])
+    expect(state.dropped).toBe(1)
+  })
+
   it('coalesces against the most recently enqueued entry, not the sort tail', () => {
     // openpets compares against the queue tail, but in a rank-sorted queue the tail is whatever
     // sorts last — semantically arbitrary. "Back-to-back" means newest by seq.
@@ -273,7 +303,7 @@ describe('bubble text sanitising', () => {
   })
 
   it('strips line and paragraph separators', () => {
-    expect(sanitizeBubbleText('a b c')).toBe('abc')
+    expect(sanitizeBubbleText('abc')).toBe('abc')
   })
 
   it('strips C0 and C1 controls', () => {

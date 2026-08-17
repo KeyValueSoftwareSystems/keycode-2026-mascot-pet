@@ -2,12 +2,12 @@
   "$comment": "Animation state map for the Argus mascot (partial demo pack). THIS FILE IS THE SINGLE SOURCE OF TRUTH for animation geometry: `pnpm generate` turns it into the renderer's CSS keyframes and into the AnimationState TypeScript union. Never hand-write a row offset, frame count or duration anywhere else.",
   "sheet": {
     "fileName": "spritesheet.png",
-    "width": 3648,
-    "height": 1456,
+    "width": 4800,
+    "height": 2496,
     "frameWidth": 192,
     "frameHeight": 208,
-    "columns": 19,
-    "rows": 7,
+    "columns": 25,
+    "rows": 12,
     "hasAlpha": true
   },
   "states": {
@@ -38,11 +38,11 @@
       "iterations": "infinite"
     },
     "waving": {
-      "row": 0,
-      "frames": 2,
-      "durationMs": 1400,
-      "iterations": 2,
-      "note": "Placeholder: reuses idle until wave art lands."
+      "row": 7,
+      "frames": 18,
+      "durationMs": 2700,
+      "iterations": 1,
+      "note": "All 18 wave frames from argus-wave."
     },
     "jumping": {
       "row": 3,
@@ -80,18 +80,25 @@
       "note": "All 11 drinking-water frames from the Argus pack."
     },
     "running": {
-      "row": 0,
-      "frames": 2,
-      "durationMs": 820,
+      "row": 1,
+      "frames": 6,
+      "durationMs": 800,
       "iterations": "infinite",
-      "note": "Placeholder busy loop: reuses idle. NOT locomotion — that is running-left/running-right."
+      "note": "In-place busy/drag jog. Same art as running-right; the engine picks running-left/right from facing. Locomotion is still a run plan, not this state."
     },
     "review": {
-      "row": 0,
-      "frames": 2,
-      "durationMs": 1030,
+      "row": 9,
+      "frames": 21,
+      "durationMs": 4200,
       "iterations": "infinite",
-      "note": "Placeholder: reuses idle until review art lands."
+      "note": "Thinking facing right. Locomotion picks review/review-left from facing."
+    },
+    "review-left": {
+      "row": 10,
+      "frames": 21,
+      "durationMs": 4200,
+      "iterations": "infinite",
+      "note": "Horizontal flip of thinking right, same pattern as idle-left / running-left."
     },
     "stretch": {
       "row": 3,
@@ -100,26 +107,54 @@
       "iterations": 1,
       "note": "All 19 jumping-jacks frames. Tuned to ~295ms/frame (was 147ms — looked like vibration). iterations:1 so the 19→1 restart hitch does not play mid-reminder; the sheet already contains two visual reps."
     },
+    "sleep-enter": {
+      "row": 8,
+      "frames": 8,
+      "durationMs": 1600,
+      "iterations": 1,
+      "note": "Stand → lie down (argus-sleep frames 1–8)."
+    },
     "sleep": {
-      "row": 0,
-      "frames": 2,
-      "durationMs": 16000,
+      "row": 8,
+      "startColumn": 8,
+      "frames": 10,
+      "durationMs": 4000,
       "iterations": "infinite",
-      "note": "The idle frames re-timed very slow, paired with a pure-CSS 'Z' overlay."
+      "note": "Quiet on-ground loop (frames 9–18). Skips 19–23 which twitch eyes/legs."
+    },
+    "sleep-exit": {
+      "row": 8,
+      "startColumn": 23,
+      "frames": 2,
+      "durationMs": 500,
+      "iterations": 1,
+      "note": "Lie → stand (frames 24–25). Plays when movement is turned back on."
+    },
+    "electrocute": {
+      "row": 11,
+      "frames": 6,
+      "durationMs": 720,
+      "iterations": 2,
+      "note": "WIP dummy cyan/yellow flash — last row on purpose so real electrocute art can replace it without reshuffling."
     }
   },
   "aliases": {
-    "$comment": "Empty for the Argus partial pack: undrawn behaviours are real states that share a drawn row (same pattern as sleep→idle), so the AnimationState union and motion engine stay complete."
+    "$comment": "Empty for the Argus partial pack: undrawn behaviours are real states that share a drawn row (same pattern as failed→idle), so the AnimationState union and motion engine stay complete."
   },
   "freeCells": {
     "$comment": "Unused (fully transparent) cells available for new frames without resizing the sheet.",
-    "row0": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    "row1": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    "row2": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    "row3": [],
-    "row4": [11, 12, 13, 14, 15, 16, 17, 18],
-    "row5": [],
-    "row6": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    "row0": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    "row1": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    "row2": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    "row3": [19, 20, 21, 22, 23, 24],
+    "row4": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    "row5": [19, 20, 21, 22, 23, 24],
+    "row6": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+    "row7": [18, 19, 20, 21, 22, 23, 24],
+    "row8": [],
+    "row9": [21, 22, 23, 24],
+    "row10": [21, 22, 23, 24],
+    "row11": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
   },
   "reactionMap": {
     "$comment": "trigger -> animation state. Keep this indirection so a new trigger is a mapping entry rather than renderer work. A value may name a state or an alias.",
@@ -141,8 +176,9 @@
     "thinking": "review",
     "busy": "running",
     "error": "failed",
-    "movement-disabled": "sleep",
-    "movement-enabled": "idle",
-    "drag-release": "waving"
+    "movement-disabled": "sleep-enter",
+    "movement-enabled": "sleep-exit",
+    "drag-release": "waving",
+    "zap": "electrocute"
   }
 }

@@ -34,6 +34,10 @@
       <span class="dismiss-hint" aria-hidden="true">×</span>
     </div>
     <div id="sprite" class="pet-sprite" data-state="idle" data-nonce="0" data-facing="right"></div>
+    <!-- Hover quick-actions. Main toggles visibility via frame.quickActions; renderer only paints. -->
+    <div id="quick-menu" hidden data-actions="">
+      <button type="button" data-action="zap" aria-label="Zap">⚡</button>
+    </div>
     <!-- Pure-CSS sleep affordance. This is what lets `sleep` ship with no new art. -->
     <div id="zzz" aria-hidden="true"><span>z</span><span>z</span><span>z</span></div>
     <script type="module" src="./pet.ts"></script>

@@ -88,6 +88,48 @@ body {
  */
 
 /* --------------------------------------------------------------------------------------- */
+/* Hover quick-menu (zap, …)                                                                */
+/* --------------------------------------------------------------------------------------- */
+
+#quick-menu {
+  position: absolute;
+  z-index: 3;
+  left: calc(var(--body-cx, 50%) + 52px * var(--pet-scale, 1));
+  top: calc(var(--body-top, 0px) + 36px * var(--pet-scale, 1));
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+#quick-menu[hidden] {
+  display: none;
+}
+
+#quick-menu button {
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 2px solid #fde047;
+  border-radius: 10px;
+  background: #1c1430;
+  color: #fde047;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0 10px 2px rgba(253, 224, 71, 0.45);
+}
+
+#quick-menu button:hover {
+  background: #2a1f45;
+}
+
+#quick-menu:not([data-actions~='zap']) [data-action='zap'] {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------------------- */
 /* Bubble                                                                                   */
 /* --------------------------------------------------------------------------------------- */
 
@@ -366,15 +408,14 @@ body {
 /* --------------------------------------------------------------------------------------- */
 
 /*
- * Positioned from the sprite origin (set on :root by the renderer, so siblings inherit it) plus an
- * offset onto the character's head. 118px right of the cell's left edge lands just past the hair;
- * 6px down from the cell top sits above it.
+ * Anchored to the character's head via `--body-top` / `--body-cx` (set from the per-state mask).
+ * Sleep-loop art lies low in the cell; a fixed cell offset floated the Z's above empty space.
  */
 #zzz {
   position: absolute;
-  /* Cell-space offsets, so they scale with the pet. */
-  left: calc(var(--sprite-x, 0px) + 118px * var(--pet-scale, 1));
-  top: calc(var(--sprite-y, 0px) + 6px * var(--pet-scale, 1));
+  left: var(--body-cx, 50%);
+  top: calc(var(--body-top, 0px) - 14px * var(--pet-scale, 1));
+  transform: translateX(-50%);
   display: none;
   pointer-events: none;
   font:

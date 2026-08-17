@@ -18,7 +18,10 @@ import {
 const REPO = resolve(import.meta.dirname, '..', '..')
 const CSS = readFileSync(resolve(REPO, 'apps/desktop/src/renderer/pet.generated.css'), 'utf8')
 const SPEC = JSON.parse(readFileSync(resolve(REPO, 'pet/spritesheet.json'), 'utf8')) as {
-  states: Record<string, { row: number; frames: number; durationMs: number; iterations?: unknown }>
+  states: Record<
+    string,
+    { row: number; frames: number; durationMs: number; iterations?: unknown; startColumn?: number }
+  >
   reactionMap: Record<string, string>
 }
 
@@ -63,12 +66,13 @@ describe('generated sprite CSS', () => {
     for (const state of ANIMATION_STATES) {
       const spec = SPEC.states[state]!
       const y = -spec.row * SHEET.frameHeight
-      const lastFrameX = -(spec.frames - 1) * SHEET.frameWidth
+      const startX = -(spec.startColumn ?? 0) * SHEET.frameWidth
+      const lastFrameX = startX - (spec.frames - 1) * SHEET.frameWidth
       const iterations = spec.iterations === undefined ? 'infinite' : String(spec.iterations)
 
       for (const nonce of [0, 1]) {
         expect(CSS, `${state} keyframes y offset`).toContain(
-          `@keyframes kp-${state}-${nonce} {\n  from { background-position: 0 ${y}px; }\n  to { background-position: ${lastFrameX}px ${y}px; }\n}`,
+          `@keyframes kp-${state}-${nonce} {\n  from { background-position: ${startX}px ${y}px; }\n  to { background-position: ${lastFrameX}px ${y}px; }\n}`,
         )
         expect(CSS, `${state} rule`).toContain(
           `.pet-sprite[data-state="${state}"][data-nonce="${nonce}"] {\n  animation: kp-${state}-${nonce} ${spec.durationMs}ms steps(${spec.frames}, jump-none) ${iterations} forwards;\n}`,
@@ -87,7 +91,7 @@ describe('generated sprite CSS', () => {
     // legitimate endpoint is another's past-the-end value. `jumping` (5 frames) correctly ends at
     // -768px, which is exactly `waving`'s (4 frames) forbidden value.
     for (const state of ANIMATION_STATES) {
-      const { frames } = ANIMATIONS[state]
+      const { frames, startColumn } = ANIMATIONS[state]
       // Non-greedy to the closing brace on its own line: a keyframes block contains nested
       // `from { … }` braces, so a `[^}]*` character class stops at the wrong one.
       const block = CSS.match(new RegExp(`@keyframes kp-${state}-0 \\{([\\s\\S]*?)\\n\\}`))
@@ -97,9 +101,11 @@ describe('generated sprite CSS', () => {
       expect(to, `no \`to\` endpoint for ${state}`).not.toBeNull()
 
       const endX = Number(to![1])
-      expect(endX, `${state} must end on its last real frame`).toBe(-(frames - 1) * SHEET.frameWidth)
+      expect(endX, `${state} must end on its last real frame`).toBe(
+        -(startColumn + frames - 1) * SHEET.frameWidth,
+      )
       expect(endX, `${state} must not reach the past-the-end column`).not.toBe(
-        -frames * SHEET.frameWidth,
+        -(startColumn + frames) * SHEET.frameWidth,
       )
 
       const rule = CSS.match(
@@ -125,6 +131,11 @@ describe('generated sprite CSS', () => {
     expect(ANIMATIONS['idle-left'].row).not.toBe(ANIMATIONS.idle.row)
   })
 
+  it('keeps a separate review-left row from the right-facing thinking pose', () => {
+    expect(ANIMATIONS['review-left'].frames).toBe(ANIMATIONS.review.frames)
+    expect(ANIMATIONS['review-left'].row).not.toBe(ANIMATIONS.review.row)
+  })
+
   it('requires image-rendering: pixelated', () => {
     // Not stylistic: the default smoothing turns pixel art to mush, worst on HiDPI.
     expect(CSS).toContain('image-rendering: pixelated')
@@ -137,11 +148,20 @@ describe('generated sprite CSS', () => {
     }
   })
 
-  it('lets two states share a row', () => {
-    // `idle` and `sleep` are the same frames at different speeds. Requiring unique rows would
-    // have forced new art for a state that needs none.
-    expect(ANIMATIONS.sleep.row).toBe(ANIMATIONS.idle.row)
-    expect(ANIMATIONS.sleep.durationMs).toBeGreaterThan(ANIMATIONS.idle.durationMs)
+  it('splits sleep into enter / loop / exit on one row', () => {
+    expect(ANIMATIONS['sleep-enter'].row).toBe(ANIMATIONS.sleep.row)
+    expect(ANIMATIONS['sleep-exit'].row).toBe(ANIMATIONS.sleep.row)
+    expect(ANIMATIONS.sleep.startColumn).toBe(ANIMATIONS['sleep-enter'].frames)
+    expect(ANIMATIONS.sleep.iterations).toBe('infinite')
+    expect(ANIMATIONS['sleep-enter'].iterations).toBe(1)
+    expect(ANIMATIONS['sleep-exit'].iterations).toBe(1)
+  })
+
+  it('gives sleep its own drawn row', () => {
+    // Sleep used to share idle frames at a slower speed. Real sleep art now has its own row;
+    // sharing would still be legal for placeholders, but this pack no longer needs that.
+    expect(ANIMATIONS.sleep.row).not.toBe(ANIMATIONS.idle.row)
+    expect(ANIMATIONS.sleep.frames).toBeGreaterThan(ANIMATIONS.idle.frames)
   })
 })
 
@@ -176,7 +196,7 @@ describe('generated animation module', () => {
   })
 
   it('has no aliases left, and still resolves a trigger that names a real state', () => {
-    // Undrawn Argus poses are real states that share a drawn row (same pattern as sleep→idle),
+    // Undrawn Argus poses are real states that share a drawn row (same pattern as failed→idle),
     // not aliases — so the AnimationState union stays complete for motion and broadcasts.
     expect(Object.keys(ANIMATION_ALIASES)).toEqual([])
     expect(resolveTrigger('water-reminder')).toBe('drink')
@@ -218,7 +238,7 @@ describe('spritesheet validation', () => {
   })
 
   it('rejects more frames than there are columns', () => {
-    expect(loadWith((s) => (s.states.idle.frames = 99))).toThrow(/only has 19 columns/)
+    expect(loadWith((s) => (s.states.idle.frames = 99))).toThrow(/only has 25 columns/)
   })
 
   it('rejects fewer than two frames', () => {
