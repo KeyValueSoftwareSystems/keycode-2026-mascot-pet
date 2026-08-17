@@ -13,8 +13,8 @@
       property="og:description"
       content="A pixel character that lives on your desktop. For macOS, Windows and Linux."
     />
-    <meta property="og:image" content="./img/m3-motion-strip.png" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🐾</text></svg>" />
+    <meta property="og:image" content="./img/og-icon.png" />
+    <link rel="icon" type="image/png" href="./img/favicon.png" />
     <style>
       /* Brand: purple #a16ae8 on near-black #141111, per docs/ASSETS.md. */
       :root {
@@ -177,8 +177,8 @@
       </header>
 
       <figure style="margin: 0">
-        <img class="strip" src="./img/m3-motion-strip.png" alt="Five frames of the pet: idle, running left, mid-jump, running right, and settled" />
-        <figcaption class="cap">Idle, running, mid-jump, running back, settled — one continuous stretch of pet life.</figcaption>
+        <img class="strip" src="./img/m3-motion-strip.png" alt="Five frames of Argus: idle, running right, jumping jacks, running left, and idle again" />
+        <figcaption class="cap">Idle, running, jumping jacks, running back, settled — Argus on your desktop.</figcaption>
       </figure>
 
       <div class="notice">
@@ -200,7 +200,7 @@
               cannot be missed by looking away.
             </p>
           </div>
-          <figure class="shot"><img src="./img/v16-sticky-notification.window.png" alt="The pet with a white speech bubble reading 'Deploy freeze starts at 5pm', with a dismiss cross" /></figure>
+          <figure class="shot"><img src="./img/v16-sticky-notification.window.png" alt="Argus standing ready to deliver a team message" /></figure>
         </div>
 
         <div class="feat">
@@ -212,7 +212,7 @@
               the floor.
             </p>
           </div>
-          <figure class="shot"><img src="./img/v12-free-placement.window.png" alt="The pet placed mid-screen rather than along the bottom" /></figure>
+          <figure class="shot"><img src="./img/v12-free-placement.window.png" alt="Argus mid-stride, free to place anywhere on screen" /></figure>
         </div>
 
         <div class="feat">
@@ -223,7 +223,7 @@
               bubble keeps its type size, because a message you cannot read is not a message.
             </p>
           </div>
-          <figure class="shot"><img src="./img/v13-size-small-bubble.window.png" alt="A small pet with a full-size speech bubble above it" /></figure>
+          <figure class="shot"><img src="./img/v13-size-small-bubble.window.png" alt="Argus at a smaller size" /></figure>
         </div>
 
         <div class="feat">
@@ -235,7 +235,7 @@
               laptop does not greet you with a backlog on wake.
             </p>
           </div>
-          <figure class="shot"><img src="./img/m5-bubble-emoji.window.png" alt="The pet reminding you to drink water" /></figure>
+          <figure class="shot"><img src="./img/m5-bubble-emoji.window.png" alt="Argus drinking water" /></figure>
         </div>
 
         <div class="feat">
@@ -247,7 +247,7 @@
               compositor swallows right-clicks and the tray is the only way in.
             </p>
           </div>
-          <figure class="shot"><img src="./img/m4-sleep-overlay.window.png" alt="The pet asleep with animated z's rising from its head" /></figure>
+          <figure class="shot"><img src="./img/m4-sleep-overlay.window.png" alt="Argus idle while movement is off" /></figure>
         </div>
       </section>
 
@@ -327,7 +327,7 @@
             'mac-arm': { href: href('Argus-' + version + '-mac-arm64.dmg'), label: 'Download Argus for Mac', platform: 'For macOS (Apple Silicon)' },
             'mac-intel': { href: href('Argus-' + version + '-mac-x64.dmg'), label: 'Download Argus for Mac', platform: 'For macOS (Intel)' },
             win: { href: href('Argus-' + version + '-win-x64.exe'), label: 'Download Argus for Windows', platform: 'For Windows' },
-            linux: { href: href('Argus-' + version + '-linux-x64.AppImage'), label: 'Download Argus for Linux', platform: 'For Linux' },
+            linux: { href: href('Argus-' + version + '-linux-x86_64.AppImage'), label: 'Download Argus for Linux', platform: 'For Linux' },
           }
         }
 

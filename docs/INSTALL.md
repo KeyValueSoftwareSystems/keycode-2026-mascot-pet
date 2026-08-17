@@ -43,7 +43,7 @@ it is not a sign the download is corrupt.
 
 | File | How |
 |---|---|
-| `.AppImage` | `chmod +x 'Argus-<version>-linux-x64.AppImage'` then run it. Nothing to install. |
+| `.AppImage` | `chmod +x 'Argus-<version>-linux-x86_64.AppImage'` then run it. Nothing to install. |
 | `.deb` | `sudo apt install ./Argus-<version>-linux-x64.deb` |
 | `.rpm` | `sudo dnf install ./Argus-<version>-linux-x64.rpm` |
 | `.tar.gz` | Extract and run the binary inside. |
