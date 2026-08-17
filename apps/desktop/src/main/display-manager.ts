@@ -120,7 +120,11 @@ export function createDisplayManager(): DisplayManager {
     },
 
     nearest(point): DisplaySnapshot {
-      const display = screen.getDisplayNearestPoint(point)
+      // Electron's Point converter rejects non-integers (and undefined/NaN), which throws
+      // "conversion failure" out of the motion tick and freezes the pet until the next interval.
+      const x = Number.isFinite(point.x) ? Math.round(point.x) : 0
+      const y = Number.isFinite(point.y) ? Math.round(point.y) : 0
+      const display = screen.getDisplayNearestPoint({ x, y })
       const key = displayKeyOf(display.bounds)
       return all().find((d) => d.key === key) ?? snapshot(display, 0)
     },

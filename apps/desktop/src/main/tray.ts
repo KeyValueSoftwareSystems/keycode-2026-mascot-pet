@@ -15,6 +15,7 @@ import { Menu, Tray, nativeImage } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 import { assetPath } from './paths.js'
 import { emit } from './harness-handshake.js'
+import { PRODUCT_NAME } from '../config/constants.js'
 
 export interface TrayController {
   refresh(): void
@@ -42,7 +43,7 @@ function loadTrayImage(): Electron.NativeImage {
 
 export function createTray(options: TrayOptions): TrayController {
   const tray = new Tray(loadTrayImage())
-  tray.setToolTip(options.tooltip ?? 'Keycode Pet')
+  tray.setToolTip(options.tooltip ?? PRODUCT_NAME)
 
   const refresh = (): void => {
     if (tray.isDestroyed()) return

@@ -24,6 +24,7 @@ const IPC = {
   dragStart: 'keycode-pet:drag-start',
   dragEnd: 'keycode-pet:drag-end',
   bubbleClicked: 'keycode-pet:bubble-clicked',
+  bubbleAction: 'keycode-pet:bubble-action',
 }
 
 /** Last reported hover state, so only transitions cross the process boundary. */
@@ -76,5 +77,10 @@ contextBridge.exposeInMainWorld('keycodePet', {
   /** Open the current callout's link. Main holds and re-validates the URL; the renderer never sees it. */
   bubbleClicked() {
     ipcRenderer.send(IPC.bubbleClicked)
+  },
+
+  /** @param {string} action */
+  bubbleAction(action) {
+    ipcRenderer.send(IPC.bubbleAction, action)
   },
 })

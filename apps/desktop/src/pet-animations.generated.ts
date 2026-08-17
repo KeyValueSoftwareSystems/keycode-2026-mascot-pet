@@ -137,7 +137,7 @@ export const REACTION_MAP: { readonly [K in Trigger]: AnimationState } = {
   'error': 'failed',
   'movement-disabled': 'sleep',
   'movement-enabled': 'idle',
-  'drag-release': 'jumping',
+  'drag-release': 'waving',
 }
 
 export function isAnimationState(value: unknown): value is AnimationState {

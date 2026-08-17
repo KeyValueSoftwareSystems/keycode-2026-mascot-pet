@@ -12,7 +12,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; font-src 'self' file: data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
     />
-    <title>Keycode Pet</title>
+    <title>Argus</title>
     <link rel="stylesheet" href="./pet.fonts.css" />
     <link rel="stylesheet" href="./pet.generated.css" />
     <link rel="stylesheet" href="./pet.css" />
@@ -25,6 +25,10 @@
     -->
     <div id="bubble" hidden>
       <span id="bubble-text"></span>
+      <div id="bubble-actions">
+        <span data-action="ok" role="button" aria-label="Done">✓</span>
+        <span data-action="snooze" role="button">Snooze</span>
+      </div>
       <!-- Shown only for bubbles that wait to be clicked. Signage, not a button: the whole bubble
            is the hit target, so this must not swallow the pointer. -->
       <span class="dismiss-hint" aria-hidden="true">×</span>

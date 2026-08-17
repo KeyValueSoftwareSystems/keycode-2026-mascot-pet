@@ -10,7 +10,7 @@
  * Derived rather than hand-authored, for the same reason as the tray icon — it keeps the "swap the
  * spritesheet, change no code" promise whole. A Keycode-branded art pack regenerates its own icons.
  *
- * `pet/preview.png` (1024x1024) is the source. Unlike the tray glyph this keeps full colour, because
+ * `pet/spritesheet.png` idle frame is the source. Unlike the tray glyph this keeps full colour, because
  * an app icon is shown at 128px and up where the character is perfectly legible.
  *
  * Outputs (all committed):
@@ -28,7 +28,8 @@ import { decodePng, encodePng, pixelAt } from './lib/png.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
-const SOURCE = join(ROOT, 'pet', 'preview.png')
+const SHEET = join(ROOT, 'pet', 'spritesheet.png')
+const SPRITE_JSON = join(ROOT, 'pet', 'spritesheet.json')
 const BUILD = join(ROOT, 'build')
 const ICONS_DIR = join(BUILD, 'icons')
 
@@ -103,14 +104,36 @@ function writeIco(pngPaths, outPath) {
   writeFileSync(outPath, Buffer.concat([header, ...entries, ...images.map((i) => i.data)]))
 }
 
+function extractIdleFrame(outPath) {
+  const png = decodePng(readFileSync(SHEET))
+  const spec = JSON.parse(readFileSync(SPRITE_JSON, 'utf8'))
+  const idle = spec.states.idle
+  if (!idle) throw new Error('spritesheet.json has no idle state')
+  const { frameWidth, frameHeight } = spec.sheet
+  const originX = 0
+  const originY = idle.row * frameHeight
+  const out = new Uint8Array(frameWidth * frameHeight * 4)
+  for (let y = 0; y < frameHeight; y += 1) {
+    for (let x = 0; x < frameWidth; x += 1) {
+      const [r, g, b, a] = pixelAt(png, originX + x, originY + y)
+      const i = (y * frameWidth + x) * 4
+      out[i] = r
+      out[i + 1] = g
+      out[i + 2] = b
+      out[i + 3] = a
+    }
+  }
+  writeFileSync(outPath, encodePng(frameWidth, frameHeight, out))
+}
+
 /**
  * Trim the source's transparent margin and re-centre on a square.
  *
  * `preview.png` has generous empty space around the character; left alone the icon reads as tiny in a
  * dock full of edge-to-edge icons.
  */
-function tightenSource(outPath) {
-  const png = decodePng(readFileSync(SOURCE))
+function tightenSource(sourcePath, outPath) {
+  const png = decodePng(readFileSync(sourcePath))
   let minX = png.width
   let minY = png.height
   let maxX = -1
@@ -126,7 +149,7 @@ function tightenSource(outPath) {
     }
   }
 
-  if (maxX < 0) throw new Error('pet/preview.png is fully transparent')
+  if (maxX < 0) throw new Error('idle frame is fully transparent')
 
   // Square, with ~8% breathing room, clamped to the source.
   const side = Math.max(maxX - minX + 1, maxY - minY + 1)
@@ -177,8 +200,11 @@ function main() {
   ensureMac()
   mkdirSync(ICONS_DIR, { recursive: true })
 
+  const idleFrame = join(BUILD, '.idle-frame.png')
+  extractIdleFrame(idleFrame)
   const staging = join(BUILD, '.icon-src.png')
-  const side = tightenSource(staging)
+  const side = tightenSource(idleFrame, staging)
+  rmSync(idleFrame, { force: true })
   console.log(`  source tightened to ${side}x${side}`)
 
   // macOS iconset

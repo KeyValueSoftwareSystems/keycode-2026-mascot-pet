@@ -85,6 +85,12 @@ export const REMINDER_TICK_MS = 15_000
  */
 export const REMINDER_MISS_FACTOR = 2
 
+/** How long a water snooze waits before reminding again. */
+export const WATER_SNOOZE_MS = 60_000
+
+/** Idle pause between drink-animation replays while the water bubble is up. */
+export const DRINK_LOOP_GAP_MS = 800
+
 /**
  * How late a clock-time reminder (coffee, lunch) may still fire. Past this it was slept through
  * and is skipped rather than dumped on wake.
@@ -172,7 +178,12 @@ export const POLL = {
 // Product identity
 // ---------------------------------------------------------------------------------------
 
-export const PRODUCT_NAME = 'Keycode Pet'
+export const PRODUCT_NAME = 'Argus'
+/** Previous `app.setName()` value; used to copy settings into the new userData folder. */
+export const LEGACY_PRODUCT_NAME = 'Keycode Pet'
+
+export const DEFAULT_MANIFEST_URL =
+  'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json'
 
 /** Where the code lives, and where a problem report goes. */
 export const REPO_URL = 'https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet'

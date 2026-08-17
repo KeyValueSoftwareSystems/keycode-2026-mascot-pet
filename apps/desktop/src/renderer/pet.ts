@@ -74,9 +74,11 @@ function applyFrame(frame: PetFrame): void {
     bubble.dataset.pinned = String(frame.bubble.pinned)
     bubble.dataset.clickable = String(frame.bubble.clickable)
     bubble.dataset.dismissible = String(frame.bubble.dismissible)
+    bubble.dataset.actions = frame.bubble.actions.join(' ')
     bubble.hidden = false
   } else {
     bubbleText.textContent = ''
+    bubble.dataset.actions = ''
     bubble.hidden = true
   }
 }
@@ -138,22 +140,44 @@ document.addEventListener('contextmenu', (event) => {
   window.keycodePet.requestContextMenu()
 })
 
-// A click on a linked bubble opens its link; anything else on the pet starts a drag. Routed by
-// DOM event targeting rather than by comparing rectangles, so there is no geometry to get wrong
-// and no behavioural branch in this file.
-// A left click on the bubble is *reported*, not interpreted. Main opens the link if there is one and
-// dismisses the callout; deciding what a click means is behaviour, and behaviour does not live here.
-// Previously this file gated the report on `data-clickable`, which was exactly such a decision.
-bubble.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0) return
-  event.stopPropagation()
-  window.keycodePet.bubbleClicked()
-})
-
-document.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0) return
-  if (isOverPet(event.clientX, event.clientY)) window.keycodePet.beginDrag()
-})
+// A left click on a bubble button is reported as that action; a click on the bubble itself is
+// reported as a bubble click; anything else on the pet starts a drag. Capture phase so the
+// sprite cell sitting under the bubble cannot steal the press.
+document.addEventListener(
+  'pointerdown',
+  (event) => {
+    if (event.button !== 0) return
+    if (!bubble.hidden) {
+      for (const chip of bubble.querySelectorAll('[data-action]')) {
+        const box = chip.getBoundingClientRect()
+        if (
+          event.clientX >= box.left &&
+          event.clientX <= box.right &&
+          event.clientY >= box.top &&
+          event.clientY <= box.bottom
+        ) {
+          event.preventDefault()
+          event.stopPropagation()
+          window.keycodePet.bubbleAction(chip.getAttribute('data-action') ?? '')
+          return
+        }
+      }
+      const box = bubble.getBoundingClientRect()
+      if (
+        event.clientX >= box.left &&
+        event.clientX <= box.right &&
+        event.clientY >= box.top &&
+        event.clientY <= box.bottom
+      ) {
+        event.stopPropagation()
+        window.keycodePet.bubbleClicked()
+        return
+      }
+    }
+    if (isOverPet(event.clientX, event.clientY)) window.keycodePet.beginDrag()
+  },
+  { capture: true },
+)
 
 document.addEventListener('pointerup', () => {
   window.keycodePet.endDrag()

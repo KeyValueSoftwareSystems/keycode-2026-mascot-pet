@@ -89,7 +89,7 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   idleActs: ['review', 'running'],
 
   dragAnimation: 'running',
-  dropAnimation: 'jumping',
+  dropAnimation: 'waving',
   sleepAnimation: 'sleep',
   idleAnimation: 'idle',
 

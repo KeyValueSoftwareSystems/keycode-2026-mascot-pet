@@ -23,6 +23,12 @@ const FOOT_INSET = 16
 /** On-screen character height. Width follows aspect; clamped only if a pose would clip the cell. */
 const TARGET_CONTENT_H = 150
 const CONTENT_MAX_W = FRAME_W - 8
+/**
+ * Drink/run/jacks exports have an orange fringe (alpha ~2–9) to the canvas edge.
+ * Counting that as content makes those poses fill the cell and look tiny next to
+ * idle, which is true transparent. Higher than ALPHA_THRESHOLD on purpose — bounds only.
+ */
+const BOUNDS_ALPHA = 16
 
 const FILTER_SUPPORT = 1
 
@@ -97,7 +103,7 @@ function contentBounds(img) {
   let maxY = -1
   for (let y = 0; y < img.height; y += 1) {
     for (let x = 0; x < img.width; x += 1) {
-      if (img.data[(y * img.width + x) * 4 + 3] <= ALPHA_THRESHOLD) continue
+      if (img.data[(y * img.width + x) * 4 + 3] <= BOUNDS_ALPHA) continue
       if (x < minX) minX = x
       if (y < minY) minY = y
       if (x > maxX) maxX = x
@@ -150,23 +156,27 @@ function blit(dest, sheetW, frame, col, row) {
   }
 }
 
+function scaleForBounds(bounds) {
+  let scale = TARGET_CONTENT_H / bounds.height
+  if (bounds.width * scale > CONTENT_MAX_W) {
+    scale = CONTENT_MAX_W / bounds.width
+  }
+  return scale
+}
+
 /**
  * Scale content into a FRAME_W×FRAME_H cell with feet on the shared baseline and
- * horizontal centering. Character height is normalized so idle/run/etc. match on screen.
+ * horizontal centering. Pass a locked `scale` so a whole animation row stays the
+ * same size (per-frame fit makes run poses pulse).
  */
-function fitToCell(img, flip) {
+function fitToCell(img, flip, scale) {
   const source = flip ? flipHorizontal(img) : img
   const bounds = contentBounds(source)
   if (!bounds) fail('Frame has no opaque pixels.')
+  const usedScale = scale ?? scaleForBounds(bounds)
 
-  let scale = TARGET_CONTENT_H / bounds.height
-  let outW = Math.max(1, Math.round(bounds.width * scale))
-  let outH = Math.max(1, Math.round(bounds.height * scale))
-  if (outW > CONTENT_MAX_W) {
-    scale = CONTENT_MAX_W / bounds.width
-    outW = Math.max(1, Math.round(bounds.width * scale))
-    outH = Math.max(1, Math.round(bounds.height * scale))
-  }
+  const outW = Math.max(1, Math.round(bounds.width * usedScale))
+  const outH = Math.max(1, Math.round(bounds.height * usedScale))
 
   const scaled = resample(source, bounds, outW, outH)
   const cell = Buffer.alloc(FRAME_W * FRAME_H * 4)
@@ -186,7 +196,19 @@ function fitToCell(img, flip) {
       cell[di + 3] = scaled.data[si + 3]
     }
   }
-  return { width: FRAME_W, height: FRAME_H, data: cell, outW, outH, scale }
+  return { width: FRAME_W, height: FRAME_H, data: cell, outW, outH, scale: usedScale }
+}
+
+function lockedScaleFor(files, flip) {
+  let min = Infinity
+  for (const file of files) {
+    const png = decodePng(readFileSync(file))
+    const source = flip ? flipHorizontal(png) : png
+    const bounds = contentBounds(source)
+    if (!bounds) fail(`Frame has no opaque pixels: ${file}`)
+    min = Math.min(min, scaleForBounds(bounds))
+  }
+  return min
 }
 
 function main() {
@@ -223,12 +245,15 @@ function main() {
   ]
 
   for (const spec of rowsSpec) {
-    console.log(`row ${spec.row}  ${spec.name}  ${spec.files.length} frames${spec.flip ? ' (flipped)' : ''}`)
+    const scale = lockedScaleFor(spec.files, spec.flip)
+    console.log(
+      `row ${spec.row}  ${spec.name}  ${spec.files.length} frames${spec.flip ? ' (flipped)' : ''}  lockedScale=${scale.toFixed(4)}`,
+    )
     for (let i = 0; i < spec.files.length; i += 1) {
       const png = decodePng(readFileSync(spec.files[i]))
-      const cell = fitToCell(png, spec.flip)
+      const cell = fitToCell(png, spec.flip, scale)
       blit(sheet, sheetW, cell, i, spec.row)
-      process.stdout.write(`  ${i + 1}/${spec.files.length} scale=${cell.scale.toFixed(4)} ${cell.outW}×${cell.outH}\n`)
+      process.stdout.write(`  ${i + 1}/${spec.files.length} ${cell.outW}×${cell.outH}\n`)
     }
   }
 

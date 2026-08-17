@@ -1,6 +1,6 @@
 <div align="center">
 
-# Keycode Pet
+# Argus
 
 **A pixel character that lives on your desktop.** It runs along the bottom of your screen over
 whatever you are working on, reminds you to drink water, and the whole team can make every installed
@@ -20,8 +20,8 @@ pet say something by editing one file.
 > double-click. Windows may still show SmartScreen once (no Authenticode cert).
 > [Install instructions →](docs/INSTALL.md)
 
-> **The character is a placeholder.** `pixel-coder` is a pixel-art chibi human, not the Keycode mascot.
-> Swapping it is a file swap plus a JSON edit, with no code changes — see [docs/ASSETS.md](docs/ASSETS.md).
+> **Argus is Keycode’s unicorn mascot.** Swapping the spritesheet is a file swap plus a JSON edit,
+> with no code changes — see [docs/ASSETS.md](docs/ASSETS.md).
 
 ---
 

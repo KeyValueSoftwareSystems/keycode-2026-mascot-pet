@@ -87,6 +87,11 @@ export const petFrameSchema = z.strictObject({
        * clicking removes it is a trap, not a feature — the user is left assuming it is stuck.
        */
       dismissible: z.boolean(),
+      /**
+       * Buttons the bubble should show. Empty for a normal bubble. The renderer paints them and
+       * reports which one was pressed; main decides what that means.
+       */
+      actions: z.array(z.enum(['ok', 'snooze'])),
     })
     .nullable(),
 
@@ -115,4 +120,5 @@ export const IPC = {
   dragStart: 'keycode-pet:drag-start',
   dragEnd: 'keycode-pet:drag-end',
   bubbleClicked: 'keycode-pet:bubble-clicked',
+  bubbleAction: 'keycode-pet:bubble-action',
 } as const

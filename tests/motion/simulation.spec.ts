@@ -419,7 +419,7 @@ describe('drag', () => {
     })
     expect(state.dragging).toBe(false)
     expect(state.x).toBe(300)
-    expect(state.animation).toBe('jumping-right')
+    expect(state.animation).toBe('waving')
   })
 
   it('repositions on drop even while movement is off', () => {

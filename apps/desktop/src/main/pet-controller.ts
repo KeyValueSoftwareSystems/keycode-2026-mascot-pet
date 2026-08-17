@@ -20,8 +20,9 @@ import { screen } from 'electron'
 import { advance, initialState } from '../motion/motion-engine.js'
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../motion/motion-config.js'
 import type { MotionState, MotionTrigger } from '../motion/types.js'
-import { resolveTrigger, type Trigger } from '../pet-animations.generated.js'
+import { ANIMATIONS, resolveTrigger, type Trigger } from '../pet-animations.generated.js'
 import type { PetFrame, Tone } from '../pet-frame.js'
+import { DRINK_LOOP_GAP_MS } from '../config/constants.js'
 import {
   floorForWorkArea,
   clampToFloor,
@@ -40,6 +41,7 @@ export interface ActiveCallout {
   clickable: boolean
   /** Waits for a click rather than timing out, so the view shows a dismiss affordance. */
   dismissible: boolean
+  actions: ReadonlyArray<'ok' | 'snooze'>
 }
 
 export interface PetControllerOptions {
@@ -132,6 +134,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
     feetY: options.startFeetY ?? options.startFloor.y,
     floorLocked: (options.startFeetY ?? null) === null,
   }
+  let drinkLoopAt = 0
 
   const buildFrame = (): PetFrame => {
     const animation = forcedState ?? state.animation
@@ -149,6 +152,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
             pinned: callout.pinned,
             clickable: callout.clickable,
             dismissible: callout.dismissible,
+            actions: [...callout.actions],
           }
         : null,
       overlay: animation === config.sleepAnimation ? 'sleep-z' : 'none',
@@ -221,6 +225,19 @@ export function createPetController(options: PetControllerOptions): PetControlle
         },
         config,
       )
+
+      const drinkMs = ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs
+      const drinkCycle = drinkMs + DRINK_LOOP_GAP_MS
+      const sticky = Boolean(callout && callout.actions.length > 0)
+      if (sticky && state.animation === 'drink') {
+        if (drinkLoopAt === 0) drinkLoopAt = timestamp
+        else if (timestamp - drinkLoopAt >= drinkCycle - config.tickMs) {
+          drinkLoopAt = timestamp
+          pending.push({ kind: 'reaction', state: 'drink', holdMs: drinkCycle })
+        }
+      } else {
+        drinkLoopAt = 0
+      }
 
       // Before moving, not after: the bubble side changes `spriteOrigin`, and therefore what window y
       // puts the feet where the motion engine says they are. Moving first would place the window with
@@ -342,6 +359,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
 
     setCallout(next: ActiveCallout | null): void {
       callout = next
+      if (!next || next.actions.length === 0) drinkLoopAt = 0
       sendFrameIfChanged()
     },
 

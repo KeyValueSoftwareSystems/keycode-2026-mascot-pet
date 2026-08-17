@@ -23,7 +23,7 @@ import {
   GREETING_MESSAGES,
   type GreetingPeriod,
 } from '../reminders/greetings.js'
-import { REMINDER_TICK_MS } from '../config/constants.js'
+import { REMINDER_TICK_MS, WATER_SNOOZE_MS } from '../config/constants.js'
 import { REMINDER_INTERVALS } from '../reminders/reminder-scheduler.js'
 import type { SettingsStore } from './settings-store.js'
 
@@ -32,6 +32,8 @@ export interface ReminderService {
   stop(): void
   /** Evaluate now. Called on wake, on unlock, and whenever a toggle changes. */
   evaluateNow(): void
+  /** Push that reminder's deadline to one minute from now. */
+  snooze(kind: ReminderKind | ClockReminderKind): void
   deadlines(): ReminderDeadlines
 }
 
@@ -151,6 +153,35 @@ export function createReminderService(options: ReminderServiceOptions): Reminder
 
     evaluateNow(): void {
       evaluate()
+    },
+
+    snooze(kind): void {
+      const current = settings.get()
+      const until = now() + WATER_SNOOZE_MS
+      const enabled =
+        kind === 'water'
+          ? current.waterReminderEnabled
+          : kind === 'stretch'
+            ? current.stretchReminderEnabled
+            : kind === 'coffee'
+              ? current.coffeeReminderEnabled
+              : current.lunchReminderEnabled
+      if (!enabled) return
+      const key =
+        kind === 'water'
+          ? 'waterNextDueAt'
+          : kind === 'stretch'
+            ? 'stretchNextDueAt'
+            : kind === 'coffee'
+              ? 'coffeeNextDueAt'
+              : 'lunchNextDueAt'
+      settings.patch({
+        reminders: {
+          ...current.reminders,
+          [key]: until,
+        },
+      })
+      log('reminder snoozed', { kind, until })
     },
 
     deadlines(): ReminderDeadlines {
