@@ -28,8 +28,8 @@
     "alwaysOnTop": true
   },
   "release": {
-    "latestVersion": "1.12.2",
-    "notesUrl": "https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/tag/v1.12.2",
+    "latestVersion": "1.12.3",
+    "notesUrl": "https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/tag/v1.12.3",
     "mandatory": false
   }
 }
