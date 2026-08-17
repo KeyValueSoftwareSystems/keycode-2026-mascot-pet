@@ -10,6 +10,7 @@ import {
   evaluateReminders,
   REMINDER_KINDS,
   REMINDER_MESSAGES,
+  REMINDER_INTERVALS,
   type ReminderDeadlines,
   type ReminderKind,
 } from '../reminders/reminder-scheduler.js'
@@ -24,7 +25,6 @@ import {
   type GreetingPeriod,
 } from '../reminders/greetings.js'
 import { REMINDER_TICK_MS, WATER_SNOOZE_MS } from '../config/constants.js'
-import { REMINDER_INTERVALS } from '../reminders/reminder-scheduler.js'
 import type { SettingsStore } from './settings-store.js'
 
 export interface ReminderService {

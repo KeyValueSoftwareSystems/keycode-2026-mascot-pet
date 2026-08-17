@@ -32,6 +32,11 @@ export function jumpAnimationFor(facing: Facing): AnimationState {
   return facing === 'left' ? 'jumping-left' : 'jumping-right'
 }
 
+/** Idle row for a direction. Same rule as running: a row, not a CSS flip. */
+export function idleAnimationFor(facing: Facing): AnimationState {
+  return facing === 'left' ? 'idle-left' : 'idle'
+}
+
 function scaled(seed: number, range: { min: number; max: number }): { value: number; seed: number } {
   const draw = nextFloat(seed)
   return { value: range.min + draw.value * (range.max - range.min), seed: draw.seed }
@@ -111,7 +116,9 @@ export function planDwell(
 ): PlanChoice {
   const range = options.range ?? config.dwellMs
   const draw = nextInt(seed, Math.round(range.min), Math.round(range.max))
-  const state = options.state ?? config.idleAnimation
+  const requested = options.state ?? config.idleAnimation
+  const state =
+    requested === 'idle' || requested === 'idle-left' ? idleAnimationFor(facing) : requested
   return {
     plan: { kind: 'dwell', untilMs: now + draw.value, state },
     animation: state,

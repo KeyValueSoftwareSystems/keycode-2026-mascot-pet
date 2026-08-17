@@ -9,6 +9,7 @@ export type AnimationState =
   | 'drink'
   | 'failed'
   | 'idle'
+  | 'idle-left'
   | 'jumping'
   | 'jumping-left'
   | 'jumping-right'
@@ -64,6 +65,7 @@ export const ANIMATIONS: { readonly [K in AnimationState]: AnimationSpec } = {
   'drink': { row: 4, frames: 11, durationMs: 2200, iterations: 2, totalMs: 4400 },
   'failed': { row: 0, frames: 2, durationMs: 1220, iterations: 2, totalMs: 2440 },
   'idle': { row: 0, frames: 2, durationMs: 2000, iterations: 'infinite', totalMs: null },
+  'idle-left': { row: 6, frames: 2, durationMs: 2000, iterations: 'infinite', totalMs: null },
   'jumping': { row: 3, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
   'jumping-left': { row: 5, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
   'jumping-right': { row: 3, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
@@ -81,6 +83,7 @@ export const ANIMATION_STATES = [
   'drink',
   'failed',
   'idle',
+  'idle-left',
   'jumping',
   'jumping-left',
   'jumping-right',
@@ -97,9 +100,9 @@ export const SHEET = {
   frameWidth: 192,
   frameHeight: 208,
   columns: 19,
-  rows: 6,
+  rows: 7,
   width: 3648,
-  height: 1248,
+  height: 1456,
   fileName: "spritesheet.png",
 } as const
 

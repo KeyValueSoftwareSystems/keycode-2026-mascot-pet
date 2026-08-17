@@ -13,17 +13,16 @@
  */
 
 import type { AnimationState } from '../pet-animations.generated.js'
-import { ANIMATIONS } from '../pet-animations.generated.js'
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from './motion-config.js'
 import { nextFloat } from './rng.js'
 import {
   planNext,
-  planRun,
   planDwell,
   planAct,
   planSleepCycle,
   runAnimationFor,
   jumpAnimationFor,
+  idleAnimationFor,
   hasRoomToRun,
   type PlanChoice,
 } from './run-planner.js'
@@ -99,6 +98,14 @@ function directedJump(state: AnimationState, facing: Facing): AnimationState {
   return state
 }
 
+/** `idle` (and either directional row) plays the idle row that matches facing. */
+function directedIdle(state: AnimationState, facing: Facing): AnimationState {
+  if (state === 'idle' || state === 'idle-left') {
+    return idleAnimationFor(facing)
+  }
+  return state
+}
+
 /**
  * Settle the vertical position against the envelope that arrived this tick.
  *
@@ -121,7 +128,7 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
         state.rngSeed,
         input.now,
         state.facing,
-        directedJump(trigger.state, state.facing),
+        directedIdle(directedJump(trigger.state, state.facing), state.facing),
         {
           ...(trigger.holdMs === undefined ? {} : { holdMs: trigger.holdMs }),
         },

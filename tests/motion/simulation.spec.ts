@@ -224,6 +224,17 @@ describe('ten minutes of pet life', () => {
       expect(jump.state.animation).toBe(jump.state.facing === 'left' ? 'jumping-left' : 'jumping-right')
     }
   })
+
+  it('plays the idle row that matches facing', () => {
+    const idles = result.frames.filter(
+      (f) => f.state.animation === 'idle' || f.state.animation === 'idle-left',
+    )
+    expect(idles.length).toBeGreaterThan(0)
+    expect(result.animationsSeen.has('idle-left')).toBe(true)
+    for (const idle of idles) {
+      expect(idle.state.animation).toBe(idle.state.facing === 'left' ? 'idle-left' : 'idle')
+    }
+  })
 })
 
 describe('determinism', () => {
@@ -238,7 +249,7 @@ describe('determinism', () => {
   it('matches the committed golden hash', () => {
     // A behavioural regression becomes a one-line diff in review. Regenerate deliberately when the
     // change to the pet's behaviour is the intended change.
-    expect(simulate({ seed: 42 }).hash).toBe('787c33fc')
+    expect(simulate({ seed: 42 }).hash).toBe('c3b641b')
   })
 
   it('holds every invariant across twenty seeds', () => {

@@ -8,21 +8,21 @@
  */
 
 :root {
-  --tone-info: #38bdf8;
   --tone-success: #10b981;
   --tone-warning: #f59e0b;
   --tone-error: #ef4444;
 
   /*
-   * A comic speech bubble: near-white fill, hard dark outline, dark text. Opaque on purpose — a
-   * translucent bubble over a busy window makes small text unreadable, and this one carries
-   * remote text people are meant to act on.
+   * Dark glass speech bubble with a neon purple halo. Opaque enough to stay readable over a busy
+   * desktop; the glow is what makes it read as the pet speaking in low light.
    */
-  --bubble-bg: #fffff8;
-  --bubble-fg: #141111;
-  --bubble-line: #141111;
+  --bubble-bg: #1c1430;
+  --bubble-fg: #f5f3ff;
+  --bubble-line: #a78bfa;
   --bubble-line-width: 2px;
-  --bubble-radius: 14px;
+  --bubble-radius: 16px;
+  --bubble-glow: rgba(167, 139, 250, 0.55);
+  --bubble-accent: #7c3aed;
   /* Half-width and height of the tail triangle, and the clear air between its tip and the hair. */
   --bubble-tail: 9px;
   --bubble-tail-gap: 3px;
@@ -118,15 +118,15 @@ body {
   /* Hugs short text; wraps rather than overflowing the window on long text. */
   width: max-content;
   max-width: calc(100% - 40px);
-  padding: 8px 11px;
+  padding: 10px 14px 12px;
   border-radius: var(--bubble-radius);
   border: var(--bubble-line-width) solid var(--bubble-line);
-  /* Tone rides on the left edge. The outline stays dark so the bubble reads as a speech bubble
-   * first and a severity indicator second. */
-  border-left-width: 5px;
-  border-left-color: var(--tone-info);
+  /* Severity and pinned states override the left edge below; info keeps the purple outline. */
   background: var(--bubble-bg);
   color: var(--bubble-fg);
+  box-shadow:
+    0 0 14px 3px var(--bubble-glow),
+    0 0 2px 1px rgba(196, 181, 253, 0.35);
   /*
    * System emoji fonts first, bundled font next, and **the generic family last of all**.
    * macOS and Windows both ship an emoji font, so they never load the 4.8MB file; Linux is meant to
@@ -219,14 +219,11 @@ body {
 /*
  * Bounds the bubble so it cannot grow up past the top of the window.
  *
- * Five lines at 13px/1.35 = 88px. That is the most that fits above the hair in the *highest* pose
- * (`review` reaches y=14, leaving 92px once padding and an 8px top margin are taken), so the
- * bubble can never be clipped by the top of the window — and because the clamp is a whole number
- * of lines, an over-long message loses a whole line rather than showing half of one.
- *
- * A full 200-character message — the manifest schema's cap — wraps to five lines at this width, so
- * the clamp is not reachable by anything the broadcast path can deliver. Clipped rather than
- * scrolled: there is nothing to scroll with in a click-through window.
+ * Five lines at 13px/1.35 = 88px — a whole number of lines, so an over-long message loses a whole
+ * line rather than showing half of one. Clipped rather than scrolled: there is nothing to scroll
+ * with in a click-through window. A full 200-character message (the manifest schema's cap) wraps
+ * to five lines at this width, so the clamp is not reachable by anything the broadcast path can
+ * deliver.
  */
 #bubble-text {
   display: block;
@@ -239,19 +236,23 @@ body {
 }
 
 #bubble[data-tone='success'] {
+  border-left-width: 4px;
   border-left-color: var(--tone-success);
 }
 #bubble[data-tone='warning'] {
+  border-left-width: 4px;
   border-left-color: var(--tone-warning);
 }
 #bubble[data-tone='error'] {
+  border-left-width: 4px;
   border-left-color: var(--tone-error);
 }
 
 #bubble[data-pinned='true'] {
-  /* A pinned callout sits above transient ones and reads as more permanent. Wider than the 5px
+  /* A pinned callout sits above transient ones and reads as more permanent. Wider than the soft
    * default, or "pinned" would be indistinguishable from every other bubble. */
-  border-left-width: 9px;
+  border-left-width: 6px;
+  border-left-color: var(--bubble-accent);
 }
 
 /*
@@ -279,7 +280,7 @@ body {
   font:
     600 13px / 1 system-ui,
     sans-serif;
-  color: rgba(20, 17, 17, 0.45);
+  color: color-mix(in srgb, var(--bubble-fg) 45%, transparent);
 }
 
 #bubble[data-clickable='true'] {
@@ -291,10 +292,12 @@ body {
 
 #bubble-actions {
   display: none;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 10px;
   margin-left: auto;
   margin-right: auto;
+  align-items: center;
+  justify-content: center;
 }
 
 #bubble[data-actions]:not([data-actions='']) #bubble-actions {
@@ -305,29 +308,57 @@ body {
   display: none;
   cursor: pointer;
   pointer-events: auto;
-  border: var(--bubble-line-width) solid var(--bubble-line);
-  border-radius: 8px;
-  font:
-    600 12px / 1.2 system-ui,
-    sans-serif;
-  padding: 4px 8px;
+  box-sizing: border-box;
 }
 
-#bubble[data-actions~='ok'] [data-action='ok'] {
+#bubble[data-actions~='ok'] [data-action='ok'],
+#bubble[data-actions~='snooze'] [data-action='snooze'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  background: var(--tone-success);
+  min-width: 40px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 10px;
+}
+
+#bubble[data-actions~='ok'] [data-action='ok'] {
+  background: linear-gradient(180deg, #8b5cf6 0%, var(--bubble-accent) 100%);
   color: #fff;
-  border-color: #059669;
+  border: 1px solid #6d28d9;
+  box-shadow: 0 2px 0 #5b21b6;
+  font: 700 15px / 1 system-ui, sans-serif;
 }
 
 #bubble[data-actions~='snooze'] [data-action='snooze'] {
-  display: inline-flex;
-  background: var(--bubble-bg);
+  align-items: flex-end;
+  gap: 1px;
+  padding: 0 11px 5px;
   color: var(--bubble-fg);
-  border-color: color-mix(in srgb, var(--bubble-line) 32%, transparent);
+  background: #12101c;
+  border: 1px solid color-mix(in srgb, var(--bubble-line) 45%, transparent);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+#bubble[data-actions~='snooze'] [data-action='snooze'] span {
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
+  line-height: 1;
+}
+
+#bubble[data-actions~='snooze'] [data-action='snooze'] span:nth-child(1) {
+  font-size: 8px;
+  transform: rotate(-8deg);
+}
+
+#bubble[data-actions~='snooze'] [data-action='snooze'] span:nth-child(2) {
+  font-size: 11px;
+  transform: rotate(2deg);
+}
+
+#bubble[data-actions~='snooze'] [data-action='snooze'] span:nth-child(3) {
+  font-size: 14px;
+  transform: rotate(8deg);
 }
 
 /* --------------------------------------------------------------------------------------- */

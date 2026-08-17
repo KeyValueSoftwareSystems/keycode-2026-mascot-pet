@@ -6,8 +6,8 @@
  *
  * Expects subfolders: argus-idle, argus-run-right, argus-jumping-jacks, argus-drinking-water
  * with numbered PNGs (1.png, 2.png, …). Uses every frame. Run-left is a horizontal flip of
- * run-right; jumping-left is a horizontal flip of jumping-jacks. Sheet columns = max frame
- * count so nothing is trimmed.
+ * run-right; jumping-left is a horizontal flip of jumping-jacks; idle-left is a horizontal
+ * flip of idle. Sheet columns = max frame count so nothing is trimmed.
  */
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
@@ -226,7 +226,7 @@ function main() {
   const drink = listFrames(folders.drink)
 
   const columns = Math.max(idle.length, runRight.length, jacks.length, drink.length)
-  const rows = 6
+  const rows = 7
   const sheetW = columns * FRAME_W
   const sheetH = rows * FRAME_H
   const sheet = Buffer.alloc(sheetW * sheetH * 4)
@@ -242,6 +242,7 @@ function main() {
     { name: 'jumping-right', files: jacks, row: 3, flip: false },
     { name: 'drink', files: drink, row: 4, flip: false },
     { name: 'jumping-left', files: jacks, row: 5, flip: true },
+    { name: 'idle-left', files: idle, row: 6, flip: true },
   ]
 
   for (const spec of rowsSpec) {
@@ -261,7 +262,7 @@ function main() {
   console.log(`wrote     ${SPRITESHEET_PNG}`)
   console.log(`next      update pet/spritesheet.json sheet to ${sheetW}×${sheetH}, columns=${columns}, rows=${rows}`)
   console.log(
-    `          states: idle:${idle.length} running-right/left:${runRight.length} jumping-right/left:${jacks.length} drink:${drink.length}`,
+    `          states: idle/idle-left:${idle.length} running-right/left:${runRight.length} jumping-right/left:${jacks.length} drink:${drink.length}`,
   )
 }
 

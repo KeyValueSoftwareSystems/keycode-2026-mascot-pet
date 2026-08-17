@@ -108,13 +108,6 @@ export const CALLOUT_DEFAULT_MS = 6_000
 export const CALLOUT_QUEUE_MAX = 16
 export const CALLOUT_TEXT_MAX = 200
 
-export const TONE_COLORS = {
-  info: '#38bdf8',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-} as const
-
 // ---------------------------------------------------------------------------------------
 // Toast
 // ---------------------------------------------------------------------------------------

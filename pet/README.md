@@ -7,7 +7,7 @@ Keycode unicorn mascot in streetwear. Assembled from individual frames in
 
 | File | Purpose |
 |---|---|
-| `spritesheet.png` | 3648×1248 RGBA, 19 cols × 6 rows of 192×208 cells. |
+| `spritesheet.png` | 3648×1456 RGBA, 19 cols × 7 rows of 192×208 cells. |
 | `spritesheet.json` | Animation state map — row/frames/duration per state, free cells, reaction map. |
 | `pet.json` | Pet metadata (`id`, `displayName`, `description`, `spritesheetPath`). |
 
@@ -21,6 +21,7 @@ Keycode unicorn mascot in streetwear. Assembled from individual frames in
 | 3 | `stretch`, `jumping`, `jumping-right` | 19 (jumping jacks, facing right) |
 | 4 | `drink` | 11 |
 | 5 | `jumping-left` (flipped from jumping-jacks) | 19 |
+| 6 | `idle-left` (flipped from idle) | 2 |
 
 Undrawn behaviours share a drawn row (same pattern as `sleep`→idle) so the motion engine
 stays complete until design delivers the rest.

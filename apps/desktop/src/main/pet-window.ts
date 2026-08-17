@@ -102,6 +102,18 @@ export interface PetWindow {
   dispose(): void
 }
 
+/**
+ * Integer device pixels for Electron's native window APIs.
+ *
+ * gin's int converter rejects floats (and some integer-valued doubles) with
+ * "conversion failure from", which the motion tick would otherwise swallow every
+ * ~60ms. `| 0` forces an int32, which is what the binding accepts.
+ */
+function nativePx(n: number): number | null {
+  if (!Number.isFinite(n)) return null
+  return Math.round(n) | 0
+}
+
 export async function createPetWindow(options: {
   initialFloor: Floor
   initialPetCentreX: number
@@ -282,13 +294,13 @@ export async function createPetWindow(options: {
     moveTo(petCentreX: number, feetY: number): void {
       if (win.isDestroyed()) return
       if (!Number.isFinite(petCentreX) || !Number.isFinite(feetY)) return
-      const nextX = windowXForPetCentre(petCentreX, placement)
-      const nextY = windowYForFloor(feetY, placement)
-      if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) return
+      const nextX = nativePx(windowXForPetCentre(petCentreX, placement))
+      const nextY = nativePx(windowYForFloor(feetY, placement))
+      if (nextX === null || nextY === null) return
       const bounds = win.getBounds()
       // Never issue a no-op: some compositors do real work per setPosition even when nothing moves.
-      if (bounds.x === nextX && bounds.y === nextY) return
-      win.setPosition(nextX, nextY, false)
+      if (nativePx(bounds.x) === nextX && nativePx(bounds.y) === nextY) return
+      win.setPosition(nextX, nextY)
     },
 
     petCentreX(): number {
@@ -369,17 +381,15 @@ export async function createPetWindow(options: {
       if (scale === placement.scale) return placement
 
       placement = placementForScale(scale, ALPHA_MASK, placement.bubbleSide)
-      const nextX = windowXForPetCentre(petCentreX, placement)
-      const nextY = windowYForFloor(feetY, placement)
+      const nextX = nativePx(windowXForPetCentre(petCentreX, placement))
+      const nextY = nativePx(windowYForFloor(feetY, placement))
+      const width = nativePx(placement.windowSize.width)
+      const height = nativePx(placement.windowSize.height)
+      if (nextX === null || nextY === null || width === null || height === null) return placement
 
       // setBounds in one call rather than setSize + setPosition: two calls make the window visibly
       // jump through an intermediate rectangle at the old position.
-      win.setBounds({
-        x: nextX,
-        y: nextY,
-        width: placement.windowSize.width,
-        height: placement.windowSize.height,
-      })
+      win.setBounds({ x: nextX, y: nextY, width, height })
 
       forwarding.setShapeRects(currentShapeRects())
       log('pet size changed', { scale, height: placement.windowSize.height })
@@ -393,9 +403,12 @@ export async function createPetWindow(options: {
       if (side === placement.bubbleSide) return placement
 
       placement = placementForScale(placement.scale, ALPHA_MASK, side)
+      const nextX = nativePx(windowXForPetCentre(petCentreX, placement))
+      const nextY = nativePx(windowYForFloor(feetY, placement))
+      if (nextX === null || nextY === null) return placement
       // The window keeps its size; only which end of it is reserved changes, so this moves the window
       // by exactly the band height and leaves the sprite on the same screen pixels.
-      win.setPosition(windowXForPetCentre(petCentreX, placement), windowYForFloor(feetY, placement), false)
+      win.setPosition(nextX, nextY)
       forwarding.setShapeRects(currentShapeRects())
       log('bubble side changed', { side, feetY })
       return placement

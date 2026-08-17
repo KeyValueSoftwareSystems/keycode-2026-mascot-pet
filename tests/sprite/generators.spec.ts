@@ -120,6 +120,11 @@ describe('generated sprite CSS', () => {
     expect(CSS).toContain('steps(19, jump-none)')
   })
 
+  it('keeps a separate idle-left row from the right-facing idle', () => {
+    expect(ANIMATIONS['idle-left'].frames).toBe(ANIMATIONS.idle.frames)
+    expect(ANIMATIONS['idle-left'].row).not.toBe(ANIMATIONS.idle.row)
+  })
+
   it('requires image-rendering: pixelated', () => {
     // Not stylistic: the default smoothing turns pixel art to mush, worst on HiDPI.
     expect(CSS).toContain('image-rendering: pixelated')

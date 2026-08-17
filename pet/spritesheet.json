@@ -3,11 +3,11 @@
   "sheet": {
     "fileName": "spritesheet.png",
     "width": 3648,
-    "height": 1248,
+    "height": 1456,
     "frameWidth": 192,
     "frameHeight": 208,
     "columns": 19,
-    "rows": 6,
+    "rows": 7,
     "hasAlpha": true
   },
   "states": {
@@ -15,7 +15,15 @@
       "row": 0,
       "frames": 2,
       "durationMs": 2000,
-      "iterations": "infinite"
+      "iterations": "infinite",
+      "note": "Idle facing right. Locomotion dwells pick idle/idle-left from facing."
+    },
+    "idle-left": {
+      "row": 6,
+      "frames": 2,
+      "durationMs": 2000,
+      "iterations": "infinite",
+      "note": "Horizontal flip of idle right, same pattern as running-left / jumping-left."
     },
     "running-right": {
       "row": 1,
@@ -110,7 +118,8 @@
     "row2": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
     "row3": [],
     "row4": [11, 12, 13, 14, 15, 16, 17, 18],
-    "row5": []
+    "row5": [],
+    "row6": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
   },
   "reactionMap": {
     "$comment": "trigger -> animation state. Keep this indirection so a new trigger is a mapping entry rather than renderer work. A value may name a state or an alias.",

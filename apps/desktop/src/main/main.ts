@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { emit } from './harness-handshake.js'
 import { log } from './logger.js'
-import { LEGACY_PRODUCT_NAME, PRODUCT_NAME } from '../config/constants.js'
+import { LEGACY_PRODUCT_NAME, PRODUCT_NAME, APP_ID } from '../config/constants.js'
 
 /** Set once the shell is up. Until then a second launch has nothing to focus. */
 let shellOnSecondInstance: (() => void) | null = null
@@ -77,7 +77,7 @@ async function boot(): Promise<void> {
     app.setActivationPolicy('accessory')
   }
   if (process.platform === 'win32') {
-    app.setAppUserModelId('systems.keyvalue.keycodepet')
+    app.setAppUserModelId(APP_ID)
   }
 
   await app.whenReady()
