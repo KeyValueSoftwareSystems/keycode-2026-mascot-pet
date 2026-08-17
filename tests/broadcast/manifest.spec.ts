@@ -524,19 +524,28 @@ describe('poll scheduling', () => {
   })
 
   it('ships a default manifest URL that a packaged build can actually fetch', () => {
-    // The shipped default lives in app-shell.ts, which imports electron and so cannot be imported
-    // here — read the source instead, the same way tests/renderer/discipline.spec.ts does.
+    // The shipped default lives in constants.ts and is wired through app-shell.ts. Neither file can
+    // be imported here (electron) — read the source instead, the same way tests/renderer/discipline.spec.ts does.
     //
     // Worth locking: a loopback or http:// default is refused outright by a packaged build, because
     // `allowLoopbackHttp` requires `!app.isPackaged`. Nothing would crash and no test would fail —
     // every install would just silently never receive an announcement, which is the failure mode
     // that takes a week to notice.
-    const source = readFileSync(
+    const shell = readFileSync(
       resolve(import.meta.dirname, '../../apps/desktop/src/main/app-shell.ts'),
       'utf8',
     )
-    const match = source.match(/resolveManifestUrl\(\s*process\.env,\s*'([^']+)'/)
-    expect(match, 'could not find the resolveManifestUrl fallback in app-shell.ts').not.toBeNull()
+    expect(
+      /resolveManifestUrl\(\s*process\.env,\s*DEFAULT_MANIFEST_URL,?\s*\)/.test(shell),
+      'app-shell.ts must pass DEFAULT_MANIFEST_URL to resolveManifestUrl',
+    ).toBe(true)
+
+    const constants = readFileSync(
+      resolve(import.meta.dirname, '../../apps/desktop/src/config/constants.ts'),
+      'utf8',
+    )
+    const match = constants.match(/export const DEFAULT_MANIFEST_URL\s*=\s*\n?\s*'([^']+)'/)
+    expect(match, 'could not find DEFAULT_MANIFEST_URL in constants.ts').not.toBeNull()
 
     const fallback = match![1]!
     expect(fallback).toMatch(/^https:\/\//)
