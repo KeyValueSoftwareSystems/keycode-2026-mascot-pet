@@ -177,6 +177,7 @@ export function shapeRectsForFrame(
     animation: string
     bubbleVisible: boolean
     overlayVisible: boolean
+    quickMenuVisible?: boolean
     bubbleSide?: BubbleSide
   },
   options: { paddingPx?: number } = {},
@@ -197,6 +198,17 @@ export function shapeRectsForFrame(
       y: Math.max(0, layout.spriteOrigin.y),
       width: Math.round(mask.frameWidth * s),
       height: Math.round(mask.frameHeight * s),
+    })
+  }
+
+  // Hover zap chip sits beside the body; cover a strip to the right of the cell so Linux paints it.
+  if (frame.quickMenuVisible) {
+    const chip = Math.round(44 * s)
+    rects.push({
+      x: Math.max(0, layout.spriteOrigin.x + Math.round(mask.frameWidth * s) - Math.round(8 * s)),
+      y: Math.max(0, layout.spriteOrigin.y + Math.round(mask.frameHeight * s * 0.28)),
+      width: chip,
+      height: chip,
     })
   }
 

@@ -19,7 +19,6 @@ import {
   planNext,
   planDwell,
   planAct,
-  planSleepCycle,
   runAnimationFor,
   jumpAnimationFor,
   idleAnimationFor,
@@ -52,6 +51,7 @@ export function initialState(options: {
     animationEndsAt: null,
     plan: { kind: 'dwell', untilMs: options.now, state: animation },
     dragging: false,
+    hovering: false,
     movementEnabled: options.movementEnabled,
     rngSeed: options.seed | 0,
     lastTickAt: options.now,
@@ -141,7 +141,7 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
         // Held for as long as the drag lasts; drag-end replaces it.
         holdMs: Number.MAX_SAFE_INTEGER,
       })
-      return { ...adopt(state, choice), dragging: true }
+      return { ...adopt(state, choice), dragging: true, hovering: false }
     }
 
     case 'drag-end': {
@@ -165,19 +165,42 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
       return adopt(dropped, choice)
     }
 
+    case 'hover-start': {
+      if (state.dragging) return state
+      const choice = planAct(state.rngSeed, input.now, state.facing, idleAnimationFor(state.facing), {
+        holdMs: Number.MAX_SAFE_INTEGER,
+      })
+      return { ...adopt(state, choice), hovering: true }
+    }
+
+    case 'hover-end': {
+      if (!state.hovering) return state
+      const next = { ...state, hovering: false }
+      if (!next.movementEnabled) {
+        return adopt(
+          next,
+          planAct(next.rngSeed, input.now, next.facing, config.sleepAnimation, {
+            holdMs: Number.MAX_SAFE_INTEGER,
+          }),
+        )
+      }
+      return adopt(next, planDwell(next.rngSeed, input.now, next.facing, config, { range: { min: 200, max: 600 } }))
+    }
+
     case 'movement-changed': {
       if (trigger.enabled === state.movementEnabled) return state
-      const next = { ...state, movementEnabled: trigger.enabled }
+      const next = { ...state, movementEnabled: trigger.enabled, hovering: false }
       if (trigger.enabled) {
-        return adopt(next, planDwell(next.rngSeed, input.now, next.facing, config, { range: { min: 200, max: 600 } }))
+        // Stand up from the ground before resuming life.
+        return adopt(
+          next,
+          planAct(next.rngSeed, input.now, next.facing, config.sleepExitAnimation, { playful: true }),
+        )
       }
-      // Sleep is the acknowledgement that the toggle landed; the in-place cycle follows.
+      // Lie down, then the in-place path holds the on-ground loop.
       return adopt(
         next,
-        planDwell(next.rngSeed, input.now, next.facing, config, {
-          state: config.sleepAnimation,
-          range: config.sleepSettleMs,
-        }),
+        planAct(next.rngSeed, input.now, next.facing, config.sleepEnterAnimation, { playful: true }),
       )
     }
 
@@ -217,9 +240,9 @@ export function advance(
     next = applyTrigger(next, trigger, input, config)
   }
 
-  // While dragging, position is owned by main (it follows the cursor), so the engine holds still.
-  // Both axes are still clamped, so a drag cannot carry the pet outside the envelope.
-  if (next.dragging) {
+  // While dragging or the hover menu is open, position freezes (main owns the cursor for drag).
+  // Both axes are still clamped, so neither path can carry the pet outside the envelope.
+  if (next.dragging || next.hovering) {
     return settleFeetY({ ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }, input)
   }
 
@@ -233,10 +256,10 @@ export function advance(
     // Abandon a run *this tick*, with x unchanged. Not teleporting to targetX matters: the toggle
     // must stop the pet where it stands, not snap it to where it was heading.
     if (next.plan.kind === 'run') {
-      next = adopt(next, planDwell(next.rngSeed, input.now, next.facing, config, {
-        state: config.sleepAnimation,
-        range: config.sleepSettleMs,
-      }))
+      next = adopt(
+        next,
+        planAct(next.rngSeed, input.now, next.facing, config.sleepEnterAnimation, { playful: true }),
+      )
     }
     return advanceInPlace(next, input, dt, config, true)
   }
@@ -309,7 +332,12 @@ function advanceInPlace(
       if (input.now < next.plan.untilMs) break
       next = { ...next, stats: { ...next.stats, plansCompleted: next.stats.plansCompleted + 1 } }
       next = asleep
-        ? adopt(next, planSleepCycle(next.rngSeed, input.now, next.facing, config))
+        ? adopt(
+            next,
+            planAct(next.rngSeed, input.now, next.facing, config.sleepAnimation, {
+              holdMs: Number.MAX_SAFE_INTEGER,
+            }),
+          )
         : adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config))
       break
     }
@@ -321,9 +349,17 @@ function advanceInPlace(
       }
       if (input.now < plan.endsAt) break
       next = { ...next, stats: { ...next.stats, plansCompleted: next.stats.plansCompleted + 1 } }
-      next = asleep
-        ? adopt(next, planSleepCycle(next.rngSeed, input.now, next.facing, config))
-        : adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config))
+      if (asleep) {
+        // After lying down, hold the on-ground loop until woken — do not replay stand→lie.
+        next = adopt(
+          next,
+          planAct(next.rngSeed, input.now, next.facing, config.sleepAnimation, {
+            holdMs: Number.MAX_SAFE_INTEGER,
+          }),
+        )
+      } else {
+        next = adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config))
+      }
       break
     }
   }
@@ -333,11 +369,11 @@ function advanceInPlace(
   if (!asleep && next.plan.kind === 'run' && hasRoomToRun(next.x, input.floor)) {
     const roll = nextJumpRoll(next.rngSeed, config.jumpChance, dt)
     if (roll.jump) {
-      const direction = next.facing === 'left' ? -1 : 1
       next = adopt(
         { ...next, rngSeed: roll.seed },
         planAct(roll.seed, input.now, next.facing, jumpAnimationFor(next.facing), {
-          driftPxPerSec: direction * next.plan.speedPxPerSec * config.jumpDriftFactor,
+          driftPxPerSec:
+            (next.plan.targetX >= next.x ? 1 : -1) * next.plan.speedPxPerSec * config.jumpDriftFactor,
           playful: true,
         }),
       )

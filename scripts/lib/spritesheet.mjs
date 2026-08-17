@@ -29,6 +29,7 @@ export class SpritesheetError extends Error {
  * @property {string} name
  * @property {number} row
  * @property {number} frames
+ * @property {number} startColumn First column on the row (0 = leftmost). Lets one row host enter/loop/exit phases.
  * @property {number} durationMs
  * @property {number | 'infinite'} iterations
  * @property {number | null} totalMs Wall-clock length, or null when it loops forever.
@@ -83,6 +84,19 @@ export function loadSpritesheet(path = SPRITESHEET_JSON) {
         `state "${name}" declares ${frames} frames but the sheet only has ${sheet.columns} columns.`,
       )
     }
+
+    const startColumn = raw.startColumn === undefined ? 0 : raw.startColumn
+    if (!Number.isInteger(startColumn) || startColumn < 0) {
+      throw new SpritesheetError(
+        `state "${name}" startColumn must be a non-negative integer, got ${startColumn}.`,
+      )
+    }
+    if (startColumn + frames > sheet.columns) {
+      throw new SpritesheetError(
+        `state "${name}" startColumn ${startColumn} + ${frames} frames exceeds ${sheet.columns} columns.`,
+      )
+    }
+
     if (!Number.isFinite(durationMs) || durationMs <= 0) {
       throw new SpritesheetError(`state "${name}" durationMs must be positive, got ${durationMs}.`)
     }
@@ -99,6 +113,7 @@ export function loadSpritesheet(path = SPRITESHEET_JSON) {
       name,
       row,
       frames,
+      startColumn,
       durationMs,
       iterations,
       totalMs: iterations === 'infinite' ? null : durationMs * iterations,

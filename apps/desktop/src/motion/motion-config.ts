@@ -52,8 +52,12 @@ export interface MotionConfig {
   dragAnimation: AnimationState
   /** Played once on drop. Finite is fine — it is a beat, not a pose. */
   dropAnimation: AnimationState
-  /** Pose when movement is switched off. */
+  /** Lie-down beat when movement is switched off. Finite. */
+  sleepEnterAnimation: AnimationState
+  /** On-ground sleep loop while movement stays off. Must be sustained. */
   sleepAnimation: AnimationState
+  /** Stand-up beat when movement is switched back on. Finite. */
+  sleepExitAnimation: AnimationState
   /** Neutral standing pose. */
   idleAnimation: AnimationState
 
@@ -71,12 +75,12 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   dtClampMs: 250,
 
   runSpeedPxPerSec: { min: 70, max: 130 },
-  runDistancePx: { min: 140, max: 520 },
+  runDistancePx: { min: 180, max: 560 },
 
   dwellMs: { min: 900, max: 4_200 },
   edgePauseMs: { min: 260, max: 700 },
 
-  skidChance: 0.35,
+  skidChance: 0,
   skidMs: 200,
   skidDriftFactor: 0.35,
 
@@ -84,13 +88,15 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   jumpDriftFactor: 0.6,
 
   idleActivityWeights: { run: 6, dwell: 3, act: 2 },
-  // `running` here is row 7, the in-place busy loop — NOT locomotion. `review` is the
-  // hand-to-chin thinking pose.
-  idleActs: ['review', 'running'],
+  // `review` is the hand-to-chin thinking pose. Do not idle into `running`: that reuses the
+  // locomotion row and reads as a planted jog.
+  idleActs: ['review'],
 
   dragAnimation: 'running',
   dropAnimation: 'waving',
+  sleepEnterAnimation: 'sleep-enter',
   sleepAnimation: 'sleep',
+  sleepExitAnimation: 'sleep-exit',
   idleAnimation: 'idle',
 
   sleepSettleMs: { min: 6_000, max: 14_000 },

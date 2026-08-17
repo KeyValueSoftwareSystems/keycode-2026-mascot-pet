@@ -85,8 +85,9 @@ function buildCss(sheet, states, holdStrategy) {
 
   for (const state of states) {
     const y = -state.row * sheet.frameHeight
-    const lastFrameX = -(state.frames - 1) * sheet.frameWidth
-    const pastEndX = -state.frames * sheet.frameWidth
+    const startX = -(state.startColumn ?? 0) * sheet.frameWidth
+    const lastFrameX = startX - (state.frames - 1) * sheet.frameWidth
+    const pastEndX = startX - state.frames * sheet.frameWidth
     const iterations = state.iterations === 'infinite' ? 'infinite' : String(state.iterations)
 
     for (const nonce of NONCES) {
@@ -94,7 +95,7 @@ function buildCss(sheet, states, holdStrategy) {
       if (holdStrategy === 'explicit-last') {
         lines.push(
           `@keyframes ${name} {`,
-          `  from { background-position: 0 ${y}px; }`,
+          `  from { background-position: ${startX}px ${y}px; }`,
           `  99.9% { background-position: ${pastEndX}px ${y}px; }`,
           `  to { background-position: ${lastFrameX}px ${y}px; }`,
           '}',
@@ -102,7 +103,7 @@ function buildCss(sheet, states, holdStrategy) {
       } else {
         lines.push(
           `@keyframes ${name} {`,
-          `  from { background-position: 0 ${y}px; }`,
+          `  from { background-position: ${startX}px ${y}px; }`,
           `  to { background-position: ${lastFrameX}px ${y}px; }`,
           '}',
         )
@@ -131,7 +132,7 @@ function buildTs(sheet, states, aliases, reactionMap) {
   const specEntries = states
     .map(
       (s) =>
-        `  '${s.name}': { row: ${s.row}, frames: ${s.frames}, durationMs: ${s.durationMs}, ` +
+        `  '${s.name}': { row: ${s.row}, frames: ${s.frames}, startColumn: ${s.startColumn ?? 0}, durationMs: ${s.durationMs}, ` +
         `iterations: ${s.iterations === 'infinite' ? "'infinite'" : s.iterations}, ` +
         `totalMs: ${s.totalMs === null ? 'null' : s.totalMs} },`,
     )
@@ -159,6 +160,8 @@ export interface AnimationSpec {
   readonly row: number
   /** Frame count; also the \`steps()\` count. */
   readonly frames: number
+  /** First column on the row. Non-zero for mid-row phases (e.g. sleep loop / exit). */
+  readonly startColumn: number
   /** Length of one iteration. */
   readonly durationMs: number
   readonly iterations: number | 'infinite'

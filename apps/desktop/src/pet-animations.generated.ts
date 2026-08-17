@@ -7,6 +7,7 @@
 /** Every animation state the current art actually provides. */
 export type AnimationState =
   | 'drink'
+  | 'electrocute'
   | 'failed'
   | 'idle'
   | 'idle-left'
@@ -14,10 +15,13 @@ export type AnimationState =
   | 'jumping-left'
   | 'jumping-right'
   | 'review'
+  | 'review-left'
   | 'running'
   | 'running-left'
   | 'running-right'
   | 'sleep'
+  | 'sleep-enter'
+  | 'sleep-exit'
   | 'stretch'
   | 'waving'
 
@@ -44,12 +48,15 @@ export type Trigger =
   | 'movement-disabled'
   | 'movement-enabled'
   | 'drag-release'
+  | 'zap'
 
 export interface AnimationSpec {
   /** Row in the spritesheet. */
   readonly row: number
   /** Frame count; also the `steps()` count. */
   readonly frames: number
+  /** First column on the row. Non-zero for mid-row phases (e.g. sleep loop / exit). */
+  readonly startColumn: number
   /** Length of one iteration. */
   readonly durationMs: number
   readonly iterations: number | 'infinite'
@@ -62,25 +69,30 @@ export interface AnimationSpec {
 }
 
 export const ANIMATIONS: { readonly [K in AnimationState]: AnimationSpec } = {
-  'drink': { row: 4, frames: 11, durationMs: 2200, iterations: 2, totalMs: 4400 },
-  'failed': { row: 0, frames: 2, durationMs: 1220, iterations: 2, totalMs: 2440 },
-  'idle': { row: 0, frames: 2, durationMs: 2000, iterations: 'infinite', totalMs: null },
-  'idle-left': { row: 6, frames: 2, durationMs: 2000, iterations: 'infinite', totalMs: null },
-  'jumping': { row: 3, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
-  'jumping-left': { row: 5, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
-  'jumping-right': { row: 3, frames: 19, durationMs: 4800, iterations: 1, totalMs: 4800 },
-  'review': { row: 0, frames: 2, durationMs: 1030, iterations: 'infinite', totalMs: null },
-  'running': { row: 0, frames: 2, durationMs: 820, iterations: 'infinite', totalMs: null },
-  'running-left': { row: 2, frames: 6, durationMs: 800, iterations: 'infinite', totalMs: null },
-  'running-right': { row: 1, frames: 6, durationMs: 800, iterations: 'infinite', totalMs: null },
-  'sleep': { row: 0, frames: 2, durationMs: 16000, iterations: 'infinite', totalMs: null },
-  'stretch': { row: 3, frames: 19, durationMs: 5600, iterations: 1, totalMs: 5600 },
-  'waving': { row: 0, frames: 2, durationMs: 1400, iterations: 2, totalMs: 2800 },
+  'drink': { row: 4, frames: 11, startColumn: 0, durationMs: 2200, iterations: 2, totalMs: 4400 },
+  'electrocute': { row: 11, frames: 6, startColumn: 0, durationMs: 720, iterations: 2, totalMs: 1440 },
+  'failed': { row: 0, frames: 2, startColumn: 0, durationMs: 1220, iterations: 2, totalMs: 2440 },
+  'idle': { row: 0, frames: 2, startColumn: 0, durationMs: 2000, iterations: 'infinite', totalMs: null },
+  'idle-left': { row: 6, frames: 2, startColumn: 0, durationMs: 2000, iterations: 'infinite', totalMs: null },
+  'jumping': { row: 3, frames: 19, startColumn: 0, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'jumping-left': { row: 5, frames: 19, startColumn: 0, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'jumping-right': { row: 3, frames: 19, startColumn: 0, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'review': { row: 9, frames: 21, startColumn: 0, durationMs: 4200, iterations: 'infinite', totalMs: null },
+  'review-left': { row: 10, frames: 21, startColumn: 0, durationMs: 4200, iterations: 'infinite', totalMs: null },
+  'running': { row: 1, frames: 6, startColumn: 0, durationMs: 800, iterations: 'infinite', totalMs: null },
+  'running-left': { row: 2, frames: 6, startColumn: 0, durationMs: 800, iterations: 'infinite', totalMs: null },
+  'running-right': { row: 1, frames: 6, startColumn: 0, durationMs: 800, iterations: 'infinite', totalMs: null },
+  'sleep': { row: 8, frames: 10, startColumn: 8, durationMs: 4000, iterations: 'infinite', totalMs: null },
+  'sleep-enter': { row: 8, frames: 8, startColumn: 0, durationMs: 1600, iterations: 1, totalMs: 1600 },
+  'sleep-exit': { row: 8, frames: 2, startColumn: 23, durationMs: 500, iterations: 1, totalMs: 500 },
+  'stretch': { row: 3, frames: 19, startColumn: 0, durationMs: 5600, iterations: 1, totalMs: 5600 },
+  'waving': { row: 7, frames: 18, startColumn: 0, durationMs: 2700, iterations: 1, totalMs: 2700 },
 }
 
 /** Declaration order is sorted, so this is stable across regenerations. */
 export const ANIMATION_STATES = [
   'drink',
+  'electrocute',
   'failed',
   'idle',
   'idle-left',
@@ -88,10 +100,13 @@ export const ANIMATION_STATES = [
   'jumping-left',
   'jumping-right',
   'review',
+  'review-left',
   'running',
   'running-left',
   'running-right',
   'sleep',
+  'sleep-enter',
+  'sleep-exit',
   'stretch',
   'waving',
 ] as const satisfies readonly AnimationState[]
@@ -99,10 +114,10 @@ export const ANIMATION_STATES = [
 export const SHEET = {
   frameWidth: 192,
   frameHeight: 208,
-  columns: 19,
-  rows: 7,
-  width: 3648,
-  height: 1456,
+  columns: 25,
+  rows: 12,
+  width: 4800,
+  height: 2496,
   fileName: "spritesheet.png",
 } as const
 
@@ -138,9 +153,10 @@ export const REACTION_MAP: { readonly [K in Trigger]: AnimationState } = {
   'thinking': 'review',
   'busy': 'running',
   'error': 'failed',
-  'movement-disabled': 'sleep',
-  'movement-enabled': 'idle',
+  'movement-disabled': 'sleep-enter',
+  'movement-enabled': 'sleep-exit',
   'drag-release': 'waving',
+  'zap': 'electrocute',
 }
 
 export function isAnimationState(value: unknown): value is AnimationState {

@@ -37,6 +37,11 @@ export function idleAnimationFor(facing: Facing): AnimationState {
   return facing === 'left' ? 'idle-left' : 'idle'
 }
 
+/** Thinking row for a direction. Same rule as idle: a row, not a CSS flip. */
+export function reviewAnimationFor(facing: Facing): AnimationState {
+  return facing === 'left' ? 'review-left' : 'review'
+}
+
 function scaled(seed: number, range: { min: number; max: number }): { value: number; seed: number } {
   const draw = nextFloat(seed)
   return { value: range.min + draw.value * (range.max - range.min), seed: draw.seed }
@@ -142,16 +147,24 @@ export function planAct(
   state: AnimationState,
   options: { holdMs?: number; driftPxPerSec?: number; playful?: boolean } = {},
 ): PlanChoice {
-  const spec = ANIMATIONS[state]
+  // `running` is the in-place busy/drag alias: reuse the locomotion row for this facing, planted.
+  // Do not redirect `running-left`/`running-right` — skid plays the opposite row on purpose.
+  const resolved =
+    state === 'running'
+      ? runAnimationFor(facing)
+      : state === 'review' || state === 'review-left'
+        ? reviewAnimationFor(facing)
+        : state
+  const spec = ANIMATIONS[resolved]
   const duration = options.holdMs ?? spec.totalMs ?? 1_200
   return {
     plan: {
       kind: 'act',
-      state,
+      state: resolved,
       endsAt: now + duration,
       driftPxPerSec: options.driftPxPerSec ?? 0,
     },
-    animation: state,
+    animation: resolved,
     facing,
     seed,
     playful: options.playful ?? false,
@@ -185,9 +198,12 @@ export function planNext(
 
   switch (choice.value) {
     case 'run':
-      return planRun(choice.seed, x, floor, config)
-    case 'dwell':
-      return planDwell(choice.seed, now, facing, config)
+      // Keep the current heading until the edge, so a rightward run does not flick left for a step.
+      return planRun(choice.seed, x, floor, config, facing)
+    case 'dwell': {
+      const cycle = ANIMATIONS[idleAnimationFor(facing)].durationMs
+      return planDwell(choice.seed, now, facing, config, { range: { min: cycle, max: cycle } })
+    }
     case 'act': {
       const pick = nextInt(choice.seed, 0, config.idleActs.length - 1)
       const state = config.idleActs[pick.value] ?? config.idleAnimation
@@ -199,29 +215,21 @@ export function planNext(
 /** Idling into an in-place animation needs an explicit hold, since those states loop forever. */
 function pickHold(state: AnimationState): number {
   const spec = ANIMATIONS[state]
-  // Two full cycles reads as a deliberate pause rather than a twitch.
-  return spec.totalMs ?? spec.durationMs * 2
+  // One cycle, then back to moving — a second loop reads as stuck.
+  return spec.totalMs ?? spec.durationMs
 }
 
-/** With movement off, drift between in-place poses so the pet naps rather than freezing. */
+/** With movement off, stay on the on-ground sleep loop until woken. */
 export function planSleepCycle(
   seed: number,
   now: number,
   facing: Facing,
   config: MotionConfig,
 ): PlanChoice {
-  const returnToSleep = nextChance(seed, config.sleepReturnChance)
-  if (returnToSleep.value) {
-    return planDwell(returnToSleep.seed, now, facing, config, {
-      state: config.sleepAnimation,
-      range: config.sleepSettleMs,
-      playful: true,
-    })
-  }
-
-  const pick = nextInt(returnToSleep.seed, 0, config.idleActs.length - 1)
-  const state = config.idleActs[pick.value] ?? config.idleAnimation
-  return planAct(pick.seed, now, facing, state, { holdMs: pickHold(state), playful: true })
+  return planAct(seed, now, facing, config.sleepAnimation, {
+    holdMs: Number.MAX_SAFE_INTEGER,
+    playful: true,
+  })
 }
 
 export function hasRoomToRun(x: number, floor: Floor): boolean {

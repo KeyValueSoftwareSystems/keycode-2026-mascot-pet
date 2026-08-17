@@ -91,6 +91,8 @@ export interface PetController {
    */
   place(position: { x: number; feetY: number }): void
   setCallout(callout: ActiveCallout | null): void
+  /** Show or hide the hover quick-action chips (zap, …). */
+  setQuickActions(actions: ReadonlyArray<'zap'>): void
   /**
    * Change the pet's size, keeping it where it is.
    *
@@ -126,6 +128,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
   let timer: NodeJS.Timeout | null = null
   let ticking = false
   let callout: ActiveCallout | null = null
+  let quickActions: ReadonlyArray<'zap'> = []
   let forcedState: string | null = null
   let dragOrigin: { cursorX: number; cursorY: number; petCentreX: number; feetY: number } | null = null
   let lastSentFrame: string | null = null
@@ -135,6 +138,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
     floorLocked: (options.startFeetY ?? null) === null,
   }
   let drinkLoopAt = 0
+  let waveLoopAt = 0
 
   const buildFrame = (): PetFrame => {
     const animation = forcedState ?? state.animation
@@ -155,6 +159,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
             actions: [...callout.actions],
           }
         : null,
+      quickActions: callout ? [] : [...quickActions],
       overlay: animation === config.sleepAnimation ? 'sleep-z' : 'none',
     }
   }
@@ -237,6 +242,17 @@ export function createPetController(options: PetControllerOptions): PetControlle
         }
       } else {
         drinkLoopAt = 0
+      }
+
+      const waveMs = ANIMATIONS.waving.totalMs ?? ANIMATIONS.waving.durationMs
+      if (callout && state.animation === 'waving') {
+        if (waveLoopAt === 0) waveLoopAt = timestamp
+        else if (timestamp - waveLoopAt >= waveMs - config.tickMs) {
+          waveLoopAt = timestamp
+          pending.push({ kind: 'reaction', state: 'waving', holdMs: Number.MAX_SAFE_INTEGER })
+        }
+      } else {
+        waveLoopAt = 0
       }
 
       // Before moving, not after: the bubble side changes `spriteOrigin`, and therefore what window y
@@ -360,6 +376,12 @@ export function createPetController(options: PetControllerOptions): PetControlle
     setCallout(next: ActiveCallout | null): void {
       callout = next
       if (!next || next.actions.length === 0) drinkLoopAt = 0
+      if (!next) waveLoopAt = 0
+      sendFrameIfChanged()
+    },
+
+    setQuickActions(actions: ReadonlyArray<'zap'>): void {
+      quickActions = actions
       sendFrameIfChanged()
     },
 

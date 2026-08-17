@@ -255,10 +255,15 @@ describe('pet size scaling', () => {
   })
 
   it('scales the hit-test so the grab margin stays constant on screen', () => {
-    // A point 1px outside the body: a hit at 1x must stay a hit at 0.5x, because the padding is
-    // converted into cell space rather than applied to already-shrunken geometry.
+    // Find a cell-space point that is a hit only thanks to padding (just off real opaque pixels),
+    // then confirm the same on-screen margin still hits at 0.5×. Using the union bbox edge is not
+    // enough: sleep lies wide near the feet, so the left of the bbox is empty at mid-body height.
     const bbox = ALPHA_MASK.bbox
-    const justOutside = { x: bbox.x - 1, y: bbox.y + bbox.height / 2 }
+    const y = bbox.y + bbox.height / 2
+    let edge = bbox.x
+    while (edge < bbox.x + bbox.width && !isOpaqueAt(ALPHA_MASK, edge, y, 0)) edge += 1
+    const justOutside = { x: edge - 1, y }
+    expect(isOpaqueAt(ALPHA_MASK, justOutside.x, justOutside.y, 0)).toBe(false)
     expect(isOpaqueAt(ALPHA_MASK, justOutside.x, justOutside.y)).toBe(true)
     expect(
       isOpaqueAt(ALPHA_MASK, justOutside.x * 0.5, justOutside.y * 0.5, undefined, 0.5),

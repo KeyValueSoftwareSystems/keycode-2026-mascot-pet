@@ -38,7 +38,7 @@ export function buildUnion(png, sheet, states) {
     let highestOpaqueRow = fh
 
     for (let frame = 0; frame < state.frames; frame += 1) {
-      const originX = frame * fw
+      const originX = ((state.startColumn ?? 0) + frame) * fw
       const originY = state.row * fh
       let opaque = 0
 

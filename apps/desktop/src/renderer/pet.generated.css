@@ -8,7 +8,7 @@
   width: 192px;
   height: 208px;
   background-repeat: no-repeat;
-  background-size: 3648px 1456px;
+  background-size: 4800px 2496px;
   background-position: 0 0;
   /* REQUIRED, not stylistic: without it the browser smooths the pixel art into mush,
      and it is worst on exactly the HiDPI displays this is developed on. */
@@ -16,11 +16,11 @@
 }
 
 @keyframes kp-drink-0 {
-  from { background-position: 0 -832px; }
+  from { background-position: 0px -832px; }
   to { background-position: -1920px -832px; }
 }
 @keyframes kp-drink-1 {
-  from { background-position: 0 -832px; }
+  from { background-position: 0px -832px; }
   to { background-position: -1920px -832px; }
 }
 .pet-sprite[data-state="drink"][data-nonce="0"] {
@@ -30,12 +30,27 @@
   animation: kp-drink-1 2200ms steps(11, jump-none) 2 forwards;
 }
 
+@keyframes kp-electrocute-0 {
+  from { background-position: 0px -2288px; }
+  to { background-position: -960px -2288px; }
+}
+@keyframes kp-electrocute-1 {
+  from { background-position: 0px -2288px; }
+  to { background-position: -960px -2288px; }
+}
+.pet-sprite[data-state="electrocute"][data-nonce="0"] {
+  animation: kp-electrocute-0 720ms steps(6, jump-none) 2 forwards;
+}
+.pet-sprite[data-state="electrocute"][data-nonce="1"] {
+  animation: kp-electrocute-1 720ms steps(6, jump-none) 2 forwards;
+}
+
 @keyframes kp-failed-0 {
-  from { background-position: 0 0px; }
+  from { background-position: 0px 0px; }
   to { background-position: -192px 0px; }
 }
 @keyframes kp-failed-1 {
-  from { background-position: 0 0px; }
+  from { background-position: 0px 0px; }
   to { background-position: -192px 0px; }
 }
 .pet-sprite[data-state="failed"][data-nonce="0"] {
@@ -46,11 +61,11 @@
 }
 
 @keyframes kp-idle-0 {
-  from { background-position: 0 0px; }
+  from { background-position: 0px 0px; }
   to { background-position: -192px 0px; }
 }
 @keyframes kp-idle-1 {
-  from { background-position: 0 0px; }
+  from { background-position: 0px 0px; }
   to { background-position: -192px 0px; }
 }
 .pet-sprite[data-state="idle"][data-nonce="0"] {
@@ -61,11 +76,11 @@
 }
 
 @keyframes kp-idle-left-0 {
-  from { background-position: 0 -1248px; }
+  from { background-position: 0px -1248px; }
   to { background-position: -192px -1248px; }
 }
 @keyframes kp-idle-left-1 {
-  from { background-position: 0 -1248px; }
+  from { background-position: 0px -1248px; }
   to { background-position: -192px -1248px; }
 }
 .pet-sprite[data-state="idle-left"][data-nonce="0"] {
@@ -76,11 +91,11 @@
 }
 
 @keyframes kp-jumping-0 {
-  from { background-position: 0 -624px; }
+  from { background-position: 0px -624px; }
   to { background-position: -3456px -624px; }
 }
 @keyframes kp-jumping-1 {
-  from { background-position: 0 -624px; }
+  from { background-position: 0px -624px; }
   to { background-position: -3456px -624px; }
 }
 .pet-sprite[data-state="jumping"][data-nonce="0"] {
@@ -91,11 +106,11 @@
 }
 
 @keyframes kp-jumping-left-0 {
-  from { background-position: 0 -1040px; }
+  from { background-position: 0px -1040px; }
   to { background-position: -3456px -1040px; }
 }
 @keyframes kp-jumping-left-1 {
-  from { background-position: 0 -1040px; }
+  from { background-position: 0px -1040px; }
   to { background-position: -3456px -1040px; }
 }
 .pet-sprite[data-state="jumping-left"][data-nonce="0"] {
@@ -106,11 +121,11 @@
 }
 
 @keyframes kp-jumping-right-0 {
-  from { background-position: 0 -624px; }
+  from { background-position: 0px -624px; }
   to { background-position: -3456px -624px; }
 }
 @keyframes kp-jumping-right-1 {
-  from { background-position: 0 -624px; }
+  from { background-position: 0px -624px; }
   to { background-position: -3456px -624px; }
 }
 .pet-sprite[data-state="jumping-right"][data-nonce="0"] {
@@ -121,41 +136,56 @@
 }
 
 @keyframes kp-review-0 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: 0px -1872px; }
+  to { background-position: -3840px -1872px; }
 }
 @keyframes kp-review-1 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: 0px -1872px; }
+  to { background-position: -3840px -1872px; }
 }
 .pet-sprite[data-state="review"][data-nonce="0"] {
-  animation: kp-review-0 1030ms steps(2, jump-none) infinite forwards;
+  animation: kp-review-0 4200ms steps(21, jump-none) infinite forwards;
 }
 .pet-sprite[data-state="review"][data-nonce="1"] {
-  animation: kp-review-1 1030ms steps(2, jump-none) infinite forwards;
+  animation: kp-review-1 4200ms steps(21, jump-none) infinite forwards;
+}
+
+@keyframes kp-review-left-0 {
+  from { background-position: 0px -2080px; }
+  to { background-position: -3840px -2080px; }
+}
+@keyframes kp-review-left-1 {
+  from { background-position: 0px -2080px; }
+  to { background-position: -3840px -2080px; }
+}
+.pet-sprite[data-state="review-left"][data-nonce="0"] {
+  animation: kp-review-left-0 4200ms steps(21, jump-none) infinite forwards;
+}
+.pet-sprite[data-state="review-left"][data-nonce="1"] {
+  animation: kp-review-left-1 4200ms steps(21, jump-none) infinite forwards;
 }
 
 @keyframes kp-running-0 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: 0px -208px; }
+  to { background-position: -960px -208px; }
 }
 @keyframes kp-running-1 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: 0px -208px; }
+  to { background-position: -960px -208px; }
 }
 .pet-sprite[data-state="running"][data-nonce="0"] {
-  animation: kp-running-0 820ms steps(2, jump-none) infinite forwards;
+  animation: kp-running-0 800ms steps(6, jump-none) infinite forwards;
 }
 .pet-sprite[data-state="running"][data-nonce="1"] {
-  animation: kp-running-1 820ms steps(2, jump-none) infinite forwards;
+  animation: kp-running-1 800ms steps(6, jump-none) infinite forwards;
 }
 
 @keyframes kp-running-left-0 {
-  from { background-position: 0 -416px; }
+  from { background-position: 0px -416px; }
   to { background-position: -960px -416px; }
 }
 @keyframes kp-running-left-1 {
-  from { background-position: 0 -416px; }
+  from { background-position: 0px -416px; }
   to { background-position: -960px -416px; }
 }
 .pet-sprite[data-state="running-left"][data-nonce="0"] {
@@ -166,11 +196,11 @@
 }
 
 @keyframes kp-running-right-0 {
-  from { background-position: 0 -208px; }
+  from { background-position: 0px -208px; }
   to { background-position: -960px -208px; }
 }
 @keyframes kp-running-right-1 {
-  from { background-position: 0 -208px; }
+  from { background-position: 0px -208px; }
   to { background-position: -960px -208px; }
 }
 .pet-sprite[data-state="running-right"][data-nonce="0"] {
@@ -181,26 +211,56 @@
 }
 
 @keyframes kp-sleep-0 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: -1536px -1664px; }
+  to { background-position: -3264px -1664px; }
 }
 @keyframes kp-sleep-1 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: -1536px -1664px; }
+  to { background-position: -3264px -1664px; }
 }
 .pet-sprite[data-state="sleep"][data-nonce="0"] {
-  animation: kp-sleep-0 16000ms steps(2, jump-none) infinite forwards;
+  animation: kp-sleep-0 4000ms steps(10, jump-none) infinite forwards;
 }
 .pet-sprite[data-state="sleep"][data-nonce="1"] {
-  animation: kp-sleep-1 16000ms steps(2, jump-none) infinite forwards;
+  animation: kp-sleep-1 4000ms steps(10, jump-none) infinite forwards;
+}
+
+@keyframes kp-sleep-enter-0 {
+  from { background-position: 0px -1664px; }
+  to { background-position: -1344px -1664px; }
+}
+@keyframes kp-sleep-enter-1 {
+  from { background-position: 0px -1664px; }
+  to { background-position: -1344px -1664px; }
+}
+.pet-sprite[data-state="sleep-enter"][data-nonce="0"] {
+  animation: kp-sleep-enter-0 1600ms steps(8, jump-none) 1 forwards;
+}
+.pet-sprite[data-state="sleep-enter"][data-nonce="1"] {
+  animation: kp-sleep-enter-1 1600ms steps(8, jump-none) 1 forwards;
+}
+
+@keyframes kp-sleep-exit-0 {
+  from { background-position: -4416px -1664px; }
+  to { background-position: -4608px -1664px; }
+}
+@keyframes kp-sleep-exit-1 {
+  from { background-position: -4416px -1664px; }
+  to { background-position: -4608px -1664px; }
+}
+.pet-sprite[data-state="sleep-exit"][data-nonce="0"] {
+  animation: kp-sleep-exit-0 500ms steps(2, jump-none) 1 forwards;
+}
+.pet-sprite[data-state="sleep-exit"][data-nonce="1"] {
+  animation: kp-sleep-exit-1 500ms steps(2, jump-none) 1 forwards;
 }
 
 @keyframes kp-stretch-0 {
-  from { background-position: 0 -624px; }
+  from { background-position: 0px -624px; }
   to { background-position: -3456px -624px; }
 }
 @keyframes kp-stretch-1 {
-  from { background-position: 0 -624px; }
+  from { background-position: 0px -624px; }
   to { background-position: -3456px -624px; }
 }
 .pet-sprite[data-state="stretch"][data-nonce="0"] {
@@ -211,16 +271,16 @@
 }
 
 @keyframes kp-waving-0 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: 0px -1456px; }
+  to { background-position: -3264px -1456px; }
 }
 @keyframes kp-waving-1 {
-  from { background-position: 0 0px; }
-  to { background-position: -192px 0px; }
+  from { background-position: 0px -1456px; }
+  to { background-position: -3264px -1456px; }
 }
 .pet-sprite[data-state="waving"][data-nonce="0"] {
-  animation: kp-waving-0 1400ms steps(2, jump-none) 2 forwards;
+  animation: kp-waving-0 2700ms steps(18, jump-none) 1 forwards;
 }
 .pet-sprite[data-state="waving"][data-nonce="1"] {
-  animation: kp-waving-1 1400ms steps(2, jump-none) 2 forwards;
+  animation: kp-waving-1 2700ms steps(18, jump-none) 1 forwards;
 }
