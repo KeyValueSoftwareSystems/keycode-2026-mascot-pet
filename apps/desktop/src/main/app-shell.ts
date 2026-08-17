@@ -31,10 +31,9 @@ import type { MenuViewModel, UpdateState } from './menu-template.js'
 import { createReminderService, type ReminderService } from './reminder-service.js'
 import { createCalloutHost, type CalloutHost } from './callout-host.js'
 import { createToastManager, type ToastManager } from './toast.js'
-import { REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
-import { CLOCK_REMINDER_TRIGGERS } from '../reminders/clock-reminders.js'
-import { GREETING_TRIGGERS } from '../reminders/greetings.js'
-import type { Trigger } from '../pet-animations.generated.js'
+import { REMINDER_MESSAGES, REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
+import { CLOCK_REMINDER_MESSAGES, CLOCK_REMINDER_TRIGGERS } from '../reminders/clock-reminders.js'
+import { GREETING_MESSAGES, GREETING_TRIGGERS } from '../reminders/greetings.js'
 import {
   createPoller,
   resolveManifestUrl,
@@ -47,7 +46,9 @@ import { createUpdateService, type UpdateService } from '../updates/update-servi
 import { openExternalChecked } from './open-external.js'
 import {
   DEFAULT_ALWAYS_ON_TOP,
+  DEFAULT_MANIFEST_URL,
   DEFAULT_PET_SIZE,
+  DRINK_LOOP_GAP_MS,
   ISSUES_URL,
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
@@ -58,7 +59,7 @@ import {
   type PetSize,
 } from '../config/constants.js'
 import { bubbleSideFor, floorForWorkArea, placementForScale } from './floor-placement.js'
-import { isAnimationState, resolveTrigger } from '../pet-animations.generated.js'
+import { ANIMATIONS, isAnimationState, resolveTrigger, type Trigger } from '../pet-animations.generated.js'
 import { userDataDir, petAssetPath } from './paths.js'
 import { env } from '../config/env.js'
 import { log as fileLog, logFilePath } from './logger.js'
@@ -198,6 +199,7 @@ export async function startApp(): Promise<AppShell> {
       },
       onPointerOverPet(over): void {
         if (!over) return
+        if (callouts?.showing()?.holdMs != null) return
         const now = Date.now()
         if (now - lastHoverReactionAt < HOVER_REACTION_COOLDOWN_MS) return
         lastHoverReactionAt = now
@@ -219,6 +221,10 @@ export async function startApp(): Promise<AppShell> {
         pet.setDragging(false)
         // The controller owns the snap-to-floor rule, so it builds the trigger.
         controller?.endDrag()
+        const held = callouts?.showing()
+        if (held?.holdMs != null && held.animation) {
+          controller?.enqueue({ kind: 'reaction', state: held.animation, holdMs: held.holdMs })
+        }
         controller?.tickNow()
         const settled = controller?.position()
         const dropped = settled?.x ?? startX
@@ -236,10 +242,17 @@ export async function startApp(): Promise<AppShell> {
         // Main holds the URL and re-validates it here. The renderer only ever reported "the bubble was
         // clicked" and never saw a string — deciding what a click *means* is behaviour, so it lives
         // here rather than in the view.
+        if (callouts?.showing()?.actions?.length) return
         const url = callouts?.currentUrl()
         if (url) openExternalChecked(url, { log })
         // Dismiss either way. A sticky notification has no other way to go, and for a timed one this
         // just means a click gets rid of it early.
+        callouts?.dismissShowing()
+      },
+      onBubbleAction(action): void {
+        const showing = callouts?.showing()
+        if (!showing?.actions?.includes(action)) return
+        if (action === 'snooze' && showing.reminderKind) reminders.snooze(showing.reminderKind)
         callouts?.dismissShowing()
       },
     },
@@ -271,6 +284,7 @@ export async function startApp(): Promise<AppShell> {
   // ---- Callouts and reminders.
   const toasts = createToastManager({ log })
 
+  let holdingCalloutPose = false
   const callouts: CalloutHost = createCalloutHost({
     onShowingChanged(showing) {
       controller?.setCallout(
@@ -281,13 +295,25 @@ export async function startApp(): Promise<AppShell> {
               pinned: Boolean(showing.pin),
               clickable: Boolean(callouts.currentUrl()),
               // Sticky entries have no expiry, so a click is the only way they go.
-              dismissible: Boolean(showing.sticky),
+              dismissible: Boolean(showing.sticky) && !(showing.actions && showing.actions.length > 0),
+              actions: showing.actions ? [...showing.actions] : [],
             }
           : null,
       )
+      if (!showing && holdingCalloutPose) {
+        holdingCalloutPose = false
+        controller?.enqueue({ kind: 'reaction', state: 'idle' })
+        controller?.tickNow()
+      }
     },
     onAnimation(animation) {
-      controller?.enqueue({ kind: 'reaction', state: animation })
+      const holdMs = callouts.showing()?.holdMs
+      if (holdMs !== undefined) holdingCalloutPose = true
+      controller?.enqueue({
+        kind: 'reaction',
+        state: animation,
+        ...(holdMs === undefined ? {} : { holdMs }),
+      })
       controller?.tickNow()
     },
     onToast(request) {
@@ -307,6 +333,12 @@ export async function startApp(): Promise<AppShell> {
         tone: 'info',
         priority: 'normal',
         animation: resolveTrigger(REMINDER_TRIGGERS[kind]),
+        reminderKind: kind,
+        sticky: true,
+        actions: ['ok', 'snooze'],
+        ...(kind === 'water'
+          ? { holdMs: (ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs) + DRINK_LOOP_GAP_MS }
+          : {}),
       })
     },
     onClockFire(kind, message) {
@@ -348,7 +380,7 @@ export async function startApp(): Promise<AppShell> {
 
   const manifestUrl = resolveManifestUrl(
     process.env,
-    'https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json',
+    DEFAULT_MANIFEST_URL,
   )
 
   // TWO independent conditions. `app.isPackaged` is not env-overridable, so a shipped build cannot be
@@ -497,6 +529,8 @@ export async function startApp(): Promise<AppShell> {
       coffee: current.coffeeReminderEnabled,
       lunch: current.lunchReminderEnabled,
       update: updateState,
+      // Packaged builds must not ship a "fire now" escape hatch.
+      devTools: !app.isPackaged,
     }
   }
 
@@ -559,6 +593,40 @@ export async function startApp(): Promise<AppShell> {
       void updates?.checkNow()
     },
     quit: () => app.quit(),
+    fireReminderNow(kind) {
+      if (kind === 'coffee' || kind === 'lunch') {
+        callouts.show({
+          sourceId: 'reminder',
+          text: CLOCK_REMINDER_MESSAGES[kind],
+          tone: 'info',
+          priority: 'normal',
+          animation: resolveTrigger(CLOCK_REMINDER_TRIGGERS[kind]),
+        })
+        return
+      }
+      callouts.show({
+        sourceId: 'reminder',
+        text: REMINDER_MESSAGES[kind],
+        tone: 'info',
+        priority: 'normal',
+        animation: resolveTrigger(REMINDER_TRIGGERS[kind]),
+        reminderKind: kind,
+        sticky: true,
+        actions: ['ok', 'snooze'],
+        ...(kind === 'water'
+          ? { holdMs: (ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs) + DRINK_LOOP_GAP_MS }
+          : {}),
+      })
+    },
+    fireGreetingNow(period) {
+      callouts.show({
+        sourceId: 'reminder',
+        text: GREETING_MESSAGES[period],
+        tone: 'info',
+        priority: 'low',
+        animation: resolveTrigger(GREETING_TRIGGERS[period]),
+      })
+    },
     log,
   })
 
@@ -728,7 +796,7 @@ async function showAbout(pet: PetMetadata, recoveryReason: string | null): Promi
 
   await dialog.showMessageBox({
     type: 'info',
-    message: 'Keycode Pet',
+    message: PRODUCT_NAME,
     detail,
     buttons: ['OK'],
     noLink: true,

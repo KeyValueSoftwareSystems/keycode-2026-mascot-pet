@@ -41,6 +41,8 @@ function noopActions(): MenuActions {
     setPetSize: () => {},
     setReminder: () => {},
     toggleClockReminder: () => {},
+    fireReminderNow: () => {},
+    fireGreetingNow: () => {},
     resetPosition: () => {},
     checkForUpdates: () => {},
     showAbout: () => {},
@@ -59,7 +61,7 @@ describe('menu template', () => {
       item.type === 'separator' ? 'separator' : (item.label ?? ''),
     )
     expect(kinds).toEqual([
-      'Keycode Pet',
+      'Argus',
       'separator',
       'Movement',
       'Always on top',
@@ -76,6 +78,36 @@ describe('menu template', () => {
       'separator',
       'Quit',
     ])
+  })
+
+  it('hides the Dev fire-now items unless asked', () => {
+    expect(buildMenuTemplate(view(), noopActions()).some((item) => item.label === 'Dev')).toBe(false)
+  })
+
+  it('adds a Dev submenu that fires each reminder immediately', () => {
+    const fireReminderNow = vi.fn()
+    const fireGreetingNow = vi.fn()
+    const template = buildMenuTemplate(view({ devTools: true }), {
+      ...noopActions(),
+      fireReminderNow,
+      fireGreetingNow,
+    })
+    const dev = template.find((item) => item.label === 'Dev')
+    expect(dev).toBeDefined()
+    const submenu = (dev?.submenu ?? []) as Array<{ label?: string; click?: () => void; type?: string }>
+    expect(submenu.map((item) => item.label ?? item.type)).toEqual([
+      'Fire drink now',
+      'Fire stretch now',
+      'Fire coffee now',
+      'Fire lunch now',
+      'separator',
+      'Fire good morning',
+      'Fire good afternoon',
+      'Fire good evening',
+    ])
+    for (const item of submenu) item.click?.()
+    expect(fireReminderNow.mock.calls).toEqual([['water'], ['stretch'], ['coffee'], ['lunch']])
+    expect(fireGreetingNow.mock.calls).toEqual([['morning'], ['afternoon'], ['evening']])
   })
 
   it('marks always-on-top as a default when nobody chose it', () => {
@@ -124,6 +156,8 @@ describe('menu template', () => {
       setPetSize: vi.fn(),
       setReminder: vi.fn(),
       toggleClockReminder: vi.fn(),
+      fireReminderNow: vi.fn(),
+      fireGreetingNow: vi.fn(),
       resetPosition: vi.fn(),
       checkForUpdates: vi.fn(),
       showAbout: vi.fn(),
@@ -248,6 +282,8 @@ function makeActions(overrides: Partial<Parameters<typeof createActions>[0]> = {
     setAlwaysOnTop: () => {},
     effectivePetSize: () => DEFAULT_PET_SIZE,
     effectiveAlwaysOnTop: () => DEFAULT_ALWAYS_ON_TOP,
+    fireReminderNow: () => {},
+    fireGreetingNow: () => {},
     ...overrides,
   })
   return { actions, settings, controller, evaluations: () => evaluations }
@@ -373,6 +409,14 @@ describe('actions', () => {
       reminders: { coffeeNextDueAt: null },
     })
     expect(evaluations()).toBe(1)
+  })
+
+  it('fires a reminder through the injected hook without touching settings', () => {
+    const fireReminderNow = vi.fn()
+    const { actions, settings } = makeActions({ fireReminderNow })
+    actions.fireReminderNow('coffee')
+    expect(fireReminderNow).toHaveBeenCalledWith('coffee')
+    expect(settings.patches).toEqual([])
   })
 })
 

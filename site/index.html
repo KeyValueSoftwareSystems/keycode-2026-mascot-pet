@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Keycode Pet — a pixel character for your desktop</title>
+    <title>Argus — a pixel character for your desktop</title>
     <meta
       name="description"
       content="A pixel character that lives on your desktop. Runs along the bottom of your screen, reminds you to drink water, and the whole team can make every installed pet speak by editing one file."
     />
-    <meta property="og:title" content="Keycode Pet" />
+    <meta property="og:title" content="Argus" />
     <meta
       property="og:description"
       content="A pixel character that lives on your desktop. For macOS, Windows and Linux."
@@ -72,16 +72,18 @@
       .cap { margin: .6rem 0 0; font-size: .82rem; color: var(--ink-soft); text-align: center; }
 
       /* ---- Downloads ---- */
-      .dl { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin: 0 0 1rem; }
+      .dl { display: flex; flex-direction: column; align-items: center; gap: .55rem; margin: 0 0 1rem; }
       .btn {
         display: inline-flex; align-items: center; gap: .5rem;
-        padding: .72rem 1.15rem;
+        padding: .85rem 1.6rem;
         border: 2px solid var(--ink); border-radius: 11px;
-        font-weight: 600; font-size: .95rem; text-decoration: none;
+        font-weight: 600; font-size: 1.02rem; text-decoration: none;
       }
-      .btn.primary { background: var(--ink); color: var(--paper); }
+      .btn.primary { background: var(--ink); color: var(--paper); min-width: 16rem; justify-content: center; }
       .btn:hover { border-color: var(--accent); }
       .btn.primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .dl-meta { margin: 0; font-size: .82rem; color: var(--ink-soft); text-align: center; }
+      .dl-meta a { color: inherit; }
 
       /* ---- Notice ---- */
       .notice {
@@ -156,18 +158,22 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>Keycode Pet</h1>
+        <h1>Argus</h1>
         <p class="tagline">
           A pixel character that lives on your desktop. It runs along the bottom of your screen over
           whatever you are working on — and the whole team can make every installed pet speak.
         </p>
 
         <div class="dl">
-          <a class="btn primary" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/latest">Download</a>
-          <a class="btn" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md">Install guide</a>
-          <a class="btn" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet">Source</a>
+          <a class="btn primary" id="dl-primary" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/download/v1.12.0/Argus-1.12.0-mac-arm64.dmg">Download Argus for Mac</a>
+          <p class="dl-meta" id="dl-cap">For your computer</p>
+          <p class="dl-meta" id="dl-others" hidden></p>
+          <p class="dl-meta">
+            <a href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md">Install guide</a>
+            ·
+            <a href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet">Source</a>
+          </p>
         </div>
-        <p class="cap">macOS (Apple Silicon &amp; Intel) · Windows · Linux (AppImage, deb, rpm)</p>
       </header>
 
       <figure style="margin: 0">
@@ -224,9 +230,9 @@
           <div>
             <h3>It looks after you</h3>
             <p>
-              Water and stretch reminders, at intervals you choose. They are wall-clock deadlines rather
-              than timers, so closing your laptop for two hours does not greet you with a backlog of
-              four reminders on wake.
+              Water and stretch stay up until you tap ✓ or Snooze (one minute). Coffee and lunch
+              close on their own. They are wall-clock deadlines rather than timers, so closing your
+              laptop does not greet you with a backlog on wake.
             </p>
           </div>
           <figure class="shot"><img src="./img/m5-bubble-emoji.window.png" alt="The pet reminding you to drink water" /></figure>
@@ -278,8 +284,131 @@
           <a href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet">Source</a> ·
           <a href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/issues/new">Report a problem</a>
         </p>
-        <p>The character is a placeholder, not the Keycode mascot.</p>
+        <p>Argus is Keycode’s unicorn mascot.</p>
       </footer>
     </div>
+    <script>
+      (function () {
+        var REPO = 'https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet'
+        var PAGES_MANIFEST = 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json'
+        // Used immediately so the button is a file URL before any fetch. Keep in sync with
+        // site/manifest.json release.latestVersion.
+        var VERSION = '1.12.0'
+        var primary = document.getElementById('dl-primary')
+        var cap = document.getElementById('dl-cap')
+        var others = document.getElementById('dl-others')
+        if (!primary || !cap || !others) return
+
+        var ua = navigator.userAgent || ''
+        var platform = navigator.platform || ''
+
+        function isIos() {
+          return /iPhone|iPad|iPod/.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+        }
+        function isMac() {
+          return !isIos() && (/Mac/.test(platform) || /Mac OS X/.test(ua))
+        }
+        function isWin() {
+          return /Win/.test(platform) || /Windows/.test(ua)
+        }
+        function isLinux() {
+          return /Linux/.test(platform) || /Linux/.test(ua)
+        }
+
+        function macIntelFromUa() {
+          return /Intel/.test(ua)
+        }
+
+        function files(version) {
+          function href(file) {
+            return REPO + '/releases/download/v' + version + '/' + file
+          }
+          return {
+            'mac-arm': { href: href('Argus-' + version + '-mac-arm64.dmg'), label: 'Download Argus for Mac', platform: 'For macOS (Apple Silicon)' },
+            'mac-intel': { href: href('Argus-' + version + '-mac-x64.dmg'), label: 'Download Argus for Mac', platform: 'For macOS (Intel)' },
+            win: { href: href('Argus-' + version + '-win-x64.exe'), label: 'Download Argus for Windows', platform: 'For Windows' },
+            linux: { href: href('Argus-' + version + '-linux-x64.AppImage'), label: 'Download Argus for Linux', platform: 'For Linux' },
+          }
+        }
+
+        function otherLinks(id, all) {
+          var order = [
+            { id: 'mac-arm', label: 'Mac (Apple Silicon)' },
+            { id: 'mac-intel', label: 'Mac (Intel)' },
+            { id: 'win', label: 'Windows' },
+            { id: 'linux', label: 'Linux' },
+          ]
+          return order.filter(function (item) { return item.id !== id })
+            .map(function (item) { return { href: all[item.id].href, label: item.label } })
+        }
+
+        function paint(id, version) {
+          var all = files(version)
+          var chosen = all[id]
+          primary.textContent = chosen.label
+          primary.href = chosen.href
+          cap.textContent = chosen.platform + ' · Version ' + version
+          others.replaceChildren()
+          others.appendChild(document.createTextNode('Other platforms: '))
+          otherLinks(id, all).forEach(function (item, i) {
+            if (i) others.appendChild(document.createTextNode(' · '))
+            var a = document.createElement('a')
+            a.href = item.href
+            a.textContent = item.label
+            others.appendChild(a)
+          })
+          others.hidden = false
+        }
+
+        function versionFrom(manifest) {
+          return manifest && manifest.release && manifest.release.latestVersion
+        }
+
+        function loadVersion() {
+          return fetch('./manifest.json')
+            .then(function (res) { return res.ok ? res.json() : Promise.reject() })
+            .then(versionFrom)
+            .catch(function () {
+              return fetch(PAGES_MANIFEST)
+                .then(function (res) { return res.ok ? res.json() : null })
+                .then(versionFrom)
+            })
+            .catch(function () { return null })
+        }
+
+        function guessId(arch) {
+          if (isMac()) return arch === 'intel' ? 'mac-intel' : 'mac-arm'
+          if (isWin()) return 'win'
+          if (isLinux()) return 'linux'
+          return 'mac-arm'
+        }
+
+        function readArch() {
+          var uaData = navigator.userAgentData
+          if (uaData && uaData.getHighEntropyValues) {
+            return uaData.getHighEntropyValues(['architecture']).then(function (info) {
+              var a = String(info.architecture || '')
+              if (/arm/i.test(a)) return 'arm'
+              if (/x86|x64|amd64/i.test(a)) return 'intel'
+              return macIntelFromUa() ? 'intel' : 'arm'
+            }).catch(function () {
+              return macIntelFromUa() ? 'intel' : 'arm'
+            })
+          }
+          return Promise.resolve(macIntelFromUa() ? 'intel' : 'arm')
+        }
+
+        var id = guessId(macIntelFromUa() ? 'intel' : 'arm')
+        paint(id, VERSION)
+
+        readArch().then(function (arch) {
+          id = guessId(arch)
+          paint(id, VERSION)
+          return loadVersion()
+        }).then(function (version) {
+          if (version) paint(id, version)
+        }).catch(function () {})
+      })()
+    </script>
   </body>
 </html>

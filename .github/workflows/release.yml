@@ -290,7 +290,7 @@ jobs:
             echo '## Install'
             echo ''
             if [ -n "$HAS_MAC_CERT" ]; then
-              echo '**macOS** — open the `.dmg` and drag Keycode Pet to Applications.'
+              echo '**macOS** — open the `.dmg` and drag Argus to Applications.'
             else
               echo '**macOS — this app is not signed by Apple, so macOS will refuse to open it the first time.**'
               echo 'Right-click the app in Applications and choose **Open**, then confirm. Or:'

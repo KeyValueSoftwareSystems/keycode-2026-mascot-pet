@@ -110,6 +110,7 @@ body {
  */
 #bubble {
   position: absolute;
+  z-index: 2;
   left: var(--body-cx, 50%);
   bottom: calc(100% - var(--body-top, 0px) + var(--bubble-tail) + var(--bubble-tail-gap));
   transform: translateX(-50%);
@@ -286,6 +287,47 @@ body {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+}
+
+#bubble-actions {
+  display: none;
+  gap: 6px;
+  margin-top: 8px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#bubble[data-actions]:not([data-actions='']) #bubble-actions {
+  display: flex;
+}
+
+#bubble-actions [data-action] {
+  display: none;
+  cursor: pointer;
+  pointer-events: auto;
+  border: var(--bubble-line-width) solid var(--bubble-line);
+  border-radius: 8px;
+  font:
+    600 12px / 1.2 system-ui,
+    sans-serif;
+  padding: 4px 8px;
+}
+
+#bubble[data-actions~='ok'] [data-action='ok'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  background: var(--tone-success);
+  color: #fff;
+  border-color: #059669;
+}
+
+#bubble[data-actions~='snooze'] [data-action='snooze'] {
+  display: inline-flex;
+  background: var(--bubble-bg);
+  color: var(--bubble-fg);
+  border-color: color-mix(in srgb, var(--bubble-line) 32%, transparent);
 }
 
 /* --------------------------------------------------------------------------------------- */

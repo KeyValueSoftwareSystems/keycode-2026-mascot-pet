@@ -70,6 +70,11 @@ export interface ForwardingController {
    * area in the wrong place — and on Linux that is the *only* thing making the pet grabbable.
    */
   setShapeRects(rects: readonly Rectangle[]): void
+  /**
+   * Keep the window interactive while a bubble that must be clicked (ok / snooze) is showing.
+   * Otherwise the first click falls through because forwarding has not yet seen a hover.
+   */
+  setForceInteractive(active: boolean): void
   dispose(): void
 }
 
@@ -92,6 +97,7 @@ export function createForwardingController(
 
   let pointerOverPet = false
   let dragging = false
+  let forceInteractive = false
   let disposed = false
   let watchTimer: NodeJS.Timeout | null = null
   let rearmTimers: NodeJS.Timeout[] = []
@@ -125,7 +131,7 @@ export function createForwardingController(
       return
     }
 
-    const passthrough = !pointerOverPet && !dragging
+    const passthrough = !forceInteractive && !pointerOverPet && !dragging
     if (passthrough) {
       if (forwardable) win.setIgnoreMouseEvents(true, { forward: true })
       else win.setIgnoreMouseEvents(true)
@@ -159,6 +165,7 @@ export function createForwardingController(
    */
   const rearm = (reason: string): void => {
     if (disposed || win.isDestroyed() || !forwardable) return
+    if (forceInteractive || dragging || pointerOverPet) return
 
     win.setIgnoreMouseEvents(false)
     win.setIgnoreMouseEvents(true, { forward: true })
@@ -172,7 +179,7 @@ export function createForwardingController(
       clearRearmTimers()
       for (const delay of WINDOWS_REARM_DELAYS_MS) {
         const timer = setTimeout(() => {
-          if (disposed || win.isDestroyed() || pointerOverPet || dragging) return
+          if (disposed || win.isDestroyed() || pointerOverPet || dragging || forceInteractive) return
           win.setIgnoreMouseEvents(false)
           win.setIgnoreMouseEvents(true, { forward: true })
           if (!win.webContents.isDestroyed()) {
@@ -199,10 +206,11 @@ export function createForwardingController(
    * alive and probing would be noise.
    */
   const scheduleWatch = (reason: string): void => {
-    if (!watch || disposed || watchTimer || dragging || pointerOverPet || win.isDestroyed()) return
+    if (!watch || disposed || watchTimer || dragging || pointerOverPet || forceInteractive || win.isDestroyed())
+      return
     watchTimer = setTimeout(() => {
       watchTimer = null
-      if (disposed || win.isDestroyed() || dragging || pointerOverPet) return
+      if (disposed || win.isDestroyed() || dragging || pointerOverPet || forceInteractive) return
       if (cursorProbe().inside) rearm(reason)
       scheduleWatch(reason)
     }, intervalMs)
@@ -239,6 +247,17 @@ export function createForwardingController(
     setShapeRects(rects: readonly Rectangle[]): void {
       shapeRects = rects
       applyLinuxShape()
+    },
+
+    setForceInteractive(active: boolean): void {
+      forceInteractive = active
+      applyPassthrough()
+      if (active) {
+        stopWatch()
+        clearRearmTimers()
+      } else {
+        scheduleWatch('callout-actions-cleared')
+      }
     },
 
     afterNavigate(): void {

@@ -7,9 +7,12 @@
  *   3. On ready: dock/activation policy, then hand off to `app-shell.ts`.
  */
 
+import { existsSync, cpSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { app } from 'electron'
 import { emit } from './harness-handshake.js'
 import { log } from './logger.js'
+import { LEGACY_PRODUCT_NAME, PRODUCT_NAME } from '../config/constants.js'
 
 /** Set once the shell is up. Until then a second launch has nothing to focus. */
 let shellOnSecondInstance: (() => void) | null = null
@@ -108,7 +111,17 @@ applyCommandLineSwitches()
 // the name afterwards is silently too late: the app keeps running, but its settings land in
 // a directory named after the package (`@keycode/desktop`) instead of the product, and a
 // later rename orphans the user's saved position and toggles.
-app.setName('Keycode Pet')
+app.setName(PRODUCT_NAME)
+
+{
+  const destDir = app.getPath('userData')
+  const destFile = join(destDir, 'settings.json')
+  const srcFile = join(app.getPath('appData'), LEGACY_PRODUCT_NAME, 'settings.json')
+  if (existsSync(srcFile) && !existsSync(destFile)) {
+    mkdirSync(destDir, { recursive: true })
+    cpSync(srcFile, destFile)
+  }
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.exit(0)

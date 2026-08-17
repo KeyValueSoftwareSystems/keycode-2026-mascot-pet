@@ -37,7 +37,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const MANIFEST = join(ROOT, 'site', 'manifest.json')
 
-const PAGES_URL = 'https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json'
+const PAGES_URL = 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json'
 
 /** Entries stay in the file this long after expiring, then get pruned, so it reads as a log. */
 const KEEP_EXPIRED_DAYS = 7

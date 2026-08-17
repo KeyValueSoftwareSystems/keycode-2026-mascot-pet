@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { SECURE_WEB_PREFERENCES, applyWindowSecurity } from './window-security.js'
 import { startAlwaysOnTopKeeper, type AlwaysOnTopKeeper } from './always-on-top.js'
 import { createForwardingController, type ForwardingController } from './mouse-forwarding.js'
+import { PRODUCT_NAME } from '../config/constants.js'
 import {
   computePlacement,
   placementForScale,
@@ -38,6 +39,7 @@ export interface PetWindowEvents {
   onDragStart(): void
   onDragEnd(): void
   onBubbleClicked(): void
+  onBubbleAction(action: 'ok' | 'snooze'): void
 }
 
 export interface PetWindow {
@@ -154,7 +156,7 @@ export async function createPetWindow(options: {
     focusable: process.platform !== 'linux',
     show: false,
     acceptFirstMouse: true,
-    title: 'Keycode Pet',
+    title: PRODUCT_NAME,
     webPreferences: {
       ...SECURE_WEB_PREFERENCES,
       preload: join(paths.distDir, 'preload', 'pet-preload.cjs'),
@@ -239,12 +241,19 @@ export async function createPetWindow(options: {
     options.events.onBubbleClicked()
   }
 
+  const onBubbleAction = (event: Electron.IpcMainEvent, action: unknown): void => {
+    if (!isFromThisWindow(event)) return
+    if (action !== 'ok' && action !== 'snooze') return
+    options.events.onBubbleAction(action)
+  }
+
   ipcMain.on(IPC.pointerOverPet, onPointerOverPet)
   ipcMain.on(IPC.rendererReady, onReady)
   ipcMain.on(IPC.contextMenu, onContextMenu)
   ipcMain.on(IPC.dragStart, onDragStart)
   ipcMain.on(IPC.dragEnd, onDragEnd)
   ipcMain.on(IPC.bubbleClicked, onBubbleClicked)
+  ipcMain.on(IPC.bubbleAction, onBubbleAction)
 
   win.webContents.on('did-finish-load', () => {
     forwarding.afterNavigate()
@@ -272,8 +281,10 @@ export async function createPetWindow(options: {
 
     moveTo(petCentreX: number, feetY: number): void {
       if (win.isDestroyed()) return
+      if (!Number.isFinite(petCentreX) || !Number.isFinite(feetY)) return
       const nextX = windowXForPetCentre(petCentreX, placement)
       const nextY = windowYForFloor(feetY, placement)
+      if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) return
       const bounds = win.getBounds()
       // Never issue a no-op: some compositors do real work per setPosition even when nothing moves.
       if (bounds.x === nextX && bounds.y === nextY) return
@@ -303,6 +314,7 @@ export async function createPetWindow(options: {
       lastBubbleVisible = parsed.data.bubble !== null
       lastOverlayVisible = parsed.data.overlay !== 'none'
       win.webContents.send(IPC.frame, parsed.data)
+      forwarding.setForceInteractive((parsed.data.bubble?.actions.length ?? 0) > 0)
 
       // On Linux the shape region decides what gets *painted*, so it has to follow the frame: the
       // bubble band belongs in it only while a bubble is up, and the pose changes where that band
@@ -425,6 +437,7 @@ export async function createPetWindow(options: {
       ipcMain.removeListener(IPC.dragStart, onDragStart)
       ipcMain.removeListener(IPC.dragEnd, onDragEnd)
       ipcMain.removeListener(IPC.bubbleClicked, onBubbleClicked)
+      ipcMain.removeListener(IPC.bubbleAction, onBubbleAction)
       forwarding.dispose()
       keeper?.dispose()
       if (!win.isDestroyed()) win.destroy()

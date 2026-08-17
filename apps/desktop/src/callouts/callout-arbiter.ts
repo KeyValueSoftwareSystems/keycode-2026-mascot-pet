@@ -50,6 +50,12 @@ export interface CalloutRequest {
   animation?: AnimationState
   /** Opaque handle; main resolves it to a validated URL. The renderer never sees a URL. */
   urlKey?: string
+  /** Optional bubble buttons. Water uses ok / snooze. */
+  actions?: readonly ('ok' | 'snooze')[]
+  /** Hold this callout's animation until the bubble is dismissed. */
+  holdMs?: number
+  /** Which reminder this bubble belongs to, for snooze. */
+  reminderKind?: 'water' | 'stretch' | 'coffee' | 'lunch'
 }
 
 export interface ActiveCallout extends CalloutRequest {

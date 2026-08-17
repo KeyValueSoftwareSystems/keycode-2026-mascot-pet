@@ -11,7 +11,7 @@ serves a file.
 ## Where it lives
 
 ```
-https://doylefermi-kv.github.io/keycode-2026-mascot-pet/manifest.json
+https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json
 ```
 
 A static file on GitHub Pages, deployed from `site/` in this repository. That is the whole hosting
@@ -343,7 +343,7 @@ Fault injection, so every negative path above can actually be exercised:
 To re-prove "shown exactly once", clear the client's memory between runs:
 
 ```bash
-rm -rf "$HOME/Library/Application Support/Keycode Pet"
+rm -rf "$HOME/Library/Application Support/Argus"
 ```
 
 ## Who can publish

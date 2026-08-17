@@ -13,6 +13,7 @@ import { BrowserWindow, app } from 'electron'
 import { SECURE_WEB_PREFERENCES, applyWindowSecurity } from './window-security.js'
 import { emit } from './harness-handshake.js'
 import { rendererFile } from './paths.js'
+import { PRODUCT_NAME } from '../config/constants.js'
 import type { DisplaySnapshot } from './display-manager.js'
 
 /** Must match `--backdrop` in backdrop.html. The harness asserts against this exact value. */
@@ -38,7 +39,7 @@ export async function createBackdropWindow(display: DisplaySnapshot): Promise<Br
     focusable: false,
     skipTaskbar: true,
     show: false,
-    title: 'Keycode Pet Backdrop',
+    title: `${PRODUCT_NAME} Backdrop`,
     webPreferences: { ...SECURE_WEB_PREFERENCES },
   })
 

@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { SECURE_WEB_PREFERENCES, applyWindowSecurity } from './window-security.js'
 import { layoutToasts, clampToastDuration, hasToastCapacity } from './toast-layout.js'
 import { rendererFile, paths } from './paths.js'
-import { TOAST } from '../config/constants.js'
+import { PRODUCT_NAME, TOAST } from '../config/constants.js'
 import type { Tone } from '../pet-frame.js'
 import { emit } from './harness-handshake.js'
 
@@ -94,7 +94,7 @@ export function createToastManager(
         skipTaskbar: true,
         alwaysOnTop: true,
         show: false,
-        title: 'Keycode Pet notification',
+        title: `${PRODUCT_NAME} notification`,
         webPreferences: {
           ...SECURE_WEB_PREFERENCES,
           preload: join(paths.distDir, 'preload', 'toast-preload.cjs'),
