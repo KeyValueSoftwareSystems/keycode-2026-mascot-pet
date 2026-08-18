@@ -314,7 +314,62 @@ function lockedTargetScale(files, flip) {
   return min
 }
 
+function clearRow(dest, sheetW, row, columns) {
+  const y0 = row * FRAME_H
+  for (let y = 0; y < FRAME_H; y += 1) {
+    for (let x = 0; x < columns * FRAME_W; x += 1) {
+      const di = ((y0 + y) * sheetW + x) * 4
+      dest[di] = 0
+      dest[di + 1] = 0
+      dest[di + 2] = 0
+      dest[di + 3] = 0
+    }
+  }
+}
+
+/** Replace only the run-right / run-left rows on the committed sheet. */
+function replaceRunRows(dir) {
+  const runRight = listFrames(dir)
+  const existing = decodePng(readFileSync(SPRITESHEET_PNG))
+  const sheetW = existing.width
+  const sheetH = existing.height
+  const columns = sheetW / FRAME_W
+  const sheet = Buffer.from(existing.data)
+  const crop = unionContentBounds(runRight, false)
+  const scale = Math.min(cellFitScale(crop), scaleForBounds(crop))
+
+  console.log(`source     ${dir}`)
+  console.log(`run        ${runRight.length} frames  union ${crop.width}×${crop.height}  scale=${scale.toFixed(4)}`)
+
+  clearRow(sheet, sheetW, 1, columns)
+  clearRow(sheet, sheetW, 2, columns)
+
+  for (const spec of [
+    { name: 'running-right', files: runRight, row: 1, flip: false, crop },
+    { name: 'running-left', files: runRight, row: 2, flip: true, crop: unionContentBounds(runRight, true) },
+  ]) {
+    console.log(`row ${spec.row}  ${spec.name}  ${spec.files.length} frames${spec.flip ? ' (flipped)' : ''}`)
+    for (let i = 0; i < spec.files.length; i += 1) {
+      const png = decodePng(readFileSync(spec.files[i]))
+      const cell = fitToCell(png, spec.flip, scale, null, spec.crop)
+      blit(sheet, sheetW, cell, i, spec.row)
+      process.stdout.write(`  ${i + 1}/${spec.files.length} ${cell.outW}×${cell.outH}\n`)
+    }
+  }
+
+  writeFileSync(SPRITESHEET_PNG, encodePng(sheetW, sheetH, sheet))
+  console.log(`wrote     ${SPRITESHEET_PNG}`)
+}
+
 function main() {
+  const onlyRunAt = process.argv.indexOf('--only-run')
+  if (onlyRunAt >= 0) {
+    const dir = process.argv[onlyRunAt + 1]
+    if (!dir) fail('--only-run needs a folder of numbered PNGs')
+    replaceRunRows(dir)
+    return
+  }
+
   const root = process.argv[2] ?? '/Users/aleena/Desktop/argos-mascot'
   const folders = {
     idle: join(root, 'argos-idle'),
