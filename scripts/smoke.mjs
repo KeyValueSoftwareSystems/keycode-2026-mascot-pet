@@ -1063,6 +1063,7 @@ async function run() {
         text: opts.callout,
         toast: opts.toast,
         sticky: opts.sticky,
+        ...(opts.sticky ? { priority: 'urgent' } : {}),
       })
       // Let the bubble paint and the emoji font resolve before capturing.
       await new Promise((r) => setTimeout(r, 700))

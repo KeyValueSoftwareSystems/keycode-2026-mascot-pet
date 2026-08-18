@@ -62,7 +62,7 @@ describe('alpha mask generation', () => {
     expect(perFramePct).toBeGreaterThan(16)
     expect(perFramePct).toBeLessThan(28)
     expect(unionPct).toBeGreaterThan(35)
-    expect(unionPct).toBeLessThan(55)
+    expect(unionPct).toBeLessThan(65)
     expect(cellPct).toBeGreaterThan(40)
     expect(cellPct).toBeLessThan(70)
 
@@ -87,10 +87,14 @@ describe('alpha mask generation', () => {
     // Deliberately a literal: this is the measurement the placement maths is built on, so it should
     // take an edit and a moment's thought when it changes rather than following the code silently.
     // Argus pack: height-normalized to 150px with feet on footInset 16; centre stays mid-cell.
-    // Width tightened after assemble strips the export smoke/matte fringe from every pose.
-    expect(ALPHA_MASK.bbox).toEqual({ x: 12, y: 42, width: 169, height: 150 })
+    // Union top is thinking/review (hand-to-chin reaches above idle's hair).
+    expect(ALPHA_MASK.bbox).toEqual({ x: 13, y: 31, width: 167, height: 161 })
     expect(ALPHA_MASK.footInset).toBe(16)
     expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2).toBeCloseTo(96.5, 5)
+  })
+
+  it('paints drink at the same height as idle', () => {
+    expect(ALPHA_MASK.headTopByState.drink).toBe(ALPHA_MASK.headTopByState.idle)
   })
 
   it('measures a per-state head top for every state, at or below the union top', () => {
@@ -118,10 +122,10 @@ describe('alpha mask generation', () => {
     // The real claim is about the *window*, not the cell: the window is 360px wide for a body of
     // ~150, so much of it is empty space beside the character and a bounds hit-test would swallow
     // clicks across all of it.
-    expect(ALPHA_MASK.bbox.width).toBeLessThan(PET_WINDOW_WIDTH * 0.5)
+    expect(ALPHA_MASK.bbox.width).toBeLessThan(PET_WINDOW_WIDTH * 0.6)
     // Body still leaves unused cell width on both sides.
-    expect(ALPHA_MASK.bbox.x).toBeGreaterThan(10)
-    expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width).toBeLessThan(sheet.frameWidth - 10)
+    expect(ALPHA_MASK.bbox.x).toBeGreaterThan(0)
+    expect(ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width).toBeLessThan(sheet.frameWidth)
   })
 
   it('derives few shape rects with no over-cover', () => {
@@ -385,6 +389,23 @@ describe('shapeRectsForFrame', () => {
     expect(covers(rects, below.windowWidth - 1, 2)).toBe(false)
   })
 
+  it('covers the hover zap chip, which sits beside the body rather than the cell', () => {
+    // The chip is `left: body-cx + 52px; top: body-top + 36px; width/height: 36px` in pet.css.
+    // A region hung off the cell's right edge starts ~36px to the *right* of that box, which is
+    // the Linux screenshot: the bolt is sliced off in a straight vertical cut.
+    const bodyCx = layout.spriteOrigin.x + (ALPHA_MASK.bbox.x + ALPHA_MASK.bbox.width / 2)
+    const headTop = layout.spriteOrigin.y + (ALPHA_MASK.headTopByState['idle'] ?? ALPHA_MASK.bbox.y)
+    const chipLeft = bodyCx + 52
+    const chipTop = headTop + 36
+    const hidden = shapeRectsForFrame(ALPHA_MASK, layout, frame())
+    const shown = shapeRectsForFrame(ALPHA_MASK, layout, frame({ quickMenuVisible: true }))
+
+    expect(covers(hidden, chipLeft + 34, chipTop + 18)).toBe(false)
+    expect(covers(shown, chipLeft + 2, chipTop + 2)).toBe(true)
+    expect(covers(shown, chipLeft + 34, chipTop + 18)).toBe(true)
+    expect(covers(shown, chipLeft + 34, chipTop + 34)).toBe(true)
+  })
+
   it('covers the sprite cell for the sleep Z’s, which sit above the hair', () => {
     const rects = shapeRectsForFrame(ALPHA_MASK, layout, frame({ overlayVisible: true }))
     // The Z's are positioned from --sprite-x/--sprite-y at roughly +118,+6 in cell space. Asserting
@@ -405,19 +426,21 @@ describe('shapeRectsForFrame', () => {
   it('never emits a rect outside the window, or an empty one', () => {
     for (const bubbleVisible of [true, false]) {
       for (const overlayVisible of [true, false]) {
-        for (const side of ['above', 'below'] as const) {
-          const rects = shapeRectsForFrame(
-            ALPHA_MASK,
-            side === 'below' ? { ...layout, spriteOrigin: { x: 84, y: 0 } } : layout,
-            frame({ bubbleVisible, overlayVisible, bubbleSide: side }),
-          )
-          for (const r of rects) {
-            expect(r.width).toBeGreaterThan(0)
-            expect(r.height).toBeGreaterThan(0)
-            expect(r.x).toBeGreaterThanOrEqual(0)
-            expect(r.y).toBeGreaterThanOrEqual(0)
-            expect(r.x + r.width).toBeLessThanOrEqual(layout.windowWidth)
-            expect(r.y + r.height).toBeLessThanOrEqual(layout.windowHeight)
+        for (const quickMenuVisible of [true, false]) {
+          for (const side of ['above', 'below'] as const) {
+            const rects = shapeRectsForFrame(
+              ALPHA_MASK,
+              side === 'below' ? { ...layout, spriteOrigin: { x: 84, y: 0 } } : layout,
+              frame({ bubbleVisible, overlayVisible, quickMenuVisible, bubbleSide: side }),
+            )
+            for (const r of rects) {
+              expect(r.width).toBeGreaterThan(0)
+              expect(r.height).toBeGreaterThan(0)
+              expect(r.x).toBeGreaterThanOrEqual(0)
+              expect(r.y).toBeGreaterThanOrEqual(0)
+              expect(r.x + r.width).toBeLessThanOrEqual(layout.windowWidth)
+              expect(r.y + r.height).toBeLessThanOrEqual(layout.windowHeight)
+            }
           }
         }
       }

@@ -7,7 +7,7 @@ Keycode unicorn mascot in streetwear. Assembled from individual frames in
 
 | File | Purpose |
 |---|---|
-| `spritesheet.png` | 4800×2496 RGBA, 25 cols × 12 rows of 192×208 cells. |
+| `spritesheet.png` | 4800×2704 RGBA, 25 cols × 13 rows of 192×208 cells. |
 | `spritesheet.json` | Animation state map — row/frames/duration per state, free cells, reaction map. |
 | `pet.json` | Pet metadata (`id`, `displayName`, `description`, `spritesheetPath`). |
 
@@ -26,13 +26,13 @@ Keycode unicorn mascot in streetwear. Assembled from individual frames in
 | 8 | `sleep-enter` / `sleep` / `sleep-exit` | 25 (phases on one row) |
 | 9 | `review` (thinking, facing right) | 21 |
 | 10 | `review-left` (flipped from thinking) | 21 |
-| 11 | `electrocute` (WIP dummy) | 6 |
+| 11 | `electrocute` | 21 |
+| 12 | `panic` (drag) | 20 |
 
-`failed` still shares the idle row until fail art lands. `running` (busy/drag) reuses the run
-cycle. Electrocute stays last on purpose so real zap frames can replace that row without
-reshuffling.
+`failed` still shares the idle row until fail art lands. `running` (busy) reuses the run
+cycle. Hover thunderbolt plays `electrocute`. Dragging plays `panic` and dropping cuts it.
 
-Sleep phases on row 8: frames 1–8 lie down, 9–18 quiet loop on the ground, 24–25 stand up.
+Sleep phases on row 8: frames 1–8 lie down, 9–18 quiet loop on the ground, 19–25 stand up.
 
 ## Rebuild
 

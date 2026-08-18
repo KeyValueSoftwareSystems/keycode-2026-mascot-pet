@@ -117,7 +117,12 @@ export function planDwell(
   now: number,
   facing: Facing,
   config: MotionConfig,
-  options: { state?: AnimationState; range?: { min: number; max: number }; playful?: boolean } = {},
+  options: {
+    state?: AnimationState
+    range?: { min: number; max: number }
+    playful?: boolean
+    after?: AnimationState
+  } = {},
 ): PlanChoice {
   const range = options.range ?? config.dwellMs
   const draw = nextInt(seed, Math.round(range.min), Math.round(range.max))
@@ -125,7 +130,12 @@ export function planDwell(
   const state =
     requested === 'idle' || requested === 'idle-left' ? idleAnimationFor(facing) : requested
   return {
-    plan: { kind: 'dwell', untilMs: now + draw.value, state },
+    plan: {
+      kind: 'dwell',
+      untilMs: now + draw.value,
+      state,
+      ...(options.after === undefined ? {} : { after: options.after }),
+    },
     animation: state,
     facing,
     seed: draw.seed,
@@ -147,14 +157,16 @@ export function planAct(
   state: AnimationState,
   options: { holdMs?: number; driftPxPerSec?: number; playful?: boolean } = {},
 ): PlanChoice {
-  // `running` is the in-place busy/drag alias: reuse the locomotion row for this facing, planted.
+  // `running` is the in-place busy alias: reuse the locomotion row for this facing, planted.
   // Do not redirect `running-left`/`running-right` — skid plays the opposite row on purpose.
   const resolved =
     state === 'running'
       ? runAnimationFor(facing)
       : state === 'review' || state === 'review-left'
         ? reviewAnimationFor(facing)
-        : state
+        : state === 'idle' || state === 'idle-left'
+          ? idleAnimationFor(facing)
+          : state
   const spec = ANIMATIONS[resolved]
   const duration = options.holdMs ?? spec.totalMs ?? 1_200
   return {
@@ -184,7 +196,11 @@ export function planNext(
   facing: Facing,
   floor: Floor,
   config: MotionConfig,
+  previous?: AnimationState,
 ): PlanChoice {
+  if (previous === 'review' || previous === 'review-left') {
+    return planDwell(seed, now, facing, config, { range: idleGapMs(), playful: true })
+  }
   if (!hasRoomToRun(x, floor)) {
     return planDwell(seed, now, facing, config)
   }
@@ -200,10 +216,8 @@ export function planNext(
     case 'run':
       // Keep the current heading until the edge, so a rightward run does not flick left for a step.
       return planRun(choice.seed, x, floor, config, facing)
-    case 'dwell': {
-      const cycle = ANIMATIONS[idleAnimationFor(facing)].durationMs
-      return planDwell(choice.seed, now, facing, config, { range: { min: cycle, max: cycle } })
-    }
+    case 'dwell':
+      return planDwell(choice.seed, now, facing, config)
     case 'act': {
       const pick = nextInt(choice.seed, 0, config.idleActs.length - 1)
       const state = config.idleActs[pick.value] ?? config.idleAnimation
@@ -215,21 +229,61 @@ export function planNext(
 /** Idling into an in-place animation needs an explicit hold, since those states loop forever. */
 function pickHold(state: AnimationState): number {
   const spec = ANIMATIONS[state]
-  // One cycle, then back to moving — a second loop reads as stuck.
-  return spec.totalMs ?? spec.durationMs
+  // Thinking is one cycle; two idle loops fill the gap before the next think. Other acts hold two.
+  if (state === 'review' || state === 'review-left') return spec.totalMs ?? spec.durationMs
+  return spec.totalMs ?? spec.durationMs * 2
 }
 
-/** With movement off, stay on the on-ground sleep loop until woken. */
+/** Two idle loops between thinking poses, so two thinks never play back to back. */
+function idleGapMs(): { min: number; max: number } {
+  const spec = ANIMATIONS.idle
+  const hold = (spec.totalMs ?? spec.durationMs) * 2
+  return { min: hold, max: hold }
+}
+
+/**
+ * Next in-place beat while movement is off: lie down, nap, stand up, idle, think, idle, nap.
+ */
 export function planSleepCycle(
   seed: number,
   now: number,
   facing: Facing,
   config: MotionConfig,
+  previous: AnimationState,
+  completing?: Plan,
 ): PlanChoice {
-  return planAct(seed, now, facing, config.sleepAnimation, {
-    holdMs: Number.MAX_SAFE_INTEGER,
-    playful: true,
-  })
+  if (previous === config.sleepEnterAnimation) {
+    const hold = scaled(seed, config.sleepSettleMs)
+    return planAct(hold.seed, now, facing, config.sleepAnimation, {
+      holdMs: Math.round(hold.value),
+      playful: true,
+    })
+  }
+  if (previous === config.sleepAnimation) {
+    return planAct(seed, now, facing, config.sleepExitAnimation, { playful: true })
+  }
+  if (previous === config.sleepExitAnimation) {
+    return planDwell(seed, now, facing, config, {
+      range: idleGapMs(),
+      playful: true,
+      after: 'review',
+    })
+  }
+  if (previous === 'review' || previous === 'review-left') {
+    return planDwell(seed, now, facing, config, {
+      range: idleGapMs(),
+      playful: true,
+      after: config.sleepEnterAnimation,
+    })
+  }
+  if (completing?.kind === 'dwell' && completing.after) {
+    return planAct(seed, now, facing, completing.after, {
+      holdMs: pickHold(completing.after),
+      playful: true,
+    })
+  }
+  // Idle wind-down (and any other standing leftover) settles into a nap.
+  return planAct(seed, now, facing, config.sleepEnterAnimation, { playful: true })
 }
 
 export function hasRoomToRun(x: number, floor: Floor): boolean {

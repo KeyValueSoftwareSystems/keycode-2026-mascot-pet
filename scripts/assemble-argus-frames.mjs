@@ -5,11 +5,10 @@
  *   node scripts/assemble-argus-frames.mjs [/path/to/argus-mascot]
  *
  * Expects subfolders: argus-idle, argus-run-right, argus-jumping-jacks, argus-drinking-water,
- * argus-wave, argus-sleep, argus-thinking — with numbered PNGs (1.png, 2.png, …). Uses every
- * frame. Run-left is a horizontal flip of run-right; jumping-left is a horizontal flip of
- * jumping-jacks; idle-left is a horizontal flip of idle; review-left is a horizontal flip of
- * thinking. Electrocute is a WIP placeholder stamped last (tinted idle), so real art can replace
- * that row without reshuffling the rest.
+ * argus-wave, argus-sleep, argus-thinking, argus-electrocute, argus-panic — with numbered PNGs
+ * (1.png, 2.png, …). Uses every frame. Run-left is a horizontal flip of run-right; jumping-left
+ * is a horizontal flip of jumping-jacks; idle-left is a horizontal flip of idle; review-left is
+ * a horizontal flip of thinking.
  * Sheet columns = max frame count so nothing is trimmed.
  */
 
@@ -283,7 +282,27 @@ function footContactY(data, width, height) {
   return maxY < 0 ? height - 1 : maxY
 }
 
-function lockedScaleFor(files, flip) {
+/** Largest scale that still fits `bounds` in the cell. Taller than TARGET_CONTENT_H is fine. */
+function cellFitScale(bounds) {
+  const maxH = FRAME_H - FOOT_INSET - 1
+  const maxW = CONTENT_MAX_W
+  return Math.min(maxH / bounds.height, maxW / bounds.width)
+}
+
+function lockedCellFitScale(files, flip) {
+  let min = Infinity
+  for (const file of files) {
+    const png = decodePng(readFileSync(file))
+    const source = flip ? flipHorizontal(png) : png
+    const bounds = contentBounds(source)
+    if (!bounds) fail(`Frame has no opaque pixels: ${file}`)
+    min = Math.min(min, cellFitScale(bounds))
+  }
+  return min
+}
+
+/** Cap a row to TARGET_CONTENT_H so a pose whose union is the whole canvas cannot dwarf idle. */
+function lockedTargetScale(files, flip) {
   let min = Infinity
   for (const file of files) {
     const png = decodePng(readFileSync(file))
@@ -305,6 +324,8 @@ function main() {
     wave: join(root, 'argus-wave'),
     sleep: join(root, 'argus-sleep'),
     thinking: join(root, 'argus-thinking'),
+    electrocute: join(root, 'argus-electrocute'),
+    panic: join(root, 'argus-panic'),
   }
 
   const idle = listFrames(folders.idle)
@@ -314,9 +335,8 @@ function main() {
   const wave = listFrames(folders.wave)
   const sleep = listFrames(folders.sleep)
   const thinking = listFrames(folders.thinking)
-
-  /** WIP electrocute placeholder frame count (tinted idle), always the last sheet row. */
-  const ELECTROCUTE_FRAMES = 6
+  const electrocute = listFrames(folders.electrocute)
+  const panic = listFrames(folders.panic)
 
   const columns = Math.max(
     idle.length,
@@ -326,18 +346,17 @@ function main() {
     wave.length,
     sleep.length,
     thinking.length,
-    ELECTROCUTE_FRAMES,
+    electrocute.length,
+    panic.length,
   )
-  // Drawn poses first; electrocute stays last so WIP art can land without reshuffling rows.
-  const drawnRows = 11
-  const rows = drawnRows + 1
+  const rows = 13
   const sheetW = columns * FRAME_W
   const sheetH = rows * FRAME_H
   const sheet = Buffer.alloc(sheetW * sheetH * 4)
 
   console.log(`source     ${root}`)
   console.log(
-    `frames     idle=${idle.length} runR=${runRight.length} jacks=${jacks.length} drink=${drink.length} wave=${wave.length} sleep=${sleep.length} think=${thinking.length} electrocute=${ELECTROCUTE_FRAMES}(wip)`,
+    `frames     idle=${idle.length} runR=${runRight.length} jacks=${jacks.length} drink=${drink.length} wave=${wave.length} sleep=${sleep.length} think=${thinking.length} electrocute=${electrocute.length} panic=${panic.length}`,
   )
   console.log(`sheet      ${columns}×${rows} cells → ${sheetW}×${sheetH}`)
 
@@ -353,29 +372,53 @@ function main() {
     { name: 'sleep', files: sleep, row: 8, flip: false },
     { name: 'review', files: thinking, row: 9, flip: false },
     { name: 'review-left', files: thinking, row: 10, flip: true },
+    { name: 'electrocute', files: electrocute, row: 11, flip: false },
+    { name: 'panic', files: panic, row: 12, flip: false },
   ]
+
+  // Idle/drink/sleep/electrocute/panic exports are 2508px; thinking/wave/jacks/run are 1254px
+  // (exactly half). Fitting each pose independently to TARGET_CONTENT_H shrinks the half-res rows,
+  // so idle looks zoomed-in when thinking ends. Scale everything from idle, then only shrink if a
+  // pose clips.
+  const idleCanvasW = decodePng(readFileSync(idle[0])).width
+  const idleScaleRef = scaleForBounds(unionContentBounds(idle, false))
 
   const packed = rowsSpec.map((spec) => {
     const perFrame =
       spec.name === 'sleep' ||
-      spec.name === 'running-right' ||
-      spec.name === 'running-left' ||
       spec.name === 'jumping-right' ||
-      spec.name === 'jumping-left'
+      spec.name === 'jumping-left' ||
+      spec.name === 'waving'
     const crop = perFrame ? null : unionContentBounds(spec.files, spec.flip)
-    const scale = crop ? scaleForBounds(crop) : lockedScaleFor(spec.files, spec.flip)
+    const canvasW = decodePng(readFileSync(spec.files[0])).width
+    const worldScale = idleScaleRef * (idleCanvasW / canvasW)
+    const fitScale = crop ? cellFitScale(crop) : lockedCellFitScale(spec.files, spec.flip)
+    // Wave's union is the whole 1254 canvas (an arm hits the edge). Cap to TARGET_CONTENT_H.
+    // Jacks: several hop frames are flush with the top of the export, so scale the *tallest*
+    // to TARGET (not the shortest) or the horn is clipped at the peak. Pin feet so the jump
+    // still grows upward from a planted stance.
+    const scale =
+      spec.name === 'waving'
+        ? Math.min(worldScale, lockedTargetScale(spec.files, spec.flip))
+        : spec.name === 'jumping-right' || spec.name === 'jumping-left'
+          ? Math.min(
+              worldScale,
+              lockedTargetScale(spec.files, spec.flip),
+              lockedCellFitScale(spec.files, spec.flip),
+            )
+          : spec.name === 'running-right' ||
+              spec.name === 'running-left' ||
+              spec.name === 'drink' ||
+              spec.name === 'electrocute' ||
+              spec.name === 'panic'
+            ? Math.min(worldScale, scaleForBounds(crop))
+            : Math.min(worldScale, fitScale)
     return { spec, crop, scale }
   })
 
-  let idleScale = null
-  let idleCrop = null
   for (const row of packed) {
     const { spec, crop, scale } = row
-    if (spec.name === 'idle') {
-      idleScale = scale
-      idleCrop = crop
-    }
-    const pinFeet = spec.name === 'waving'
+    const pinFeet = spec.name === 'waving' || spec.name === 'jumping-right' || spec.name === 'jumping-left'
     let anchors = pinFeet ? { footX: null, footY: null } : null
     console.log(
       `row ${spec.row}  ${spec.name}  ${spec.files.length} frames${spec.flip ? ' (flipped)' : ''}  lockedScale=${scale.toFixed(4)}${crop ? '  unionCrop' : ''}${pinFeet ? '  pinFeet' : ''}`,
@@ -391,46 +434,12 @@ function main() {
     }
   }
 
-  // Last row: dummy electrocute until design delivers real frames.
-  const electrocuteRow = drawnRows
-  const idleCells = idle.map((file) =>
-    fitToCell(decodePng(readFileSync(file)), false, idleScale, null, idleCrop),
-  )
-  console.log(`row ${electrocuteRow}  electrocute  ${ELECTROCUTE_FRAMES} frames (WIP tinted idle)`)
-  for (let i = 0; i < ELECTROCUTE_FRAMES; i += 1) {
-    const src = idleCells[i % idleCells.length]
-    const tinted = tintElectrocute(src.data, i)
-    blit(sheet, sheetW, { width: FRAME_W, height: FRAME_H, data: tinted }, i, electrocuteRow)
-  }
-
   writeFileSync(SPRITESHEET_PNG, encodePng(sheetW, sheetH, sheet))
   console.log(`wrote     ${SPRITESHEET_PNG}`)
   console.log(`next      update pet/spritesheet.json sheet to ${sheetW}×${sheetH}, columns=${columns}, rows=${rows}`)
   console.log(
-    `          states: idle/idle-left:${idle.length} running-right/left:${runRight.length} jumping-right/left:${jacks.length} drink:${drink.length} waving:${wave.length} sleep:${sleep.length} review/review-left:${thinking.length} electrocute:${ELECTROCUTE_FRAMES}(wip row ${electrocuteRow})`,
+    `          states: idle/idle-left:${idle.length} running-right/left:${runRight.length} jumping-right/left:${jacks.length} drink:${drink.length} waving:${wave.length} sleep:${sleep.length} review/review-left:${thinking.length} electrocute:${electrocute.length} panic:${panic.length}`,
   )
-}
-
-/** Cyan/yellow flash jitter over idle pixels — placeholder until electrocute frames are available. */
-function tintElectrocute(frame, index) {
-  const shakes = [-4, 4, 3, -3, 2, -2]
-  const shakeX = shakes[index % shakes.length]
-  const next = Buffer.alloc(frame.length)
-  for (let y = 0; y < FRAME_H; y += 1) {
-    for (let x = 0; x < FRAME_W; x += 1) {
-      const sx = Math.min(FRAME_W - 1, Math.max(0, x - shakeX))
-      const si = (y * FRAME_W + sx) * 4
-      const di = (y * FRAME_W + x) * 4
-      const a = frame[si + 3]
-      if (a === 0) continue
-      const flash = index % 2 === 0
-      next[di] = Math.min(255, Math.round(frame[si] * (flash ? 0.75 : 1.3) + (flash ? 0 : 70)))
-      next[di + 1] = Math.min(255, Math.round(frame[si + 1] * (flash ? 1.15 : 1.3) + (flash ? 40 : 60)))
-      next[di + 2] = Math.min(255, Math.round(frame[si + 2] * (flash ? 1.45 : 0.55) + (flash ? 90 : 0)))
-      next[di + 3] = a
-    }
-  }
-  return next
 }
 
 main()

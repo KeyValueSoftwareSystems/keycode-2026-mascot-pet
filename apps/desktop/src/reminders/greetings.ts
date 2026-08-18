@@ -52,8 +52,8 @@ export function evaluateGreeting(input: GreetingInput): GreetingResult {
 
 export const GREETING_MESSAGES: Readonly<Record<GreetingPeriod, string>> = {
   morning: 'Good morning ☀️',
-  afternoon: 'Good afternoon 👋',
-  evening: 'Good evening 🌙',
+  afternoon: 'Good afternoon ☀️',
+  evening: 'Good evening 👋',
 }
 
 export const GREETING_TRIGGERS = {

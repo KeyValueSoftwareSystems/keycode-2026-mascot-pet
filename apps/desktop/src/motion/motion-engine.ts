@@ -19,6 +19,7 @@ import {
   planNext,
   planDwell,
   planAct,
+  planSleepCycle,
   runAnimationFor,
   jumpAnimationFor,
   idleAnimationFor,
@@ -38,9 +39,10 @@ export function initialState(options: {
   config?: MotionConfig
 }): MotionState {
   const config = options.config ?? DEFAULT_MOTION_CONFIG
-  const animation = options.movementEnabled ? config.idleAnimation : config.sleepAnimation
+  const animation = config.idleAnimation
   const floorY = options.floor?.y ?? 0
   const restored = options.feetY ?? null
+  const windDownMs = config.sleepWindDownMs.min
   return {
     x: options.x,
     feetY: restored ?? floorY,
@@ -48,8 +50,10 @@ export function initialState(options: {
     facing: 'right',
     animation,
     animationNonce: 0,
-    animationEndsAt: null,
-    plan: { kind: 'dwell', untilMs: options.now, state: animation },
+    animationEndsAt: options.movementEnabled ? null : options.now + windDownMs,
+    plan: options.movementEnabled
+      ? { kind: 'dwell', untilMs: options.now, state: animation }
+      : { kind: 'dwell', untilMs: options.now + windDownMs, state: animation },
     dragging: false,
     hovering: false,
     movementEnabled: options.movementEnabled,
@@ -137,6 +141,25 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
     }
 
     case 'drag-start': {
+      const lying =
+        state.animation === config.sleepAnimation ||
+        state.animation === config.sleepEnterAnimation
+      const waking = state.animation === config.sleepExitAnimation
+      if (lying) {
+        return {
+          ...adopt(
+            state,
+            planAct(state.rngSeed, input.now, state.facing, config.sleepExitAnimation, {
+              playful: true,
+            }),
+          ),
+          dragging: false,
+          hovering: true,
+        }
+      }
+      if (waking) {
+        return { ...state, dragging: false, hovering: true }
+      }
       const choice = planAct(state.rngSeed, input.now, state.facing, config.dragAnimation, {
         // Held for as long as the drag lasts; drag-end replaces it.
         holdMs: Number.MAX_SAFE_INTEGER,
@@ -153,54 +176,68 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
         feetY: trigger.floorLocked ? input.floor.maxFeetY : trigger.feetY,
         floorLocked: trigger.floorLocked,
       }
-      const choice = planAct(
-        dropped.rngSeed,
-        input.now,
-        dropped.facing,
-        directedJump(config.dropAnimation, dropped.facing),
-        {
-          playful: true,
-        },
+      // Panic is only for the lift. Dropping cuts it immediately and resumes standing idle;
+      // locomotion (or the movement-off rest cycle) picks up on the next completed plan.
+      return adopt(
+        dropped,
+        planDwell(dropped.rngSeed, input.now, dropped.facing, config, {
+          state: config.dropAnimation,
+          range: { min: 200, max: 400 },
+        }),
       )
-      return adopt(dropped, choice)
     }
 
     case 'hover-start': {
-      if (state.dragging) return state
-      const choice = planAct(state.rngSeed, input.now, state.facing, idleAnimationFor(state.facing), {
-        holdMs: Number.MAX_SAFE_INTEGER,
-      })
-      return { ...adopt(state, choice), hovering: true }
+      // Freeze locomotion. If the pet is lying down, play the stand-up beat instead of snapping awake.
+      if (state.dragging || state.hovering) return state
+      const lying =
+        !state.movementEnabled &&
+        (state.animation === config.sleepAnimation ||
+          state.animation === config.sleepEnterAnimation)
+      if (lying) {
+        return {
+          ...adopt(
+            state,
+            planAct(state.rngSeed, input.now, state.facing, config.sleepExitAnimation, {
+              playful: true,
+            }),
+          ),
+          hovering: true,
+        }
+      }
+      return { ...state, hovering: true }
     }
 
     case 'hover-end': {
       if (!state.hovering) return state
-      const next = { ...state, hovering: false }
-      if (!next.movementEnabled) {
-        return adopt(
-          next,
-          planAct(next.rngSeed, input.now, next.facing, config.sleepAnimation, {
-            holdMs: Number.MAX_SAFE_INTEGER,
-          }),
-        )
-      }
-      return adopt(next, planDwell(next.rngSeed, input.now, next.facing, config, { range: { min: 200, max: 600 } }))
+      return { ...state, hovering: false }
     }
 
     case 'movement-changed': {
       if (trigger.enabled === state.movementEnabled) return state
       const next = { ...state, movementEnabled: trigger.enabled, hovering: false }
       if (trigger.enabled) {
-        // Stand up from the ground before resuming life.
+        // Only the lie-down poses need the stand-up beat. Playing it from idle/think would flash
+        // the sleep row for a frame.
+        if (next.animation === config.sleepExitAnimation) return next
+        if (
+          next.animation === config.sleepAnimation ||
+          next.animation === config.sleepEnterAnimation
+        ) {
+          return adopt(
+            next,
+            planAct(next.rngSeed, input.now, next.facing, config.sleepExitAnimation, { playful: true }),
+          )
+        }
         return adopt(
           next,
-          planAct(next.rngSeed, input.now, next.facing, config.sleepExitAnimation, { playful: true }),
+          planDwell(next.rngSeed, input.now, next.facing, config, { range: { min: 200, max: 600 } }),
         )
       }
-      // Lie down, then the in-place path holds the on-ground loop.
+      // Stand still first so turning movement off does not drop him onto the floor mid-stride.
       return adopt(
         next,
-        planAct(next.rngSeed, input.now, next.facing, config.sleepEnterAnimation, { playful: true }),
+        planDwell(next.rngSeed, input.now, next.facing, config, { range: config.sleepWindDownMs }),
       )
     }
 
@@ -242,7 +279,19 @@ export function advance(
 
   // While dragging or the hover menu is open, position freezes (main owns the cursor for drag).
   // Both axes are still clamped, so neither path can carry the pet outside the envelope.
-  if (next.dragging || next.hovering) {
+  if (next.dragging) {
+    return settleFeetY({ ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }, input)
+  }
+  if (next.hovering) {
+    // Freeze locomotion, not the current pose. Sleep-exit and electrocute (and any other finite
+    // act) must be allowed to finish — otherwise CSS `forwards` holds the last frame forever and
+    // zap cannot fire again because the shell still thinks the pet is electrocuting.
+    if (next.plan.kind === 'act' && input.now >= next.plan.endsAt) {
+      next = adopt(
+        next,
+        planDwell(next.rngSeed, input.now, next.facing, config, { range: { min: 200, max: 400 } }),
+      )
+    }
     return settleFeetY({ ...next, x: clamp(next.x, input.floor.minX, input.floor.maxX) }, input)
   }
 
@@ -258,7 +307,7 @@ export function advance(
     if (next.plan.kind === 'run') {
       next = adopt(
         next,
-        planAct(next.rngSeed, input.now, next.facing, config.sleepEnterAnimation, { playful: true }),
+        planDwell(next.rngSeed, input.now, next.facing, config, { range: config.sleepWindDownMs }),
       )
     }
     return advanceInPlace(next, input, dt, config, true)
@@ -324,7 +373,7 @@ function advanceInPlace(
         break
       }
 
-      next = adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config))
+      next = adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config, next.animation))
       break
     }
 
@@ -332,13 +381,8 @@ function advanceInPlace(
       if (input.now < next.plan.untilMs) break
       next = { ...next, stats: { ...next.stats, plansCompleted: next.stats.plansCompleted + 1 } }
       next = asleep
-        ? adopt(
-            next,
-            planAct(next.rngSeed, input.now, next.facing, config.sleepAnimation, {
-              holdMs: Number.MAX_SAFE_INTEGER,
-            }),
-          )
-        : adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config))
+        ? adopt(next, planSleepCycle(next.rngSeed, input.now, next.facing, config, next.animation, next.plan))
+        : adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config, next.animation))
       break
     }
 
@@ -350,15 +394,9 @@ function advanceInPlace(
       if (input.now < plan.endsAt) break
       next = { ...next, stats: { ...next.stats, plansCompleted: next.stats.plansCompleted + 1 } }
       if (asleep) {
-        // After lying down, hold the on-ground loop until woken — do not replay stand→lie.
-        next = adopt(
-          next,
-          planAct(next.rngSeed, input.now, next.facing, config.sleepAnimation, {
-            holdMs: Number.MAX_SAFE_INTEGER,
-          }),
-        )
+        next = adopt(next, planSleepCycle(next.rngSeed, input.now, next.facing, config, next.animation, next.plan))
       } else {
-        next = adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config))
+        next = adopt(next, planNext(next.rngSeed, input.now, next.x, next.facing, input.floor, config, next.animation))
       }
       break
     }

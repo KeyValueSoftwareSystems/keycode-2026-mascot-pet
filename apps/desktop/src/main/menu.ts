@@ -24,6 +24,8 @@ export interface MenuOptions {
   actions: MenuActions
   petWindow: () => BrowserWindow | null
   onTemplateChanged: (template: MenuItemConstructorOptions[]) => void
+  /** Fires when the sprite settings menu opens or closes. */
+  onPopupChanged?: (open: boolean) => void
 }
 
 export function createMenuController(options: MenuOptions): MenuController {
@@ -40,6 +42,7 @@ export function createMenuController(options: MenuOptions): MenuController {
       // Built fresh every time, so the checkboxes always reflect current settings.
       const menu = Menu.buildFromTemplate(template())
       openMenu = menu
+      options.onPopupChanged?.(true)
 
       // No explicit x/y: Electron places it at the cursor. Converting the renderer's client
       // coordinates to screen coordinates by hand is exactly the DPI bug that bites on
@@ -48,6 +51,7 @@ export function createMenuController(options: MenuOptions): MenuController {
         window: win,
         callback: () => {
           if (openMenu === menu) openMenu = null
+          options.onPopupChanged?.(false)
         },
       })
     },

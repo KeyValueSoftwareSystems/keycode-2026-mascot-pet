@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { advance, initialState } from '../../apps/desktop/src/motion/motion-engine.js'
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../../apps/desktop/src/motion/motion-config.js'
-import { runAnimationFor } from '../../apps/desktop/src/motion/run-planner.js'
+import { idleAnimationFor } from '../../apps/desktop/src/motion/run-planner.js'
 import { ANIMATIONS, ANIMATION_STATES } from '../../apps/desktop/src/pet-animations.generated.js'
 import type { Floor, MotionState, MotionTrigger } from '../../apps/desktop/src/motion/types.js'
 
@@ -158,6 +158,7 @@ describe('ten minutes of pet life', () => {
       config: {
         ...DEFAULT_MOTION_CONFIG,
         skidChance: 1,
+        jumpChance: 0,
         runDistancePx: { min: 280, max: 520 },
       },
     })
@@ -254,6 +255,29 @@ describe('ten minutes of pet life', () => {
       expect(review.state.animation).toBe(review.state.facing === 'left' ? 'review-left' : 'review')
     }
   })
+
+  it('puts two idle loops between thinking poses instead of stacking thinks', () => {
+    const think = new Set(['review', 'review-left'])
+    const idle = new Set(['idle', 'idle-left'])
+    let lastThinkEnd: (typeof result.frames)[number] | null = null
+    for (let i = 0; i < result.frames.length; i += 1) {
+      const frame = result.frames[i]!
+      const isThink = think.has(frame.state.animation)
+      const prevThink = i > 0 && think.has(result.frames[i - 1]!.state.animation)
+      if (!isThink && prevThink) lastThinkEnd = result.frames[i - 1]!
+      if (isThink && lastThinkEnd) {
+        const gap = result.frames.slice(
+          result.frames.indexOf(lastThinkEnd) + 1,
+          i,
+        )
+        const idleMs = gap.filter((f) => idle.has(f.state.animation)).length * TICK
+        expect(idleMs, 'expected two idle loops between thinks').toBeGreaterThanOrEqual(
+          ANIMATIONS.idle.durationMs * 2 - TICK,
+        )
+        lastThinkEnd = null
+      }
+    }
+  })
 })
 
 describe('determinism', () => {
@@ -268,7 +292,7 @@ describe('determinism', () => {
   it('matches the committed golden hash', () => {
     // A behavioural regression becomes a one-line diff in review. Regenerate deliberately when the
     // change to the pet's behaviour is the intended change.
-    expect(simulate({ seed: 42 }).hash).toBe('69c370b6')
+    expect(simulate({ seed: 42 }).hash).toBe('2f4e5574')
   })
 
   it('holds every invariant across twenty seeds', () => {
@@ -379,26 +403,102 @@ describe('movement toggle', () => {
     // Stops where it stands. Snapping to targetX would look like the pet was yanked.
     expect(state.x).toBe(xBefore)
     expect(state.x).not.toBe(runTarget)
-    expect(state.animation).toBe('sleep-enter')
+    expect(state.animation === 'idle' || state.animation === 'idle-left').toBe(true)
+    expect(state.animation).not.toBe('sleep-enter')
   })
 
-  it('stays put but keeps animating while movement is off', () => {
+  it('idles for a wind-down before lying down when movement is turned off', () => {
+    let state = initialState({ seed: 4, x: 700, now: 0, movementEnabled: true })
+    let tick = 1
+    while (state.plan.kind !== 'run' && tick < 500) {
+      state = advance(state, { now: tick * TICK, floor, settings: { movementEnabled: true }, pending: [] })
+      tick += 1
+    }
+    const offAt = tick * TICK
+    state = advance(state, {
+      now: offAt,
+      floor,
+      settings: { movementEnabled: false },
+      pending: [{ kind: 'movement-changed', enabled: false }],
+    })
+    expect(state.animation === 'idle' || state.animation === 'idle-left').toBe(true)
+
+    const beforeNap = offAt + DEFAULT_MOTION_CONFIG.sleepWindDownMs.min - TICK
+    state = advance(state, { now: beforeNap, floor, settings: { movementEnabled: false }, pending: [] })
+    expect(state.animation).not.toBe('sleep-enter')
+    expect(state.animation).not.toBe('sleep')
+  })
+
+  it('holds a nap for at least the minimum settle window', () => {
+    let state = initialState({ seed: 6, x: 700, now: 0, movementEnabled: false })
+    let now = 0
+    while (state.animation !== 'sleep' && now < 40_000) {
+      now += TICK
+      state = advance(state, { now, floor, settings: { movementEnabled: false }, pending: [] })
+    }
+    expect(state.animation).toBe('sleep')
+    const sleptAt = now
+    while (state.animation === 'sleep' && now < sleptAt + 40_000) {
+      now += TICK
+      state = advance(state, { now, floor, settings: { movementEnabled: false }, pending: [] })
+    }
+    expect(now - sleptAt).toBeGreaterThanOrEqual(DEFAULT_MOTION_CONFIG.sleepSettleMs.min)
+    expect(now - sleptAt).toBeLessThanOrEqual(DEFAULT_MOTION_CONFIG.sleepSettleMs.max + 4 * TICK)
+  })
+
+  it('after a nap, idles, thinks, idles, then lies down again', () => {
+    let state = initialState({ seed: 6, x: 700, now: 0, movementEnabled: false })
+    let now = 0
+    const sequence: string[] = []
+    let last = ''
+    while (now < 90_000) {
+      now += TICK
+      state = advance(state, { now, floor, settings: { movementEnabled: false }, pending: [] })
+      if (state.animation !== last) {
+        sequence.push(state.animation)
+        last = state.animation
+      }
+      const firstEnter = sequence.indexOf('sleep-enter')
+      if (firstEnter !== -1 && sequence.indexOf('sleep-enter', firstEnter + 1) !== -1) break
+    }
+    const exitAt = sequence.indexOf('sleep-exit')
+    expect(exitAt).toBeGreaterThanOrEqual(0)
+    const afterWake = sequence.slice(exitAt).map((name) => name.replace('-left', ''))
+    expect(afterWake.join('>')).toContain('sleep-exit>idle>review>idle>sleep-enter')
+  })
+
+  it('stays put but keeps cycling poses while movement is off', () => {
     const run = simulate({ seed: 6, ticks: 6_000, movementEnabled: false })
     const xs = run.frames.map((f) => f.state.x)
     // Exactly still: no drift at all.
     expect(new Set(xs).size).toBe(1)
 
-    // Lies down then holds the on-ground loop — no locomotion, no stand-up until woken.
     expect(run.animationsSeen.has('sleep')).toBe(true)
-    for (const animation of run.animationsSeen) {
-      expect(['running-left', 'running-right', 'sleep-exit']).not.toContain(animation)
-    }
+    expect(run.animationsSeen.has('sleep-exit')).toBe(true)
+    expect(run.animationsSeen.has('drink')).toBe(false)
+    expect(run.animationsSeen.has('stretch')).toBe(false)
+    expect(run.animationsSeen.has('jumping-left')).toBe(false)
+    expect(run.animationsSeen.has('jumping-right')).toBe(false)
+    expect(
+      run.animationsSeen.has('review') || run.animationsSeen.has('review-left'),
+      'expected thinking in the rest cycle',
+    ).toBe(true)
+    const standing = ['idle', 'idle-left', 'review', 'review-left']
+    expect(
+      standing.some((name) => run.animationsSeen.has(name)),
+      `expected a standing rest pose, saw ${[...run.animationsSeen].join(',')}`,
+    ).toBe(true)
+    expect(run.animationsSeen.has('running-left')).toBe(false)
+    expect(run.animationsSeen.has('running-right')).toBe(false)
   })
 
   it('never plays a locomotion row while movement is off, over 10k ticks', () => {
     const run = simulate({ seed: 12, ticks: 10_000, movementEnabled: false })
     expect(run.animationsSeen.has('running-left')).toBe(false)
     expect(run.animationsSeen.has('running-right')).toBe(false)
+    expect(run.animationsSeen.has('jumping-left')).toBe(false)
+    expect(run.animationsSeen.has('jumping-right')).toBe(false)
+    expect(run.animationsSeen.has('stretch')).toBe(false)
   })
 
   it('resumes moving when movement is switched back on', () => {
@@ -408,7 +508,7 @@ describe('movement toggle', () => {
     }
     const stillX = state.x
 
-    for (let tick = 201; tick <= 900; tick += 1) {
+    for (let tick = 201; tick <= 2_500; tick += 1) {
       state = advance(state, {
         now: tick * TICK,
         floor,
@@ -417,6 +517,105 @@ describe('movement toggle', () => {
       })
     }
     expect(state.x).not.toBe(stillX)
+  })
+})
+
+describe('hover', () => {
+  it('freezes locomotion without swapping the current pose', () => {
+    let state = initialState({ seed: 4, x: 700, now: 0, movementEnabled: true })
+    let tick = 1
+    while (state.plan.kind !== 'run' && tick < 500) {
+      state = advance(state, { now: tick * TICK, floor, settings: { movementEnabled: true }, pending: [] })
+      tick += 1
+    }
+    expect(state.plan.kind).toBe('run')
+    const pose = state.animation
+    const nonce = state.animationNonce
+    const xBefore = state.x
+
+    state = advance(state, {
+      now: tick * TICK,
+      floor,
+      settings: { movementEnabled: true },
+      pending: [{ kind: 'hover-start' }],
+    })
+    expect(state.hovering).toBe(true)
+    expect(state.animation).toBe(pose)
+    expect(state.animationNonce).toBe(nonce)
+
+    tick += 1
+    for (let i = 0; i < 20; i += 1) {
+      state = advance(state, { now: (tick + i) * TICK, floor, settings: { movementEnabled: true }, pending: [] })
+    }
+    expect(state.x).toBe(xBefore)
+    expect(state.animation).toBe(pose)
+  })
+
+  it('stands up through sleep-exit when hovered while lying down', () => {
+    let state = initialState({ seed: 22, x: 700, now: 0, movementEnabled: false })
+    let now = 0
+    while (state.animation !== 'sleep' && now < 30_000) {
+      now += TICK
+      state = advance(state, { now, floor, settings: { movementEnabled: false }, pending: [] })
+    }
+    expect(state.animation).toBe('sleep')
+    state = advance(state, {
+      now: now + TICK,
+      floor,
+      settings: { movementEnabled: false },
+      pending: [{ kind: 'hover-start' }],
+    })
+    expect(state.hovering).toBe(true)
+    expect(state.animation).toBe('sleep-exit')
+
+    const wakeMs = ANIMATIONS['sleep-exit'].totalMs ?? ANIMATIONS['sleep-exit'].durationMs
+    const hoverStarted = now + TICK
+    now = hoverStarted
+    while (now <= hoverStarted + wakeMs + 4 * TICK && state.animation === 'sleep-exit') {
+      now += TICK
+      state = advance(state, { now, floor, settings: { movementEnabled: false }, pending: [] })
+    }
+    expect(state.hovering).toBe(true)
+    expect(state.animation === 'idle' || state.animation === 'idle-left').toBe(true)
+  })
+
+  it('wakes on a click instead of panicking, while lying down', () => {
+    let state = initialState({ seed: 24, x: 700, now: 0, movementEnabled: false })
+    let now = 0
+    while (state.animation !== 'sleep' && now < 30_000) {
+      now += TICK
+      state = advance(state, { now, floor, settings: { movementEnabled: false }, pending: [] })
+    }
+    expect(state.animation).toBe('sleep')
+    state = advance(state, {
+      now: now + TICK,
+      floor,
+      settings: { movementEnabled: false },
+      pending: [{ kind: 'drag-start' }],
+    })
+    expect(state.dragging).toBe(false)
+    expect(state.animation).toBe('sleep-exit')
+    expect(state.animation).not.toBe('panic')
+  })
+
+  it('does not put a sleeping pet back to sleep when a reminder bubble hides the hover menu', () => {
+    let state = initialState({ seed: 21, x: 700, now: 0, movementEnabled: false })
+    state = advance(state, {
+      now: TICK,
+      floor,
+      settings: { movementEnabled: false },
+      pending: [{ kind: 'hover-start' }],
+    })
+    expect(state.hovering).toBe(true)
+
+    state = advance(state, {
+      now: 2 * TICK,
+      floor,
+      settings: { movementEnabled: false },
+      pending: [{ kind: 'reaction', state: 'stretch' }, { kind: 'hover-end' }],
+    })
+    expect(state.hovering).toBe(false)
+    expect(state.animation).toBe('stretch')
   })
 })
 
@@ -430,13 +629,14 @@ describe('drag', () => {
       pending: [{ kind: 'drag-start' }],
     })
     expect(state.dragging).toBe(true)
-    expect(state.animation).toBe(runAnimationFor(state.facing))
+    expect(state.animation).toBe('panic')
 
     const held = state.x
     for (let tick = 2; tick <= 60; tick += 1) {
       state = advance(state, { now: tick * 60, floor, settings: { movementEnabled: true }, pending: [] })
     }
     expect(state.x).toBe(held)
+    expect(state.animation).toBe('panic')
 
     state = advance(state, {
       now: 4_000,
@@ -446,7 +646,7 @@ describe('drag', () => {
     })
     expect(state.dragging).toBe(false)
     expect(state.x).toBe(300)
-    expect(state.animation).toBe('waving')
+    expect(state.animation).toBe(idleAnimationFor(state.facing))
   })
 
   it('repositions on drop even while movement is off', () => {
@@ -480,6 +680,59 @@ describe('drag', () => {
 })
 
 describe('reactions', () => {
+  it('holds a stretch reminder instead of napping while movement is off', () => {
+    let state = initialState({ seed: 23, x: 700, now: 0, movementEnabled: false })
+    state = advance(state, {
+      now: TICK,
+      floor,
+      settings: { movementEnabled: false },
+      pending: [{ kind: 'reaction', state: 'stretch', holdMs: 30_000 }],
+    })
+    expect(state.animation).toBe('stretch')
+    for (let tick = 2; tick <= 200; tick += 1) {
+      state = advance(state, {
+        now: tick * TICK,
+        floor,
+        settings: { movementEnabled: false },
+        pending: [],
+      })
+    }
+    expect(state.animation).toBe('stretch')
+  })
+
+  it('plays electrocute when zapped', () => {
+    let state = initialState({ seed: 17, x: 700, now: 0, movementEnabled: true })
+    state = advance(state, {
+      now: TICK,
+      floor,
+      settings: { movementEnabled: true },
+      pending: [{ kind: 'reaction', state: 'electrocute' }],
+    })
+    expect(state.animation).toBe('electrocute')
+  })
+
+  it('returns to idle after electrocute even while the pointer is still over the pet', () => {
+    let state = initialState({ seed: 17, x: 700, now: 0, movementEnabled: true })
+    state = advance(state, {
+      now: TICK,
+      floor,
+      settings: { movementEnabled: true },
+      pending: [{ kind: 'hover-start' }, { kind: 'reaction', state: 'electrocute' }],
+    })
+    expect(state.hovering).toBe(true)
+    expect(state.animation).toBe('electrocute')
+    const done = TICK + (ANIMATIONS.electrocute.totalMs ?? ANIMATIONS.electrocute.durationMs) + TICK
+    state = advance(state, {
+      now: done,
+      floor,
+      settings: { movementEnabled: true },
+      pending: [],
+    })
+    expect(state.hovering).toBe(true)
+    expect(state.animation === 'idle' || state.animation === 'idle-left').toBe(true)
+    expect(state.animation).not.toBe('electrocute')
+  })
+
   it('preempts the current plan, then returns to normal life', () => {
     let state = initialState({ seed: 16, x: 700, now: 0, movementEnabled: true })
     for (let tick = 1; tick <= 40; tick += 1) {

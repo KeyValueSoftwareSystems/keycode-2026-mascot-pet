@@ -6,10 +6,10 @@
   "frameWidth": 192,
   "frameHeight": 208,
   "bbox": {
-    "x": 12,
-    "y": 42,
-    "width": 169,
-    "height": 150
+    "x": 13,
+    "y": 31,
+    "width": 167,
+    "height": 161
   },
   "footInset": 16,
   "footInsetByState": {
@@ -21,6 +21,7 @@
     "jumping": 16,
     "jumping-left": 16,
     "jumping-right": 16,
+    "panic": 16,
     "review": 16,
     "review-left": 16,
     "running": 16,
@@ -41,143 +42,168 @@
     "jumping": 42,
     "jumping-left": 42,
     "jumping-right": 42,
-    "review": 42,
-    "review-left": 42,
+    "panic": 42,
+    "review": 31,
+    "review-left": 31,
     "running": 42,
     "running-left": 42,
     "running-right": 42,
     "sleep": 128,
-    "sleep-enter": 42,
-    "sleep-exit": 43,
+    "sleep-enter": 43,
+    "sleep-exit": 44,
     "stretch": 42,
-    "waving": 49
+    "waving": 47
   },
   "shapeRects": [
     {
       "x": 76,
+      "y": 28,
+      "width": 8,
+      "height": 4
+    },
+    {
+      "x": 108,
+      "y": 28,
+      "width": 8,
+      "height": 4
+    },
+    {
+      "x": 68,
+      "y": 32,
+      "width": 20,
+      "height": 4
+    },
+    {
+      "x": 104,
+      "y": 32,
+      "width": 20,
+      "height": 4
+    },
+    {
+      "x": 64,
+      "y": 36,
+      "width": 28,
+      "height": 4
+    },
+    {
+      "x": 104,
+      "y": 36,
+      "width": 28,
+      "height": 4
+    },
+    {
+      "x": 44,
       "y": 40,
-      "width": 52,
-      "height": 4
-    },
-    {
-      "x": 56,
-      "y": 44,
-      "width": 84,
-      "height": 8
+      "width": 104,
+      "height": 16
     },
     {
       "x": 40,
-      "y": 48,
-      "width": 8,
-      "height": 4
-    },
-    {
-      "x": 144,
-      "y": 48,
-      "width": 8,
-      "height": 4
-    },
-    {
-      "x": 40,
-      "y": 52,
+      "y": 56,
       "width": 112,
-      "height": 8
+      "height": 4
     },
     {
-      "x": 40,
+      "x": 32,
       "y": 60,
-      "width": 116,
-      "height": 8
-    },
-    {
-      "x": 44,
-      "y": 68,
-      "width": 108,
-      "height": 4
-    },
-    {
-      "x": 44,
-      "y": 72,
-      "width": 104,
-      "height": 4
-    },
-    {
-      "x": 40,
-      "y": 76,
-      "width": 112,
-      "height": 12
-    },
-    {
-      "x": 44,
-      "y": 88,
-      "width": 104,
-      "height": 4
-    },
-    {
-      "x": 40,
-      "y": 92,
-      "width": 112,
-      "height": 20
-    },
-    {
-      "x": 40,
-      "y": 112,
-      "width": 120,
-      "height": 4
-    },
-    {
-      "x": 40,
-      "y": 116,
-      "width": 124,
-      "height": 12
-    },
-    {
-      "x": 40,
-      "y": 128,
-      "width": 132,
-      "height": 8
-    },
-    {
-      "x": 44,
-      "y": 136,
       "width": 128,
       "height": 4
     },
     {
-      "x": 44,
-      "y": 140,
+      "x": 32,
+      "y": 64,
+      "width": 124,
+      "height": 4
+    },
+    {
+      "x": 28,
+      "y": 68,
+      "width": 132,
+      "height": 8
+    },
+    {
+      "x": 28,
+      "y": 76,
       "width": 136,
       "height": 4
     },
     {
-      "x": 24,
-      "y": 144,
-      "width": 12,
+      "x": 32,
+      "y": 80,
+      "width": 140,
       "height": 4
     },
     {
-      "x": 40,
-      "y": 144,
+      "x": 28,
+      "y": 84,
+      "width": 144,
+      "height": 8
+    },
+    {
+      "x": 24,
+      "y": 92,
+      "width": 148,
+      "height": 4
+    },
+    {
+      "x": 20,
+      "y": 96,
+      "width": 148,
+      "height": 8
+    },
+    {
+      "x": 20,
+      "y": 104,
+      "width": 152,
+      "height": 12
+    },
+    {
+      "x": 20,
+      "y": 116,
+      "width": 144,
+      "height": 12
+    },
+    {
+      "x": 20,
+      "y": 128,
       "width": 140,
+      "height": 4
+    },
+    {
+      "x": 28,
+      "y": 132,
+      "width": 144,
+      "height": 8
+    },
+    {
+      "x": 40,
+      "y": 140,
+      "width": 136,
+      "height": 8
+    },
+    {
+      "x": 28,
+      "y": 144,
+      "width": 8,
       "height": 4
     },
     {
       "x": 24,
       "y": 148,
       "width": 156,
-      "height": 4
+      "height": 8
     },
     {
-      "x": 20,
-      "y": 152,
-      "width": 160,
+      "x": 16,
+      "y": 156,
+      "width": 164,
       "height": 4
     },
     {
       "x": 12,
-      "y": 156,
-      "width": 172,
-      "height": 8
+      "y": 160,
+      "width": 168,
+      "height": 4
     },
     {
       "x": 12,
@@ -189,13 +215,7 @@
       "x": 12,
       "y": 168,
       "width": 148,
-      "height": 8
-    },
-    {
-      "x": 12,
-      "y": 176,
-      "width": 144,
-      "height": 8
+      "height": 16
     },
     {
       "x": 12,
@@ -205,17 +225,17 @@
     }
   ],
   "stats": {
-    "unionOpaquePixels": 18092,
+    "unionOpaquePixels": 20781,
     "cellPixels": 39936,
-    "maskSetCells": 1191,
+    "maskSetCells": 1360,
     "maskTotalCells": 2496,
-    "framesMeasured": 197,
-    "perFrameOpaqueMin": 6376,
-    "perFrameOpaqueMax": 9407,
-    "perFrameOpaqueMean": 7616,
-    "shapeRectsArea": 19056,
-    "maskArea": 19056
+    "framesMeasured": 237,
+    "perFrameOpaqueMin": 6174,
+    "perFrameOpaqueMax": 13789,
+    "perFrameOpaqueMean": 8192,
+    "shapeRectsArea": 21760,
+    "maskArea": 21760
   },
-  "bitsBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAf/wAAAAP//+AAADP//+wAAD////wAAD////wAAD////4AAD////4AAB////wAAB////gAAD////wAAD////wAAD////wAAB////gAAD////wAAD////wAAD////wAAD////wAAD////wAAD////8AAD////+AAD////+AAD////+AAD/////gAD/////gAB/////gAB/////4A7/////4A//////4B//////4H//////8H//////8H//////wH/////8AH/////8AH/////4AH/////4AH/////wAH/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-  "sourceSha256": "8726264e9b6484b37969829a1548efe6b56921890ed41eb2960c68afaa40f460"
+  "bitsBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYGAAAAAB8PgAAAAD+P4AAAB////gAAB////gAAB////gAAB////gAAD////wAAP////8AAP////4AAf////8AAf////8AAf////+AAP/////gAf/////gAf/////gA//////gB//////AB//////AB//////gB//////gB//////gB/////+AB/////+AB/////+AB/////8AAf/////gAf/////gAD/////wAb/////wA//////4A//////4D//////4H//////4H//////wH/////8AH/////8AH/////8AH/////8AH/////wAH/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "sourceSha256": "6552a174845decb6f02d5690517f718c67efeb759c3f66728831055cb5ea42d3"
 }

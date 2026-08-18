@@ -201,14 +201,22 @@ export function shapeRectsForFrame(
     })
   }
 
-  // Hover zap chip sits beside the body; cover a strip to the right of the cell so Linux paints it.
+  // Hover zap chip sits beside the *body*, not the cell. The cell is 192px and mostly empty, so a
+  // strip hung off the cell's right edge misses the 36px button (which CSS places at
+  // `--body-cx + 52px`) and Linux clips it to a notch. Same anchors as `#quick-menu` in pet.css;
+  // size is CSS px (the chip does not shrink with the pet), offsets scale. Glow padding is the
+  // `0 0 10px 2px` box-shadow — too small and the halo is eaten the same way the button was.
   if (frame.quickMenuVisible) {
-    const chip = Math.round(44 * s)
+    const chipSize = 36
+    const chipGlow = 14
+    const bodyCx = layout.spriteOrigin.x + (mask.bbox.x + mask.bbox.width / 2) * s
+    const headTop =
+      layout.spriteOrigin.y + (mask.headTopByState[frame.animation] ?? mask.bbox.y) * s
     rects.push({
-      x: Math.max(0, layout.spriteOrigin.x + Math.round(mask.frameWidth * s) - Math.round(8 * s)),
-      y: Math.max(0, layout.spriteOrigin.y + Math.round(mask.frameHeight * s * 0.28)),
-      width: chip,
-      height: chip,
+      x: Math.round(bodyCx + 52 * s - chipGlow),
+      y: Math.round(headTop + 36 * s - chipGlow),
+      width: chipSize + chipGlow * 2,
+      height: chipSize + chipGlow * 2,
     })
   }
 

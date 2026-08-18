@@ -43,6 +43,7 @@ import {
 import type { SafeDefaults } from '../broadcast/manifest-schema.js'
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
+import { createSilentUpdater } from '../updates/silent-updater.js'
 import { createAnalytics, type AnalyticsService } from '../analytics/analytics-service.js'
 import { osName } from '../analytics/analytics-client.js'
 import { openExternalChecked } from './open-external.js'
@@ -156,8 +157,12 @@ export async function startApp(): Promise<AppShell> {
     settings.get().alwaysOnTop ?? manifestDefaults?.alwaysOnTop ?? DEFAULT_ALWAYS_ON_TOP
 
   let pointerOverPet = false
-  /** Hover quick-menu + idle-freeze currently applied. */
+  /** Hover quick-menu currently shown. Separate from freeze so waking from sleep can hide the zap. */
   let hoverMenuOpen = false
+  /** True while hover-start is holding locomotion (cursor over the pet, no callout). */
+  let hoverFrozen = false
+  /** True while the right-click settings menu is open. */
+  let settingsMenuOpen = false
   /** True only between a real drag-start and its matching drag-end. */
   let petDragging = false
   /**
@@ -177,17 +182,31 @@ export async function startApp(): Promise<AppShell> {
   }
 
   const syncHoverMenu = (): void => {
-    const want = pointerOverPet && !callouts?.showing() && !hoverNeedsReenter
-    if (want === hoverMenuOpen) return
-    hoverMenuOpen = want
-    if (want) {
-      controller?.setQuickActions(['zap'])
-      controller?.enqueue({ kind: 'hover-start' })
-    } else {
-      controller?.setQuickActions([])
-      controller?.enqueue({ kind: 'hover-end' })
+    const animation = controller?.animation()
+    if (
+      pointerOverPet &&
+      (animation === 'sleep' || animation === 'sleep-enter' || animation === 'sleep-exit')
+    ) {
+      hoverNeedsReenter = true
     }
-    controller?.tickNow()
+
+    const freeze = pointerOverPet && !callouts?.showing()
+    const hideZap =
+      petDragging || animation === 'electrocute' || animation === 'panic'
+    const showZap = freeze && !hoverNeedsReenter && !settingsMenuOpen && !hideZap
+    let changed = false
+
+    if (showZap !== hoverMenuOpen) {
+      hoverMenuOpen = showZap
+      controller?.setQuickActions(showZap ? ['zap'] : [])
+      changed = true
+    }
+    if (freeze !== hoverFrozen) {
+      hoverFrozen = freeze
+      controller?.enqueue(freeze ? { kind: 'hover-start' } : { kind: 'hover-end' })
+      changed = true
+    }
+    if (changed) controller?.tickNow()
   }
 
   const confirmHoverLeft = (): void => {
@@ -251,14 +270,32 @@ export async function startApp(): Promise<AppShell> {
         syncHoverMenu()
       },
       onContextMenu(): void {
+        settingsMenuOpen = true
+        syncHoverMenu()
         menu.popupOverPet()
       },
       onDragStart(): void {
+        const animation = controller?.animation()
+        if (
+          animation === 'sleep' ||
+          animation === 'sleep-enter' ||
+          animation === 'sleep-exit'
+        ) {
+          // A click on a sleeper is a nudge, not a pickup.
+          hoverNeedsReenter = true
+          if (!hoverFrozen) {
+            hoverFrozen = true
+            controller?.enqueue({ kind: 'hover-start' })
+          }
+          controller?.tickNow()
+          return
+        }
         // Counted, not captured. Folded into the next heartbeat as one number — a pet dragged
         // across the screen thirty times in an afternoon is one fact, not thirty events.
         petInteractions += 1
         petDragging = true
         hoverMenuOpen = false
+        hoverFrozen = false
         controller?.setQuickActions([])
         pet.setDragging(true)
         controller?.enqueue({ kind: 'drag-start' })
@@ -293,6 +330,7 @@ export async function startApp(): Promise<AppShell> {
         // here rather than in the view.
         petInteractions += 1
         if (callouts?.showing()?.actions?.length) return
+        if (callouts?.showing()?.sourceId === 'update' && updates?.applyIfReady()) return
         const url = callouts?.currentUrl()
         if (url) {
           // Only for broadcasts, and only the id — never the URL, which is the one field in a
@@ -315,6 +353,10 @@ export async function startApp(): Promise<AppShell> {
       },
       onQuickAction(action): void {
         if (action !== 'zap') return
+        if (hoverMenuOpen) {
+          hoverMenuOpen = false
+          controller?.setQuickActions([])
+        }
         controller?.react('zap')
         controller?.tickNow()
       },
@@ -327,6 +369,9 @@ export async function startApp(): Promise<AppShell> {
     getMovementEnabled: () => settings.get().movementEnabled,
     onPositionChanged(displayKey, petCentreX, feetY) {
       settings.patch({ position: { displayKey, x: petCentreX, feetY } })
+    },
+    onAnimationChanged() {
+      syncHoverMenu()
     },
     startPetCentreX: startX,
     startFeetY,
@@ -409,7 +454,9 @@ export async function startApp(): Promise<AppShell> {
         actions: ['ok', 'snooze'],
         ...(kind === 'water'
           ? { holdMs: (ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs) + DRINK_LOOP_GAP_MS }
-          : {}),
+          : kind === 'stretch'
+            ? { holdMs: ANIMATIONS.stretch.totalMs ?? ANIMATIONS.stretch.durationMs }
+            : {}),
       })
     },
     onClockFire(kind, message) {
@@ -448,6 +495,11 @@ export async function startApp(): Promise<AppShell> {
   // The manifest is world-readable, so nothing goes in it that would not be fine on a public page.
   // See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
   let updates: UpdateService | null = null
+  const silentUpdater = createSilentUpdater({
+    packaged: app.isPackaged,
+    log,
+    onReady: (version) => updates?.onDownloaded(version),
+  })
 
   const manifestUrl = resolveManifestUrl(
     process.env,
@@ -567,6 +619,13 @@ export async function startApp(): Promise<AppShell> {
       void analytics.capture('update_notes_opened', { latest_version: updateState.latestVersion })
       return openExternalChecked(url, { log })
     },
+    ...(app.isPackaged
+      ? {
+          startDownload: () => silentUpdater.check(),
+          isReady: () => silentUpdater.isReady(),
+          applyUpdate: () => silentUpdater.quitAndInstall(),
+        }
+      : {}),
   })
 
   // ---------------------------------------------------------------------------------------
@@ -785,8 +844,10 @@ export async function startApp(): Promise<AppShell> {
     captureEvent: (event, properties) => analytics.capture(event, properties),
     flushAnalytics: () => analytics.flush(),
     checkForUpdates: () => {
-      // If an update is already known, the item opens its notes; otherwise it runs a real check.
-      if (updateState.state === 'available') {
+      // Packaged: apply a finished download (quit, swap, relaunch). Unpackaged: the download page
+      // is the update. A download still in flight re-checks rather than opening the browser.
+      if (updates?.applyIfReady()) return
+      if (updateState.state === 'available' && !app.isPackaged) {
         updates?.openNotes()
         return
       }
@@ -815,7 +876,9 @@ export async function startApp(): Promise<AppShell> {
         actions: ['ok', 'snooze'],
         ...(kind === 'water'
           ? { holdMs: (ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs) + DRINK_LOOP_GAP_MS }
-          : {}),
+          : kind === 'stretch'
+            ? { holdMs: ANIMATIONS.stretch.totalMs ?? ANIMATIONS.stretch.durationMs }
+            : {}),
       })
     },
     fireGreetingNow(period) {
@@ -841,6 +904,10 @@ export async function startApp(): Promise<AppShell> {
     petWindow: () => pet.win,
     // The tray menu is retained by the OS, so a state change has to push a rebuild into it.
     onTemplateChanged: () => trayRef?.refresh(),
+    onPopupChanged(open) {
+      settingsMenuOpen = open
+      if (!open) syncHoverMenu()
+    },
   })
 
   const tray = createTray({

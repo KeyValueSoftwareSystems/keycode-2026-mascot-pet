@@ -95,23 +95,22 @@ describe('sustained poses', () => {
     // A finite animation ends and then holds one frame. Using one as a *pose* would look like the
     // pet froze mid-gesture, so the config's pose slots must name looping states.
     const { ANIMATIONS } = await import('../../apps/desktop/src/pet-animations.generated.js')
-    for (const key of ['dragAnimation', 'sleepAnimation', 'idleAnimation'] as const) {
+    for (const key of ['dragAnimation', 'sleepAnimation', 'idleAnimation', 'dropAnimation'] as const) {
       const state = DEFAULT_MOTION_CONFIG[key]
       expect(ANIMATIONS[state].iterations, `${key} (${state}) must loop`).toBe('infinite')
     }
     for (const act of DEFAULT_MOTION_CONFIG.idleActs) {
       expect(ANIMATIONS[act].iterations, `idleAct ${act} must loop`).toBe('infinite')
     }
-    // The drop / sleep-enter / sleep-exit beats are deliberately finite.
-    expect(ANIMATIONS[DEFAULT_MOTION_CONFIG.dropAnimation].iterations).not.toBe('infinite')
+    // The sleep-enter / sleep-exit beats are deliberately finite.
     expect(ANIMATIONS[DEFAULT_MOTION_CONFIG.sleepEnterAnimation].iterations).not.toBe('infinite')
     expect(ANIMATIONS[DEFAULT_MOTION_CONFIG.sleepExitAnimation].iterations).not.toBe('infinite')
   })
 
   it('never uses the in-place busy loop for locomotion', () => {
-    // `running` is the in-place busy/drag alias. Wiring it to a run plan would jog in place
+    // `running` is the in-place busy alias. Wiring it to a run plan would jog in place
     // while sliding sideways; locomotion uses running-left/running-right instead.
-    expect(DEFAULT_MOTION_CONFIG.dragAnimation).toBe('running')
+    expect(DEFAULT_MOTION_CONFIG.dragAnimation).toBe('panic')
     expect(DEFAULT_MOTION_CONFIG.idleActs).not.toContain('running')
     const state = initialState({ seed: 3, x: 300, now: 0, movementEnabled: true })
     expect(state.animation).not.toBe('running')

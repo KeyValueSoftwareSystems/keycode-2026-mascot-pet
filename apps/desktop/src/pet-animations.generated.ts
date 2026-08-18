@@ -14,6 +14,7 @@ export type AnimationState =
   | 'jumping'
   | 'jumping-left'
   | 'jumping-right'
+  | 'panic'
   | 'review'
   | 'review-left'
   | 'running'
@@ -70,21 +71,22 @@ export interface AnimationSpec {
 
 export const ANIMATIONS: { readonly [K in AnimationState]: AnimationSpec } = {
   'drink': { row: 4, frames: 11, startColumn: 0, durationMs: 2200, iterations: 2, totalMs: 4400 },
-  'electrocute': { row: 11, frames: 6, startColumn: 0, durationMs: 720, iterations: 2, totalMs: 1440 },
+  'electrocute': { row: 11, frames: 21, startColumn: 0, durationMs: 2100, iterations: 1, totalMs: 2100 },
   'failed': { row: 0, frames: 2, startColumn: 0, durationMs: 1220, iterations: 2, totalMs: 2440 },
   'idle': { row: 0, frames: 2, startColumn: 0, durationMs: 2000, iterations: 'infinite', totalMs: null },
   'idle-left': { row: 6, frames: 2, startColumn: 0, durationMs: 2000, iterations: 'infinite', totalMs: null },
   'jumping': { row: 3, frames: 19, startColumn: 0, durationMs: 4800, iterations: 1, totalMs: 4800 },
   'jumping-left': { row: 5, frames: 19, startColumn: 0, durationMs: 4800, iterations: 1, totalMs: 4800 },
   'jumping-right': { row: 3, frames: 19, startColumn: 0, durationMs: 4800, iterations: 1, totalMs: 4800 },
+  'panic': { row: 12, frames: 20, startColumn: 0, durationMs: 2400, iterations: 'infinite', totalMs: null },
   'review': { row: 9, frames: 21, startColumn: 0, durationMs: 4200, iterations: 'infinite', totalMs: null },
   'review-left': { row: 10, frames: 21, startColumn: 0, durationMs: 4200, iterations: 'infinite', totalMs: null },
-  'running': { row: 1, frames: 6, startColumn: 0, durationMs: 800, iterations: 'infinite', totalMs: null },
-  'running-left': { row: 2, frames: 6, startColumn: 0, durationMs: 800, iterations: 'infinite', totalMs: null },
-  'running-right': { row: 1, frames: 6, startColumn: 0, durationMs: 800, iterations: 'infinite', totalMs: null },
+  'running': { row: 1, frames: 6, startColumn: 0, durationMs: 1400, iterations: 'infinite', totalMs: null },
+  'running-left': { row: 2, frames: 6, startColumn: 0, durationMs: 1400, iterations: 'infinite', totalMs: null },
+  'running-right': { row: 1, frames: 6, startColumn: 0, durationMs: 1400, iterations: 'infinite', totalMs: null },
   'sleep': { row: 8, frames: 10, startColumn: 8, durationMs: 4000, iterations: 'infinite', totalMs: null },
-  'sleep-enter': { row: 8, frames: 8, startColumn: 0, durationMs: 1600, iterations: 1, totalMs: 1600 },
-  'sleep-exit': { row: 8, frames: 2, startColumn: 23, durationMs: 500, iterations: 1, totalMs: 500 },
+  'sleep-enter': { row: 8, frames: 8, startColumn: 0, durationMs: 3200, iterations: 1, totalMs: 3200 },
+  'sleep-exit': { row: 8, frames: 7, startColumn: 18, durationMs: 2800, iterations: 1, totalMs: 2800 },
   'stretch': { row: 3, frames: 19, startColumn: 0, durationMs: 5600, iterations: 1, totalMs: 5600 },
   'waving': { row: 7, frames: 18, startColumn: 0, durationMs: 2700, iterations: 1, totalMs: 2700 },
 }
@@ -99,6 +101,7 @@ export const ANIMATION_STATES = [
   'jumping',
   'jumping-left',
   'jumping-right',
+  'panic',
   'review',
   'review-left',
   'running',
@@ -115,9 +118,9 @@ export const SHEET = {
   frameWidth: 192,
   frameHeight: 208,
   columns: 25,
-  rows: 12,
+  rows: 13,
   width: 4800,
-  height: 2496,
+  height: 2704,
   fileName: "spritesheet.png",
 } as const
 
@@ -155,7 +158,7 @@ export const REACTION_MAP: { readonly [K in Trigger]: AnimationState } = {
   'error': 'failed',
   'movement-disabled': 'sleep-enter',
   'movement-enabled': 'sleep-exit',
-  'drag-release': 'waving',
+  'drag-release': 'idle',
   'zap': 'electrocute',
 }
 

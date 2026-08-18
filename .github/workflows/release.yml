@@ -234,6 +234,7 @@ jobs:
             release/*.deb
             release/*.rpm
             release/*.tar.gz
+            release/latest*.yml
           if-no-files-found: error
           retention-days: 14
 
@@ -335,6 +336,7 @@ jobs:
             release/*.deb
             release/*.rpm
             release/*.tar.gz
+            release/latest*.yml
 
   # ---------------------------------------------------------------------------------------
   # Announce the release to every installed pet.

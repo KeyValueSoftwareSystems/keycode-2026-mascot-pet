@@ -47,10 +47,12 @@ export interface MotionConfig {
   idleActivityWeights: { run: number; dwell: number; act: number }
   /** In-place animations the pet may idle into. Must be sustained (infinite) states. */
   idleActs: readonly AnimationState[]
+  /** Poses cycled while movement is off, after a nap. Finite is fine — each plays once then yields. */
+  restActs: readonly AnimationState[]
 
   /** Pose while being dragged. Must be a sustained state. */
   dragAnimation: AnimationState
-  /** Played once on drop. Finite is fine — it is a beat, not a pose. */
+  /** Neutral standing pose resumed on drop. Panic stops the instant the drag ends. */
   dropAnimation: AnimationState
   /** Lie-down beat when movement is switched off. Finite. */
   sleepEnterAnimation: AnimationState
@@ -66,6 +68,8 @@ export interface MotionConfig {
    * frozen — a napping pet rather than a switched-off one, while still making the toggle visible.
    */
   sleepSettleMs: { min: number; max: number }
+  /** Idle pause after movement is turned off, before lying down. */
+  sleepWindDownMs: { min: number; max: number }
   /** Chance an in-place cycle returns to `sleep` rather than another idle act. */
   sleepReturnChance: number
 }
@@ -74,8 +78,8 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   tickMs: 60,
   dtClampMs: 250,
 
-  runSpeedPxPerSec: { min: 70, max: 130 },
-  runDistancePx: { min: 180, max: 560 },
+  runSpeedPxPerSec: { min: 18, max: 32 },
+  runDistancePx: { min: 140, max: 520 },
 
   dwellMs: { min: 900, max: 4_200 },
   edgePauseMs: { min: 260, max: 700 },
@@ -85,20 +89,23 @@ export const DEFAULT_MOTION_CONFIG: MotionConfig = {
   skidDriftFactor: 0.35,
 
   jumpChance: 0.18,
-  jumpDriftFactor: 0.6,
+  jumpDriftFactor: 1,
 
   idleActivityWeights: { run: 6, dwell: 3, act: 2 },
   // `review` is the hand-to-chin thinking pose. Do not idle into `running`: that reuses the
   // locomotion row and reads as a planted jog.
   idleActs: ['review'],
+  restActs: ['idle', 'review'],
 
-  dragAnimation: 'running',
-  dropAnimation: 'waving',
+
+  dragAnimation: 'panic',
+  dropAnimation: 'idle',
   sleepEnterAnimation: 'sleep-enter',
   sleepAnimation: 'sleep',
   sleepExitAnimation: 'sleep-exit',
   idleAnimation: 'idle',
 
-  sleepSettleMs: { min: 6_000, max: 14_000 },
+  sleepSettleMs: { min: 8_000, max: 16_000 },
+  sleepWindDownMs: { min: 4_000, max: 8_000 },
   sleepReturnChance: 0.55,
 }

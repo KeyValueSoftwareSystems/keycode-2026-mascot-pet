@@ -75,6 +75,9 @@ function harness(
     currentVersion?: string
     lastKnownRelease?: string | null
     pollOutcome?: PollOutcome
+    startDownload?: () => boolean
+    isReady?: () => boolean
+    applyUpdate?: () => boolean
   } = {},
 ) {
   let lastKnown = options.lastKnownRelease ?? null
@@ -97,6 +100,9 @@ function harness(
       opened.push(url)
       return url !== null
     },
+    ...(options.startDownload ? { startDownload: options.startDownload } : {}),
+    ...(options.isReady ? { isReady: options.isReady } : {}),
+    ...(options.applyUpdate ? { applyUpdate: options.applyUpdate } : {}),
   })
 
   return {
@@ -231,5 +237,58 @@ describe('update service', () => {
   it('reports failure when there is no notes URL to open', () => {
     const h = harness()
     expect(h.service.openNotes()).toBe(false)
+  })
+
+  it('downloads in the background instead of announcing, when an installer can be applied', () => {
+    const started: string[] = []
+    const h = harness({
+      startDownload: () => {
+        started.push('yes')
+        return true
+      },
+    })
+    h.service.onReleaseFromPoll(release())
+    expect(started).toEqual(['yes'])
+    expect(h.callouts).toEqual([])
+    expect(h.service.view().state).toBe('available')
+  })
+
+  it('announces a restart once the installer has downloaded', () => {
+    const h = harness({ startDownload: () => true })
+    h.service.onReleaseFromPoll(release())
+    h.service.onDownloaded('0.9.0')
+    expect(h.callouts).toHaveLength(1)
+    expect(h.callouts[0]).toMatchObject({
+      sourceId: 'update',
+      text: 'Version 0.9.0 is ready. Click to restart.',
+      sticky: true,
+    })
+    expect(h.callouts[0]).not.toHaveProperty('url')
+    expect(h.service.view().state).toBe('downloaded')
+  })
+
+  it('applies a ready update from the menu without polling again', async () => {
+    const applied: string[] = []
+    const pollNow = vi.fn(
+      async (): Promise<PollOutcome> => ({ kind: 'ok', surfaced: 0, unchanged: false }),
+    )
+    const service = createUpdateService({
+      currentVersion: '0.5.0',
+      getLastKnownRelease: () => '0.9.0',
+      setLastKnownRelease: () => {},
+      submitCallout: () => {},
+      showToast: () => {},
+      pollNow,
+      onStateChange: () => {},
+      openReleaseNotes: () => true,
+      isReady: () => true,
+      applyUpdate: () => {
+        applied.push('yes')
+        return true
+      },
+    })
+    await service.checkNow()
+    expect(applied).toEqual(['yes'])
+    expect(pollNow).not.toHaveBeenCalled()
   })
 })

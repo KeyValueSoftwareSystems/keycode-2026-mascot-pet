@@ -21,7 +21,7 @@ export type MotionTrigger =
   | { kind: 'drag-start' }
   /** `floorLocked` is decided by the host from how close the drop was to the floor. */
   | { kind: 'drag-end'; petCentreX: number; feetY: number; floorLocked: boolean }
-  /** Hover quick-menu is up — freeze locomotion and hold idle. */
+  /** Hover quick-menu is up — freeze locomotion, keep the current pose. */
   | { kind: 'hover-start' }
   | { kind: 'hover-end' }
   | { kind: 'movement-changed'; enabled: boolean }
@@ -45,7 +45,7 @@ export interface MotionInput {
  */
 export type Plan =
   | { kind: 'run'; targetX: number; speedPxPerSec: number; skidOnArrival: boolean }
-  | { kind: 'dwell'; untilMs: number; state: AnimationState }
+  | { kind: 'dwell'; untilMs: number; state: AnimationState; after?: AnimationState }
   | { kind: 'act'; state: AnimationState; endsAt: number; driftPxPerSec: number }
 
 export interface MotionStats {
@@ -86,7 +86,7 @@ export interface MotionState {
   animationEndsAt: number | null
   plan: Plan
   dragging: boolean
-  /** True while the hover quick-menu is open — locomotion freezes on idle. */
+  /** True while the hover quick-menu is open — locomotion freezes; the current pose keeps playing. */
   hovering: boolean
   movementEnabled: boolean
   rngSeed: number

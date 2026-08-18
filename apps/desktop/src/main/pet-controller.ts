@@ -20,7 +20,7 @@ import { screen } from 'electron'
 import { advance, initialState } from '../motion/motion-engine.js'
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../motion/motion-config.js'
 import type { MotionState, MotionTrigger } from '../motion/types.js'
-import { ANIMATIONS, resolveTrigger, type Trigger } from '../pet-animations.generated.js'
+import { ANIMATIONS, resolveTrigger, type Trigger, type AnimationState } from '../pet-animations.generated.js'
 import type { PetFrame, Tone } from '../pet-frame.js'
 import { DRINK_LOOP_GAP_MS } from '../config/constants.js'
 import {
@@ -50,6 +50,8 @@ export interface PetControllerOptions {
   getMovementEnabled: () => boolean
   /** `feetY` is null when the pet is floor-locked, meaning "re-derive it on launch". */
   onPositionChanged: (displayKey: string, petCentreX: number, feetY: number | null) => void
+  /** Fired after a tick when the pose changed, so the hover chip can return after electrocute. */
+  onAnimationChanged?: (animation: AnimationState) => void
   startPetCentreX: number
   /** Restored free-placement height, or null for floor-locked. */
   startFeetY?: number | null
@@ -83,6 +85,8 @@ export interface PetController {
   endDrag(): void
   /** Where the pet is, and whether it is floor-locked. */
   position(): { x: number; feetY: number; floorLocked: boolean }
+  /** Current animation state. Used by the hover menu to wake a sleeper without showing zap. */
+  animation(): AnimationState
   /**
    * Place the pet at an absolute position, as a drop would — same clamping, same snap-to-floor rule.
    *
@@ -219,6 +223,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
 
       const drained = pending
       pending = []
+      const animationBefore = state.animation
 
       state = advance(
         state,
@@ -231,14 +236,19 @@ export function createPetController(options: PetControllerOptions): PetControlle
         config,
       )
 
-      const drinkMs = ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs
-      const drinkCycle = drinkMs + DRINK_LOOP_GAP_MS
       const sticky = Boolean(callout && callout.actions.length > 0)
-      if (sticky && state.animation === 'drink') {
+      const loopingPose =
+        sticky && (state.animation === 'drink' || state.animation === 'stretch')
+          ? state.animation
+          : null
+      if (loopingPose) {
+        const spec = ANIMATIONS[loopingPose]
+        const cycle =
+          (spec.totalMs ?? spec.durationMs) + (loopingPose === 'drink' ? DRINK_LOOP_GAP_MS : 0)
         if (drinkLoopAt === 0) drinkLoopAt = timestamp
-        else if (timestamp - drinkLoopAt >= drinkCycle - config.tickMs) {
+        else if (timestamp - drinkLoopAt >= cycle - config.tickMs) {
           drinkLoopAt = timestamp
-          pending.push({ kind: 'reaction', state: 'drink', holdMs: drinkCycle })
+          pending.push({ kind: 'reaction', state: loopingPose, holdMs: cycle })
         }
       } else {
         drinkLoopAt = 0
@@ -268,6 +278,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
       )
       pet.moveTo(state.x, state.feetY)
       sendFrameIfChanged()
+      if (animationBefore !== state.animation) options.onAnimationChanged?.(state.animation)
 
       // Persist position sparingly: the settings store debounces, but there is no reason to mark it
       // dirty on every one of ~17 ticks a second when the pet has barely moved. `feetY` is included
@@ -349,6 +360,10 @@ export function createPetController(options: PetControllerOptions): PetControlle
 
     position(): { x: number; feetY: number; floorLocked: boolean } {
       return { x: state.x, feetY: state.feetY, floorLocked: state.floorLocked }
+    },
+
+    animation(): AnimationState {
+      return state.animation
     },
 
     place(position: { x: number; feetY: number }): void {

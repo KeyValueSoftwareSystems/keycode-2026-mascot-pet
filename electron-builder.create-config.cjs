@@ -55,8 +55,13 @@ function createConfig(env = process.env) {
      * step that buys us nothing here.
      */
     asar: false,
-    // Releases are published deliberately, never as a side effect of a build.
-    publish: null,
+    // Metadata for electron-updater (`latest-mac.yml` and friends). The package scripts pass
+    // `--publish never` so a GH_TOKEN in CI cannot turn a build into a GitHub Release by itself.
+    publish: {
+      provider: 'github',
+      owner: 'KeyValueSoftwareSystems',
+      repo: 'keycode-2026-mascot-pet',
+    },
     artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
 
     /**

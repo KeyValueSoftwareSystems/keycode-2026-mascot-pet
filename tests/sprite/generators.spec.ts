@@ -292,13 +292,13 @@ describe('spritesheet validation', () => {
   it('accepts an extended sheet that moves stretch onto a new row', () => {
     // The art-swap path, tested: adding rows must need no code change.
     const load = loadWith((s) => {
-      s.sheet.rows = 12
-      s.sheet.height = 12 * 208
-      s.states.stretch = { row: 9, frames: 6, durationMs: 2200, iterations: 2 }
+      s.sheet.rows = 14
+      s.sheet.height = 14 * 208
+      s.states.stretch = { row: 13, frames: 6, durationMs: 2200, iterations: 2 }
       delete s.aliases.stretch
     })
     const result = load() as { states: Array<{ name: string; row: number }> }
     const stretch = result.states.find((st) => st.name === 'stretch')
-    expect(stretch?.row).toBe(9)
+    expect(stretch?.row).toBe(13)
   })
 })
