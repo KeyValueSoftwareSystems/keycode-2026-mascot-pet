@@ -1,5 +1,5 @@
 /**
- * Packaged auto-update: download in the background, then quit, replace the app, and relaunch.
+ * Packaged auto-update: download when the user asks, then quit, replace the app, and relaunch.
  *
  * Unpackaged (`pnpm dev`) is a no-op — there is no bundle to replace. Production builds are
  * Developer ID signed and notarized, which is what makes Squirrel.Mac's signature check pass.

@@ -327,7 +327,10 @@ export async function startApp(): Promise<AppShell> {
         // here rather than in the view.
         petInteractions += 1
         if (callouts?.showing()?.actions?.length) return
-        if (callouts?.showing()?.sourceId === 'update' && updates?.applyIfReady()) return
+        if (callouts?.showing()?.sourceId === 'update' && updates?.beginInstall()) {
+          callouts.dismissShowing()
+          return
+        }
         const url = callouts?.currentUrl()
         if (url) {
           // Only for broadcasts, and only the id — never the URL, which is the one field in a

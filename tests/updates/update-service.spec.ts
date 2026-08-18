@@ -239,7 +239,7 @@ describe('update service', () => {
     expect(h.service.openNotes()).toBe(false)
   })
 
-  it('downloads in the background instead of announcing, when an installer can be applied', () => {
+  it('announces a newer version without downloading until the user accepts', () => {
     const started: string[] = []
     const h = harness({
       startDownload: () => {
@@ -248,22 +248,44 @@ describe('update service', () => {
       },
     })
     h.service.onReleaseFromPoll(release())
-    expect(started).toEqual(['yes'])
-    expect(h.callouts).toEqual([])
+    expect(started).toEqual([])
+    expect(h.callouts).toHaveLength(1)
+    expect(h.callouts[0]).toMatchObject({
+      sourceId: 'update',
+      text: 'Version 0.9.0 is available',
+    })
     expect(h.service.view().state).toBe('available')
+  })
+
+  it('starts the download when the user accepts the bubble', () => {
+    const started: string[] = []
+    const h = harness({
+      startDownload: () => {
+        started.push('yes')
+        return true
+      },
+    })
+    h.service.onReleaseFromPoll(release())
+    expect(h.service.beginInstall()).toBe(true)
+    expect(started).toEqual(['yes'])
+    expect(h.toasts).toEqual([{ text: 'Downloading version 0.9.0…', tone: 'success' }])
   })
 
   it('announces a restart once the installer has downloaded, when it cannot apply it itself', () => {
     const h = harness({ startDownload: () => true })
     h.service.onReleaseFromPoll(release())
     h.service.onDownloaded('0.9.0')
-    expect(h.callouts).toHaveLength(1)
+    expect(h.callouts).toHaveLength(2)
     expect(h.callouts[0]).toMatchObject({
+      sourceId: 'update',
+      text: 'Version 0.9.0 is available',
+    })
+    expect(h.callouts[1]).toMatchObject({
       sourceId: 'update',
       text: 'Version 0.9.0 is ready. Click to restart.',
       sticky: true,
     })
-    expect(h.callouts[0]).not.toHaveProperty('url')
+    expect(h.callouts[1]).not.toHaveProperty('url')
     expect(h.service.view().state).toBe('downloaded')
   })
 
@@ -279,7 +301,11 @@ describe('update service', () => {
     h.service.onReleaseFromPoll(release())
     h.service.onDownloaded('0.9.0')
     expect(applied).toEqual(['yes'])
-    expect(h.callouts).toEqual([])
+    expect(h.callouts).toHaveLength(1)
+    expect(h.callouts[0]).toMatchObject({
+      sourceId: 'update',
+      text: 'Version 0.9.0 is available',
+    })
     expect(h.service.view().state).toBe('downloaded')
   })
 

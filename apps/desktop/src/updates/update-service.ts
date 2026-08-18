@@ -1,9 +1,9 @@
 /**
  * Update checking.
  *
- * Packaged builds download in the background via electron-updater, then quit, swap the app, and
- * relaunch — the same shape as Claude Desktop. Unpackaged (`pnpm dev`) still opens the download
- * page: there is no bundle to replace.
+ * Packaged builds announce a newer version, then download only after a click, then quit, swap the
+ * app, and relaunch. Unpackaged (`pnpm dev`) still opens the download page: there is no bundle
+ * to replace.
  *
  * A background poll that fails says nothing. A user who clicked "Check for updates…" and is
  * *waiting* must be told something — silence there reads as a broken menu item. So `checkNow`
@@ -45,10 +45,15 @@ export interface UpdateServiceDeps {
 export interface UpdateService {
   /** Wire to the poller's `onRelease`. */
   onReleaseFromPoll(release: SafeRelease | null): void
-  /** The installer finished downloading. Packaged builds quit and relaunch immediately. */
+  /** The installer finished downloading. Packaged builds quit and relaunch. */
   onDownloaded(version: string): void
   /** Quit, apply, relaunch if a download is waiting. */
   applyIfReady(): boolean
+  /**
+   * Bubble click. Applies a finished download, or starts one. Returns true when the click
+   * was handled here so the download page does not also open.
+   */
+  beginInstall(): boolean
   /** The menu item. Always reports an outcome. */
   checkNow(): Promise<void>
   /** Open the notes for the currently known release. */
@@ -79,6 +84,14 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
   const applyIfReady = (): boolean => {
     if (!deps.isReady?.()) return false
     return deps.applyUpdate?.() === true
+  }
+
+  const beginInstall = (): boolean => {
+    if (applyIfReady()) return true
+    if (!deps.startDownload?.()) return false
+    log('update download started', { version: latestVersion })
+    deps.showToast({ text: `Downloading version ${latestVersion}…`, tone: 'success' })
+    return true
   }
 
   const announceReady = (version: string): void => {
@@ -120,17 +133,10 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
       if (alreadyAnnounced) {
         log('update already announced', { version: release.latestVersion })
-        if (deps.startDownload?.()) return
         return
       }
 
       deps.setLastKnownRelease(release.latestVersion)
-
-      // Packaged: download in the background and speak up only when the restart is actually ready.
-      if (deps.startDownload?.()) {
-        log('update download started', { version: release.latestVersion, mandatory: release.mandatory })
-        return
-      }
 
       deps.submitCallout({
         sourceId: 'update',
@@ -159,6 +165,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
     },
 
     applyIfReady,
+    beginInstall,
 
     async checkNow(): Promise<void> {
       if (applyIfReady()) return
@@ -186,11 +193,9 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
         if (latestVersion && isNewer(latestVersion, deps.currentVersion)) {
           setState('available')
-          if (deps.startDownload) {
-            // A person is waiting: the sticky bubble only appears once the restart is actually ready.
-            deps.showToast({ text: `Downloading version ${latestVersion}…`, tone: 'success' })
-          } else if (latestVersion === before) {
-            // Only speak up if this is news; the callout already fired if it was.
+          if (latestVersion === before) {
+            // A second "Check for updates…" is the user asking to install, not to be told again.
+            if (beginInstall()) return
             deps.showToast({ text: `Version ${latestVersion} is available`, tone: 'success' })
           }
           return
