@@ -2,6 +2,15 @@
   "version": 1,
   "notifications": [
     {
+      "id": "hey-everyone-this-is-a-test-notification-20260818T1222",
+      "text": "Hey everyone. This is a test notification. ",
+      "tone": "info",
+      "priority": "high",
+      "animation": "jumping",
+      "startsAt": "2026-08-18T12:21:34Z",
+      "expiresAt": "2026-08-18T12:37:34Z"
+    },
+    {
       "id": "test-20260817T0654",
       "text": "Test",
       "tone": "info",
