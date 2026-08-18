@@ -183,16 +183,14 @@ export async function startApp(): Promise<AppShell> {
 
   const syncHoverMenu = (): void => {
     const animation = controller?.animation()
-    if (
-      pointerOverPet &&
-      (animation === 'sleep' || animation === 'sleep-enter' || animation === 'sleep-exit')
-    ) {
-      hoverNeedsReenter = true
-    }
-
     const freeze = pointerOverPet && !callouts?.showing()
+    const waking =
+      animation === 'sleep' || animation === 'sleep-enter' || animation === 'sleep-exit'
     const hideZap =
-      petDragging || animation === 'electrocute' || animation === 'panic'
+      petDragging ||
+      waking ||
+      animation === 'electrocute' ||
+      animation === 'panic'
     const showZap = freeze && !hoverNeedsReenter && !settingsMenuOpen && !hideZap
     let changed = false
 
@@ -282,7 +280,6 @@ export async function startApp(): Promise<AppShell> {
           animation === 'sleep-exit'
         ) {
           // A click on a sleeper is a nudge, not a pickup.
-          hoverNeedsReenter = true
           if (!hoverFrozen) {
             hoverFrozen = true
             controller?.enqueue({ kind: 'hover-start' })
@@ -623,7 +620,13 @@ export async function startApp(): Promise<AppShell> {
       ? {
           startDownload: () => silentUpdater.check(),
           isReady: () => silentUpdater.isReady(),
-          applyUpdate: () => silentUpdater.quitAndInstall(),
+          // Quit through the normal path so `before-quit` can flush, then `quitAndInstall`
+          // runs instead of `app.exit(0)` — which would skip Squirrel's swap and relaunch.
+          applyUpdate: () => {
+            if (!silentUpdater.isReady()) return false
+            app.quit()
+            return true
+          },
         }
       : {}),
   })
@@ -1062,6 +1065,9 @@ export async function startApp(): Promise<AppShell> {
   // here and awaited by holding the quit until it settles.
   let quitting = false
   app.on('before-quit', (event) => {
+    // electron-updater (and Squirrel.Mac) apply the swap on this quit. `preventDefault` plus
+    // `app.exit(0)` kills the process without installing or relaunching.
+    if (silentUpdater.isInstalling()) return
     if (quitting) return
     quitting = true
     event.preventDefault()
@@ -1071,6 +1077,7 @@ export async function startApp(): Promise<AppShell> {
         emit({ ev: 'error', where: 'dispose', message: String(error) })
       })
       .finally(() => {
+        if (silentUpdater.quitAndInstall()) return
         app.exit(0)
       })
   })

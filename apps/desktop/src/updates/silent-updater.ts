@@ -17,6 +17,12 @@ export interface SilentUpdater {
    * (unpackaged, or the download has not finished).
    */
   quitAndInstall(): boolean
+  /**
+   * True between `quitAndInstall` and process exit. `before-quit` must not `preventDefault`
+   * in that window — electron-updater applies the swap on `will-quit`, and intercepting
+   * quit with `app.exit(0)` skips the installer and the relaunch.
+   */
+  isInstalling(): boolean
 }
 
 export interface SilentUpdaterOptions {
@@ -40,6 +46,7 @@ export function createSilentUpdater(options: SilentUpdaterOptions): SilentUpdate
       check: () => false,
       isReady: () => false,
       quitAndInstall: () => false,
+      isInstalling: () => false,
     }
   }
 
@@ -50,17 +57,20 @@ export function createSilentUpdater(options: SilentUpdaterOptions): SilentUpdate
       check: () => false,
       isReady: () => false,
       quitAndInstall: () => false,
+      isInstalling: () => false,
     }
   }
 
   let ready = false
   let checking = false
+  let installing = false
   let quitAndInstallImpl: (() => void) | null = null
 
   const loaded = import('electron-updater')
     .then(({ autoUpdater }) => {
       autoUpdater.autoDownload = true
       autoUpdater.autoInstallOnAppQuit = true
+      autoUpdater.autoRunAppAfterInstall = true
       autoUpdater.allowPrerelease = false
       autoUpdater.setFeedURL({ provider: 'github', owner: feed.owner, repo: feed.repo })
       autoUpdater.on('update-downloaded', (info) => {
@@ -75,8 +85,10 @@ export function createSilentUpdater(options: SilentUpdaterOptions): SilentUpdate
         options.onError?.(message)
       })
       quitAndInstallImpl = () => {
-        // Force relaunch after the swap — without it, macOS can apply the files and stay quit.
-        autoUpdater.quitAndInstall(false, true)
+        installing = true
+        // Silent on Windows; unused on macOS. Force relaunch after the swap so the pet
+        // comes back by itself rather than staying quit.
+        autoUpdater.quitAndInstall(true, true)
       }
       return autoUpdater
     })
@@ -103,6 +115,7 @@ export function createSilentUpdater(options: SilentUpdaterOptions): SilentUpdate
       return true
     },
     isReady: () => ready,
+    isInstalling: () => installing,
     quitAndInstall(): boolean {
       if (!ready || !quitAndInstallImpl) return false
       quitAndInstallImpl()

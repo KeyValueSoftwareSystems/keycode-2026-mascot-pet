@@ -45,7 +45,7 @@ export interface UpdateServiceDeps {
 export interface UpdateService {
   /** Wire to the poller's `onRelease`. */
   onReleaseFromPoll(release: SafeRelease | null): void
-  /** The installer finished downloading. Announces "click to restart". */
+  /** The installer finished downloading. Packaged builds quit and relaunch immediately. */
   onDownloaded(version: string): void
   /** Quit, apply, relaunch if a download is waiting. */
   applyIfReady(): boolean
@@ -148,6 +148,13 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
     },
 
     onDownloaded(version: string): void {
+      latestVersion = version
+      setState('downloaded')
+      if (deps.applyUpdate) {
+        log('update ready, restarting', { version })
+        deps.applyUpdate()
+        return
+      }
       announceReady(version)
     },
 

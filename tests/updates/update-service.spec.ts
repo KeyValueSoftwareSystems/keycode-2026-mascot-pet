@@ -253,7 +253,7 @@ describe('update service', () => {
     expect(h.service.view().state).toBe('available')
   })
 
-  it('announces a restart once the installer has downloaded', () => {
+  it('announces a restart once the installer has downloaded, when it cannot apply it itself', () => {
     const h = harness({ startDownload: () => true })
     h.service.onReleaseFromPoll(release())
     h.service.onDownloaded('0.9.0')
@@ -264,6 +264,22 @@ describe('update service', () => {
       sticky: true,
     })
     expect(h.callouts[0]).not.toHaveProperty('url')
+    expect(h.service.view().state).toBe('downloaded')
+  })
+
+  it('restarts immediately once the installer has downloaded', () => {
+    const applied: string[] = []
+    const h = harness({
+      startDownload: () => true,
+      applyUpdate: () => {
+        applied.push('yes')
+        return true
+      },
+    })
+    h.service.onReleaseFromPoll(release())
+    h.service.onDownloaded('0.9.0')
+    expect(applied).toEqual(['yes'])
+    expect(h.callouts).toEqual([])
     expect(h.service.view().state).toBe('downloaded')
   })
 

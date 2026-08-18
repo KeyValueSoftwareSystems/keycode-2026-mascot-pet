@@ -33,5 +33,6 @@ describe('silent updater', () => {
     expect(updater.check()).toBe(false)
     expect(updater.isReady()).toBe(false)
     expect(updater.quitAndInstall()).toBe(false)
+    expect(updater.isInstalling()).toBe(false)
   })
 })
