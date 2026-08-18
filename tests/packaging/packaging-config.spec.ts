@@ -216,25 +216,9 @@ describe('general', () => {
     expect(config).not.toHaveProperty('asarUnpack')
   })
 
-  it('never auto-publishes; GitHub metadata is for electron-updater only', () => {
-    // `publish` is what writes latest-mac.yml (and friends) into the Release. The package scripts
-    // pass `--publish never` so a GH_TOKEN cannot turn a build into a GitHub Release by itself.
-    expect(config.publish).toEqual({
-      provider: 'github',
-      owner: 'KeyValueSoftwareSystems',
-      repo: 'keycode-2026-mascot-pet',
-    })
-    const pkg = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')) as {
-      scripts?: Record<string, string>
-    }
-    for (const script of ['package', 'package:linux-ci-only', 'package:win-ci-only']) {
-      expect(pkg.scripts?.[script], script).toContain('--publish never')
-    }
-    const root = JSON.parse(readFileSync(resolve(REPO, 'package.json'), 'utf8')) as {
-      dependencies?: Record<string, string>
-    }
-    expect(root.dependencies).toHaveProperty('electron-updater')
-    expect(root.dependencies).toHaveProperty('zod')
+  it('never auto-publishes', () => {
+    // Publishing is a deliberate act, not a side effect of a build.
+    expect(config.publish).toBeNull()
   })
 
   it('does not export createConfig, which electron-builder 26.15 rejects as an unknown key', () => {

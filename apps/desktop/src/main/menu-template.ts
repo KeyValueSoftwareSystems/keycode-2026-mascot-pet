@@ -23,7 +23,7 @@ import {
   type PetSize,
 } from '../config/constants.js'
 
-export type UpdateState = 'idle' | 'checking' | 'available' | 'downloaded' | 'current' | 'error'
+export type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'error'
 
 export interface ReminderView {
   enabled: boolean
@@ -125,11 +125,6 @@ export function updateItemLabel(update: MenuViewModel['update']): { label: strin
     case 'available':
       return {
         label: `Update available: ${update.latestVersion ?? 'newer version'}`,
-        enabled: true,
-      }
-    case 'downloaded':
-      return {
-        label: `Restart to update${update.latestVersion ? ` to ${update.latestVersion}` : ''}`,
         enabled: true,
       }
     // 'error' deliberately falls back to the neutral label rather than showing a sticky failure.

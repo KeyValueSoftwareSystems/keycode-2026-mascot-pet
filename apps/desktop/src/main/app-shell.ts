@@ -43,7 +43,6 @@ import {
 import type { SafeDefaults } from '../broadcast/manifest-schema.js'
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
-import { createSilentUpdater } from '../updates/silent-updater.js'
 import { createAnalytics, type AnalyticsService } from '../analytics/analytics-service.js'
 import { osName } from '../analytics/analytics-client.js'
 import { openExternalChecked } from './open-external.js'
@@ -327,10 +326,6 @@ export async function startApp(): Promise<AppShell> {
         // here rather than in the view.
         petInteractions += 1
         if (callouts?.showing()?.actions?.length) return
-        if (callouts?.showing()?.sourceId === 'update' && updates?.beginInstall()) {
-          callouts.dismissShowing()
-          return
-        }
         const url = callouts?.currentUrl()
         if (url) {
           // Only for broadcasts, and only the id — never the URL, which is the one field in a
@@ -495,11 +490,6 @@ export async function startApp(): Promise<AppShell> {
   // The manifest is world-readable, so nothing goes in it that would not be fine on a public page.
   // See docs/BROADCAST.md. Override with KEYCODE_PET_MANIFEST_URL.
   let updates: UpdateService | null = null
-  const silentUpdater = createSilentUpdater({
-    packaged: app.isPackaged,
-    log,
-    onReady: (version) => updates?.onDownloaded(version),
-  })
 
   const manifestUrl = resolveManifestUrl(
     process.env,
@@ -619,19 +609,6 @@ export async function startApp(): Promise<AppShell> {
       void analytics.capture('update_notes_opened', { latest_version: updateState.latestVersion })
       return openExternalChecked(url, { log })
     },
-    ...(app.isPackaged
-      ? {
-          startDownload: () => silentUpdater.check(),
-          isReady: () => silentUpdater.isReady(),
-          // Quit through the normal path so `before-quit` can flush, then `quitAndInstall`
-          // runs instead of `app.exit(0)` — which would skip Squirrel's swap and relaunch.
-          applyUpdate: () => {
-            if (!silentUpdater.isReady()) return false
-            app.quit()
-            return true
-          },
-        }
-      : {}),
   })
 
   // ---------------------------------------------------------------------------------------
@@ -850,10 +827,8 @@ export async function startApp(): Promise<AppShell> {
     captureEvent: (event, properties) => analytics.capture(event, properties),
     flushAnalytics: () => analytics.flush(),
     checkForUpdates: () => {
-      // Packaged: apply a finished download (quit, swap, relaunch). Unpackaged: the download page
-      // is the update. A download still in flight re-checks rather than opening the browser.
-      if (updates?.applyIfReady()) return
-      if (updateState.state === 'available' && !app.isPackaged) {
+      // If an update is already known, the item opens its notes; otherwise it runs a real check.
+      if (updateState.state === 'available') {
         updates?.openNotes()
         return
       }
@@ -1068,9 +1043,6 @@ export async function startApp(): Promise<AppShell> {
   // here and awaited by holding the quit until it settles.
   let quitting = false
   app.on('before-quit', (event) => {
-    // electron-updater (and Squirrel.Mac) apply the swap on this quit. `preventDefault` plus
-    // `app.exit(0)` kills the process without installing or relaunching.
-    if (silentUpdater.isInstalling()) return
     if (quitting) return
     quitting = true
     event.preventDefault()
@@ -1080,7 +1052,6 @@ export async function startApp(): Promise<AppShell> {
         emit({ ev: 'error', where: 'dispose', message: String(error) })
       })
       .finally(() => {
-        if (silentUpdater.quitAndInstall()) return
         app.exit(0)
       })
   })

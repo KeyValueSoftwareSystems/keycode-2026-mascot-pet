@@ -1,14 +1,33 @@
 /**
- * Update checking.
+ * Update checking, on top of the broadcast poll's `release` block.
  *
- * Packaged builds announce a newer version, then download only after a click, then quit, swap the
- * app, and relaunch. Unpackaged (`pnpm dev`) still opens the download page: there is no bundle
- * to replace.
+ * ---------------------------------------------------------------------------------------
+ * Why there is no electron-updater.
+ * ---------------------------------------------------------------------------------------
  *
- * A background poll that fails says nothing. A user who clicked "Check for updates…" and is
- * *waiting* must be told something — silence there reads as a broken menu item. So `checkNow`
- * always reports an outcome, via a toast rather than a dialog: a modal breaks the illusion, and
- * with the dock hidden it can open behind everything.
+ * The brief recommends opening a release page instead of auto-updating, and the recommendation is
+ * stronger than it states. Three reasons, in order of weight:
+ *
+ *   1. **electron-updater cannot update this app on macOS at all.** Squirrel.Mac requires a valid,
+ *      consistent code signature across the old and new versions. This app is ad-hoc signed
+ *      (`identity: '-'`) because there is no Developer ID, so the signature check fails and the
+ *      update silently does not apply. The one platform that can be verified here is the one where
+ *      auto-update is structurally impossible.
+ *   2. It would need a published `latest-mac.yml` / `latest.yml` feed — a *second endpoint*, when the
+ *      locked decision is that OTA reuses the M6 poll.
+ *   3. Windows NSIS and Linux AppImage would each need their own handling, for an install base of a
+ *      handful of colleagues who can click a link.
+ *
+ * So: no new dependency, and the runtime dependency list stays at exactly `zod`.
+ *
+ * ---------------------------------------------------------------------------------------
+ * One deliberate exception to "failure is silent".
+ * ---------------------------------------------------------------------------------------
+ *
+ * A background poll that fails says nothing. But a user who clicked "Check for updates…" and is
+ * *waiting* must be told something — silence there reads as a broken menu item. So `checkNow` always
+ * reports an outcome, via a toast rather than a dialog: a modal breaks the illusion, and with the
+ * dock hidden it can open behind everything.
  */
 
 import { isNewer } from './version-compare.js'
@@ -36,24 +55,11 @@ export interface UpdateServiceDeps {
   onStateChange: (view: UpdateView) => void
   openReleaseNotes: (url: string | null) => boolean
   log?: (message: string, meta?: unknown) => void
-  /** Packaged auto-update. Absent in tests and in `pnpm dev`. */
-  startDownload?: () => boolean
-  isReady?: () => boolean
-  applyUpdate?: () => boolean
 }
 
 export interface UpdateService {
   /** Wire to the poller's `onRelease`. */
   onReleaseFromPoll(release: SafeRelease | null): void
-  /** The installer finished downloading. Packaged builds quit and relaunch. */
-  onDownloaded(version: string): void
-  /** Quit, apply, relaunch if a download is waiting. */
-  applyIfReady(): boolean
-  /**
-   * Bubble click. Applies a finished download, or starts one. Returns true when the click
-   * was handled here so the download page does not also open.
-   */
-  beginInstall(): boolean
   /** The menu item. Always reports an outcome. */
   checkNow(): Promise<void>
   /** Open the notes for the currently known release. */
@@ -81,37 +87,10 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
     deps.onStateChange(view())
   }
 
-  const applyIfReady = (): boolean => {
-    if (!deps.isReady?.()) return false
-    return deps.applyUpdate?.() === true
-  }
-
-  const beginInstall = (): boolean => {
-    if (applyIfReady()) return true
-    if (!deps.startDownload?.()) return false
-    log('update download started', { version: latestVersion })
-    deps.showToast({ text: `Downloading version ${latestVersion}…`, tone: 'success' })
-    return true
-  }
-
-  const announceReady = (version: string): void => {
-    latestVersion = version
-    setState('downloaded')
-    deps.submitCallout({
-      sourceId: 'update',
-      text: `Version ${version} is ready. Click to restart.`,
-      tone: 'success',
-      priority: 'high',
-      sticky: true,
-      animation: 'jumping',
-    })
-    log('update ready to install', { version })
-  }
-
   return {
     onReleaseFromPoll(release: SafeRelease | null): void {
       if (!release) {
-        if (state !== 'available' && state !== 'downloaded') setState('current')
+        if (state !== 'available') setState('current')
         return
       }
 
@@ -129,7 +108,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
       // Announce once per *version*, not once per install — deliberately different from broadcast
       // dedupe, because a further version must be able to announce again.
       const alreadyAnnounced = deps.getLastKnownRelease() === release.latestVersion
-      setState(deps.isReady?.() ? 'downloaded' : 'available')
+      setState('available')
 
       if (alreadyAnnounced) {
         log('update already announced', { version: release.latestVersion })
@@ -143,7 +122,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
         text: `Version ${release.latestVersion} is available`,
         tone: 'success',
         // A mandatory release gets a pinned, higher-priority callout — the only durable surface this
-        // app has when we cannot replace the running bundle (dev, or a failed auto-update).
+        // app has. It does not block, nag modally, or quit: nothing in scope enforces an update.
         priority: release.mandatory ? 'high' : 'normal',
         ...(release.mandatory ? { pin: true, sticky: true } : {}),
         animation: 'jumping',
@@ -153,22 +132,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
       log('update available', { version: release.latestVersion, mandatory: release.mandatory })
     },
 
-    onDownloaded(version: string): void {
-      latestVersion = version
-      setState('downloaded')
-      if (deps.applyUpdate) {
-        log('update ready, restarting', { version })
-        deps.applyUpdate()
-        return
-      }
-      announceReady(version)
-    },
-
-    applyIfReady,
-    beginInstall,
-
     async checkNow(): Promise<void> {
-      if (applyIfReady()) return
       if (userCheckPending) return
       userCheckPending = true
       const before = latestVersion
@@ -184,18 +148,10 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
           return
         }
 
-        if (deps.isReady?.()) {
-          setState('downloaded')
-          deps.showToast({ text: `Version ${latestVersion} is ready. Restarting…`, tone: 'success' })
-          deps.applyUpdate?.()
-          return
-        }
-
         if (latestVersion && isNewer(latestVersion, deps.currentVersion)) {
           setState('available')
+          // Only speak up if this is news; the callout already fired if it was.
           if (latestVersion === before) {
-            // A second "Check for updates…" is the user asking to install, not to be told again.
-            if (beginInstall()) return
             deps.showToast({ text: `Version ${latestVersion} is available`, tone: 'success' })
           }
           return
