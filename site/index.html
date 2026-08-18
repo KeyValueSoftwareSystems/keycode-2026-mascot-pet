@@ -275,9 +275,11 @@
 
       <footer>
         <p>
-          <strong>No telemetry.</strong> The app makes one network request — the manifest above — and sends
-          no analytics, no identifiers and no usage data. It has no accounts. Nothing leaves your machine
-          unless you use “Report a problem…” and send it yourself.
+          <strong>Anonymous usage data, and you can switch it off.</strong> The app reports that it was
+          launched, that it is still running, its version and your OS — tagged with a random id that is
+          not linked to you, your name, your account or your files. It exists so we know whether anyone
+          is actually using this. Untick <em>Share anonymous usage data</em> in the right-click menu and
+          it stops. It has no accounts, and “Report a problem…” still uploads nothing by itself.
         </p>
         <p>
           MIT licensed ·
@@ -287,13 +289,70 @@
         <p>Argus is Keycode’s unicorn mascot.</p>
       </footer>
     </div>
+    <!--
+      Page analytics. Cookieless (`persistence: 'memory'`) so this stays outside consent-banner
+      territory: nothing is stored on the visitor's machine, and there is no cross-site identity.
+
+      This is the *page*, not the app — the app has its own opt-out and sends nothing from here. The
+      question this answers is narrow and worth answering: do people who land here find the download
+      for their own OS, or bounce. Only two events, both anonymous.
+    -->
+    <script>
+      !(function (t, e) {
+        var o, n, p, r
+        e.__SV ||
+          ((window.posthog = e),
+          (e._i = []),
+          (e.init = function (i, s, a) {
+            function g(t, e) {
+              var o = e.split('.')
+              2 == o.length && ((t = o[0]), (e = o[1]))
+              t[e] = function () {
+                t.push([e].concat(Array.prototype.slice.call(arguments, 0)))
+              }
+            }
+            ;((p = t.createElement('script')).type = 'text/javascript'),
+              (p.crossOrigin = 'anonymous'),
+              (p.async = !0),
+              (p.src = s.api_host + '/static/array.js'),
+              (r = t.getElementsByTagName('script')[0]).parentNode.insertBefore(p, r)
+            var u = e
+            for (
+              void 0 !== a ? (u = e[a] = []) : (a = 'posthog'),
+                u.people = u.people || [],
+                u.toString = function (t) {
+                  var e = 'posthog'
+                  return 'posthog' !== a && (e += '.' + a), t || (e += ' (stub)'), e
+                },
+                u.people.toString = function () {
+                  return u.toString(1) + '.people (stub)'
+                },
+                o =
+                  'init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug'.split(
+                    ' ',
+                  ),
+                n = 0;
+              n < o.length;
+              n++
+            )
+              g(u, o[n])
+            e._i.push([i, s, a])
+          }),
+          (e.__SV = 1))
+      })(document, window.posthog || [])
+      posthog.init('phc_rWg6r2hAyu7Y8chiHv7aLhtmLSCTdvChSUecWPCfZAvr', {
+        api_host: 'https://us.i.posthog.com',
+        persistence: 'memory',
+        autocapture: false,
+      })
+    </script>
     <script>
       (function () {
         var REPO = 'https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet'
         var PAGES_MANIFEST = 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json'
         // Used immediately so the button is a file URL before any fetch. Keep in sync with
         // site/manifest.json release.latestVersion.
-        var VERSION = '1.12.3'
+        var VERSION = '1.12.5'
         var primary = document.getElementById('dl-primary')
         var cap = document.getElementById('dl-cap')
         var others = document.getElementById('dl-others')
@@ -339,7 +398,25 @@
             { id: 'linux', label: 'Linux' },
           ]
           return order.filter(function (item) { return item.id !== id })
-            .map(function (item) { return { href: all[item.id].href, label: item.label } })
+            .map(function (item) { return { id: item.id, href: all[item.id].href, label: item.label } })
+        }
+
+        // `suggested` is the whole point of tracking this: it says whether the guess the page made
+        // was the one the visitor actually wanted, which is the only way to find out that (say)
+        // every Windows visitor is hunting through "Other platforms" to get their build.
+        function trackDownload(chosenId, suggestedId, version) {
+          try {
+            if (window.posthog) {
+              posthog.capture('download_click', {
+                platform: chosenId,
+                suggested: suggestedId,
+                took_suggestion: chosenId === suggestedId,
+                version: version,
+              })
+            }
+          } catch (e) {
+            /* Analytics must never be able to break the download button. */
+          }
         }
 
         function paint(id, version) {
@@ -348,6 +425,9 @@
           primary.textContent = chosen.label
           primary.href = chosen.href
           cap.textContent = chosen.platform + ' · Version ' + version
+          primary.onclick = function () {
+            trackDownload(id, id, version)
+          }
           others.replaceChildren()
           others.appendChild(document.createTextNode('Other platforms: '))
           otherLinks(id, all).forEach(function (item, i) {
@@ -355,6 +435,11 @@
             var a = document.createElement('a')
             a.href = item.href
             a.textContent = item.label
+            a.onclick = (function (otherId) {
+              return function () {
+                trackDownload(otherId, id, version)
+              }
+            })(item.id)
             others.appendChild(a)
           })
           others.hidden = false

@@ -168,6 +168,49 @@ export const POLL = {
 } as const
 
 // ---------------------------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------------------------
+
+/**
+ * PostHog ingest. The key is a **public, write-only** project token — it can append events and read
+ * nothing back, which is why it ships in a public repo without ceremony.
+ */
+export const ANALYTICS_ENDPOINT = 'https://us.i.posthog.com/batch'
+export const ANALYTICS_PROJECT_KEY = 'phc_rWg6r2hAyu7Y8chiHv7aLhtmLSCTdvChSUecWPCfZAvr'
+
+export const ANALYTICS = {
+  /**
+   * Minutes between heartbeats.
+   *
+   * The heartbeat is what "how many are running it right now" is counted from, and what distinguishes
+   * a dormant install from an uninstalled one. Thirty minutes is a deliberate compromise: a pet that
+   * runs all day costs ~1,440 events a month, so the free tier's million holds roughly 660 installs.
+   * Shortening it buys resolution nobody needs and spends that headroom fast.
+   *
+   * Overridable per-fleet from the manifest (`defaults.analyticsMinutes`), including `0` to switch
+   * analytics off for everyone without shipping a build.
+   */
+  heartbeatMinutes: 30,
+  /** ±20%, so a fleet does not synchronise into a thundering herd. Same reasoning as POLL.jitter. */
+  jitter: 0.2,
+  minMinutes: 5,
+  maxMinutes: 1_440,
+  /** Events kept on disk when sending fails. Oldest evicted first. */
+  queueMax: 500,
+  /**
+   * How long a queued event stays worth sending.
+   *
+   * Four days, so a laptop closed over a long weekend still reports what it did. Past that the event
+   * is more likely to distort a retention chart than to inform one.
+   */
+  queueMaxAgeMs: 4 * 24 * 60 * 60 * 1_000,
+  /** Events per request. Well under PostHog's 20MB body limit at this event size. */
+  batchMax: 100,
+  /** The response is read only so the socket can be released; it is never used. */
+  responseMaxBytes: 8 * 1024,
+} as const
+
+// ---------------------------------------------------------------------------------------
 // Product identity
 // ---------------------------------------------------------------------------------------
 

@@ -12,8 +12,17 @@ This is an internal tool maintained on a best-effort basis, so expect a reply in
 
 Worth stating plainly, because it is smaller than "an Electron app" suggests:
 
-- **The app makes exactly one network request** — a `GET` for the broadcast manifest. It has no server,
-  no accounts, no telemetry, and it never opens a socket.
+- **The app makes exactly two kinds of network request** — a `GET` for the broadcast manifest, and a
+  `POST` of anonymous usage events. It has no server of its own, no accounts, and it never opens a
+  socket. Both go through the same bounded, never-throwing helper (`broadcast/http-capped.ts`) behind
+  the same HTTPS-only URL guard.
+- **The analytics `POST` refuses redirects outright**, rather than following them as the `GET` does.
+  Re-sending a body to a host the server chose is not worth the 301-versus-307 method-rewrite
+  question; the endpoint is a constant, and if it ever moves, the constant moves with it.
+- **Usage data is a random per-install UUID and nothing else identifying** — no username, no machine
+  name, no file paths, no window titles. It is on by default, switched off from the right-click menu,
+  and can be withdrawn from every install at once by publishing `defaults.analyticsMinutes: 0` in the
+  manifest. Events are queued on disk when offline and capped at 500 entries / 4 days.
 - **The manifest is treated as hostile.** HTTPS only; redirects followed manually with the scheme
   re-checked at every hop (max 3); a 64KB cap enforced *while streaming*; a strict envelope with
   per-entry parsing; text sanitised of control characters, bidi overrides and zero-width characters,

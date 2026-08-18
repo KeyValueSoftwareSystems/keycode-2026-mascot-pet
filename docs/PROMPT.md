@@ -155,7 +155,7 @@ Runtime dependencies, target count: **zero to two.**
 
 ### Explicitly forbidden
 
-A plugin system. A pet catalog, marketplace, or installer. Multiple pets. Pet selection or customization. A settings window or "control centre" of any kind — the right-click menu is the *only* settings surface (locked decision #3). React, Vue, Svelte, Tailwind, or any UI framework in the pet renderer. Canvas or WebGL sprite rendering. `requestAnimationFrame`-driven sprite frames. Agent/CLI integrations. LAN mode, sockets, WebSockets, a push service, or any backend. Code signing, notarization, or store attestation. A login, account, or telemetry system. openpets' sprite art.
+A plugin system. A pet catalog, marketplace, or installer. Multiple pets. Pet selection or customization. A settings window or "control centre" of any kind — the right-click menu is the *only* settings surface (locked decision #3). React, Vue, Svelte, Tailwind, or any UI framework in the pet renderer. Canvas or WebGL sprite rendering. `requestAnimationFrame`-driven sprite frames. Agent/CLI integrations. LAN mode, sockets, WebSockets, a push service, or any backend. Code signing, notarization, or store attestation. A login or account system. (Anonymous, opt-out analytics were added in v1.13.0 — see DECISIONS #103. A *login* is still forbidden.) openpets' sprite art.
 
 ---
 
@@ -724,7 +724,7 @@ Verify each against a **running, installed** app, not against the source.
 
 Do not build these. If one seems essential, argue it in `DECISIONS.md` first.
 
-A plugin system or SDK. A pet catalog, marketplace, or downloadable pets. Multiple pets, pet selection, or customization. A settings window or control centre. Free 2D roaming, gravity, or physics — horizontal only (locked decision #6). Window occlusion / foreground-app awareness. Agent or CLI integrations. LAN mode, multiplayer, sockets, push. A backend of any kind. Code signing, notarization, store attestation. Accounts, login, telemetry, analytics. User-configurable reminder intervals. Sound or voice. i18n. Auto-launch at login. Clicking or petting interactions beyond drag. `electron-updater` auto-download (M8 recommends `openExternal`). Authoring Keycode-branded sprite art — the format is fixed and the swap is a file swap.
+A plugin system or SDK. A pet catalog, marketplace, or downloadable pets. Multiple pets, pet selection, or customization. A settings window or control centre. Free 2D roaming, gravity, or physics — horizontal only (locked decision #6). Window occlusion / foreground-app awareness. Agent or CLI integrations. LAN mode, multiplayer, sockets, push. A backend of any kind. Code signing, notarization, store attestation. Accounts, login. (Anonymous, opt-out analytics shipped in v1.13.0 against this line — argued in DECISIONS #103, as this section requires.) User-configurable reminder intervals. Sound or voice. i18n. Auto-launch at login. Clicking or petting interactions beyond drag. `electron-updater` auto-download (M8 recommends `openExternal`). Authoring Keycode-branded sprite art — the format is fixed and the swap is a file swap.
 
 ---
 

@@ -88,8 +88,21 @@ unaffected.
 
 ## Privacy
 
-The app makes **one** network request: it fetches a small JSON file so the team can broadcast a
-message to everyone. It sends no analytics, no identifiers and no usage data, and it has no accounts.
+The app makes **two** kinds of network request. It fetches a small JSON file so the team can broadcast
+a message to everyone, and it sends anonymous usage data. It has no accounts.
+
+**What the usage data is:** that the app was launched, that it is still running, how long a session
+lasted, its version, your operating system and architecture, your locale and timezone, and which
+features are switched on. Every event carries a random id generated on this machine.
+
+**What it is not:** your name, your username, your email, your machine name, your IP address as
+anything we store, your files, your file paths, or what is on your screen. Nothing is linked to you.
+
+**Turning it off:** right-click the pet and untick **Share anonymous usage data**. That stops it
+immediately and permanently on this machine. You can check the current state in **About** at any time.
+
+Data that cannot be sent — because you are offline — is stored on your own machine and sent later.
+It is capped at 500 events or 4 days, whichever comes first, and it is deleted once sent.
 
 There is a **Report a problem…** menu item. It copies a filled-in report to your clipboard and opens
 the log file so you can attach it — nothing is uploaded unless you do it yourself.

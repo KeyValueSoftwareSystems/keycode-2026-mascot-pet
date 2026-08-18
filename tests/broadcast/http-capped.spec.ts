@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createServer, type Server } from 'node:http'
-import { getCapped, type CappedFetch } from '../../apps/desktop/src/broadcast/http-capped.js'
+import { getCapped, postCapped, type CappedFetch } from '../../apps/desktop/src/broadcast/http-capped.js'
 import { assertAllowedUrl, safeUrl, UnsafeUrlError } from '../../apps/desktop/src/broadcast/url-guard.js'
 import { MANIFEST_MAX_BYTES } from '../../apps/desktop/src/config/constants.js'
 
@@ -91,6 +91,22 @@ beforeAll(async () => {
       case '/redirect-nowhere':
         response.writeHead(302).end()
         return
+
+      case '/echo': {
+        // Reads the request back so a test can prove the method, content-type and body arrived.
+        const chunks: Buffer[] = []
+        request.on('data', (chunk: Buffer) => chunks.push(chunk))
+        request.on('end', () => {
+          response.writeHead(200, { 'content-type': 'application/json' }).end(
+            JSON.stringify({
+              method: request.method,
+              contentType: request.headers['content-type'] ?? null,
+              body: Buffer.concat(chunks).toString('utf8'),
+            }),
+          )
+        })
+        return
+      }
 
       default:
         response.writeHead(404).end()
@@ -291,5 +307,84 @@ describe('url guard', () => {
       expect(error).toBeInstanceOf(UnsafeUrlError)
       expect((error as UnsafeUrlError).reason).toBe('forbidden-scheme')
     }
+  })
+})
+
+describe('postCapped', () => {
+  function postOptions(overrides: Partial<Parameters<typeof postCapped>[1]> = {}) {
+    return {
+      body: '{"hello":"world"}',
+      timeoutMs: 2_000,
+      maxBytes: MANIFEST_MAX_BYTES,
+      allowLoopbackHttp: true,
+      ...overrides,
+    }
+  }
+
+  it('sends the body as JSON and reports success', async () => {
+    const result = await postCapped(`${base}/echo`, postOptions(), { fetch: realFetch })
+
+    expect(result.kind).toBe('ok')
+    if (result.kind !== 'ok') return
+    const echoed = JSON.parse(result.body) as {
+      method: string
+      contentType: string | null
+      body: string
+    }
+    expect(echoed.method).toBe('POST')
+    expect(echoed.contentType).toBe('application/json')
+    expect(echoed.body).toBe('{"hello":"world"}')
+  })
+
+  it('REFUSES a redirect instead of following it', async () => {
+    // The whole point of the divergence from getCapped: re-sending a payload to a host the server
+    // picked is not a thing worth doing for analytics.
+    const result = await postCapped(`${base}/redirect-https`, postOptions(), { fetch: realFetch })
+
+    expect(result.kind).toBe('error')
+    if (result.kind !== 'error') return
+    expect(result.reason).toBe('redirect')
+  })
+
+  it('refuses a non-HTTPS URL when loopback is not permitted', async () => {
+    const result = await postCapped(
+      `${base}/echo`,
+      postOptions({ allowLoopbackHttp: false }),
+      { fetch: realFetch },
+    )
+
+    expect(result.kind).toBe('error')
+    if (result.kind !== 'error') return
+    expect(result.reason).toBe('scheme')
+  })
+
+  it('reports a server error by status rather than throwing', async () => {
+    const result = await postCapped(`${base}/500`, postOptions(), { fetch: realFetch })
+
+    expect(result.kind).toBe('error')
+    if (result.kind !== 'error') return
+    expect(result.reason).toBe('status')
+    expect(result.status).toBe(500)
+  })
+
+  it('gives up on a server that never answers', async () => {
+    const result = await postCapped(
+      `${base}/hang`,
+      postOptions({ timeoutMs: 150 }),
+      { fetch: realFetch },
+    )
+
+    expect(result.kind).toBe('error')
+    if (result.kind !== 'error') return
+    expect(result.reason).toBe('timeout')
+  })
+
+  it('never rejects, whatever the fetch does', async () => {
+    const throwing: CappedFetch = () => Promise.reject(new Error('socket exploded'))
+    const result = await postCapped('https://example.invalid/x', postOptions(), { fetch: throwing })
+
+    expect(result.kind).toBe('error')
+    if (result.kind !== 'error') return
+    expect(result.reason).toBe('network')
   })
 })

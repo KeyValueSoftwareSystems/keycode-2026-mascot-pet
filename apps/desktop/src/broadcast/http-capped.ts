@@ -1,5 +1,8 @@
 /**
- * A bounded, never-throwing HTTPS GET. The only place this app touches the network.
+ * Bounded, never-throwing HTTPS. The only place this app touches the network.
+ *
+ * Two verbs: `getCapped` for the broadcast manifest, `postCapped` for analytics. They share the URL
+ * guard, the abort timeout, and the typed result, and differ on redirects — see `postCapped`.
  *
  * `fetch` is injected, so tests drive a real loopback server or a fake and never import Electron.
  * Production passes Electron's `net.fetch`, which routes through Chromium's network stack — that
@@ -105,6 +108,87 @@ export async function getCapped(
         detail: `unsafe redirect target (${error instanceof UnsafeUrlError ? error.reason : 'invalid'})`,
       }
     }
+  }
+}
+
+export interface PostCappedOptions {
+  body: string
+  timeoutMs: number
+  maxBytes: number
+  allowLoopbackHttp: boolean
+  userAgent?: string
+  contentType?: string
+}
+
+/**
+ * A bounded, never-throwing HTTPS POST.
+ *
+ * **Redirects are refused outright rather than followed**, which is the one real difference from
+ * `getCapped`. Following a redirected POST means deciding whether to re-send the body and whether to
+ * rewrite the method — 301/302/303 turn a POST into a GET, 307/308 do not — and getting that wrong
+ * either silently drops the payload or replays it against a host we have re-validated but did not
+ * choose. There is no ingest endpoint worth that: the analytics host is a constant, and if it ever
+ * starts redirecting, the right response is to change the constant, not to chase it at runtime.
+ *
+ * The response body is read and discarded. It is read rather than ignored so the connection can be
+ * released, and capped for the same reason every other read here is.
+ */
+export async function postCapped(
+  url: string,
+  options: PostCappedOptions,
+  deps: FetchDeps,
+): Promise<HttpResult> {
+  let target: URL
+  try {
+    target = assertAllowedUrl(url, { allowLoopbackHttp: options.allowLoopbackHttp })
+  } catch (error) {
+    return {
+      kind: 'error',
+      reason: 'scheme',
+      detail: error instanceof UnsafeUrlError ? error.reason : String(error),
+    }
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error('timeout')), options.timeoutMs)
+  ;(timer as unknown as { unref?: () => void }).unref?.()
+
+  try {
+    const response = await deps.fetch(target.toString(), {
+      method: 'POST',
+      redirect: 'manual',
+      credentials: 'omit',
+      cache: 'no-store',
+      signal: controller.signal,
+      body: options.body,
+      headers: {
+        'content-type': options.contentType ?? 'application/json',
+        accept: 'application/json',
+        ...(options.userAgent ? { 'user-agent': options.userAgent } : {}),
+      },
+    })
+
+    if (response.status >= 300 && response.status < 400) {
+      return { kind: 'error', reason: 'redirect', detail: 'redirects are not followed on POST' }
+    }
+
+    if (!response.ok) {
+      return { kind: 'error', reason: 'status', status: response.status }
+    }
+
+    const body = await readCapped(response, options.maxBytes)
+    if (body.kind === 'error') return body
+
+    return { kind: 'ok', body: body.text, etag: null, finalUrl: target.toString() }
+  } catch (error) {
+    const isAbort = (error as { name?: string })?.name === 'AbortError' || controller.signal.aborted
+    return {
+      kind: 'error',
+      reason: isAbort ? 'timeout' : 'network',
+      detail: String((error as Error)?.message ?? error).slice(0, 120),
+    }
+  } finally {
+    clearTimeout(timer)
   }
 }
 

@@ -19,7 +19,7 @@
 import { z } from 'zod'
 import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 7 as const
+export const SETTINGS_SCHEMA_VERSION = 8 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -103,6 +103,28 @@ export const settingsSchema = z.strictObject({
 
   /** Latest release version already announced, so a version announces once, not once per poll. */
   lastKnownRelease: z.string().max(32).nullable(),
+
+  /**
+   * Whether anonymous usage data is sent. On by default, off by one menu click.
+   *
+   * Not nullable, and deliberately not eligible for a manifest default: "nobody has said" is not a
+   * coherent state for a privacy choice, and a remote file that could switch analytics *on* for
+   * someone who turned it off is exactly the thing the fill-versus-override rule exists to prevent.
+   * The manifest can only disable it fleet-wide — see `analyticsMinutes` in the manifest schema.
+   */
+  analyticsEnabled: z.boolean(),
+
+  /**
+   * Random per-install id, or null until first launch mints one.
+   *
+   * A UUID rather than a machine fingerprint. A fingerprint would survive reinstalls, which is the
+   * one thing it has going for it, and in exchange it changes under OS upgrades (inflating the
+   * install count with ghosts), identifies the machine rather than the install, and needs a
+   * dependency. Reinstalling therefore counts as a new install here. That is the honest trade.
+   *
+   * Written with a forced flush at the moment it is minted — see the note in app-shell.
+   */
+  installId: z.string().max(64).nullable(),
 })
 
 export type Settings = z.infer<typeof settingsSchema>
@@ -130,6 +152,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lastGreetingKey: null,
   seenBroadcastIds: [],
   lastKnownRelease: null,
+  analyticsEnabled: true,
+  installId: null,
 }
 
 export type ParseResult =
@@ -227,6 +251,15 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
           ? { ...(reminders as Record<string, unknown>), coffeeNextDueAt: null, lunchNextDueAt: null }
           : reminders,
     }
+  }
+
+  // v7 → v8: anonymous usage analytics. On, because an opt-out that ships off is an opt-in, and an
+  // opt-in nobody sees answers none of the questions this was added to answer — see DECISIONS #103.
+  //
+  // `installId` stays null rather than being minted here: this function is pure and synchronous, and
+  // the id has to be written back with a forced flush to be worth anything. First launch mints it.
+  if (out['schemaVersion'] === 7) {
+    out = { ...out, schemaVersion: 8, analyticsEnabled: true, installId: null }
   }
 
   return out

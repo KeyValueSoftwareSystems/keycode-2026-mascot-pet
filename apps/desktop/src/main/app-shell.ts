@@ -43,8 +43,11 @@ import {
 import type { SafeDefaults } from '../broadcast/manifest-schema.js'
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
+import { createAnalytics, type AnalyticsService } from '../analytics/analytics-service.js'
+import { osName } from '../analytics/analytics-client.js'
 import { openExternalChecked } from './open-external.js'
 import {
+  ANALYTICS_ENDPOINT,
   DEFAULT_ALWAYS_ON_TOP,
   DEFAULT_MANIFEST_URL,
   DEFAULT_PET_SIZE,
@@ -64,6 +67,8 @@ import { env } from '../config/env.js'
 import { log as fileLog, logFilePath } from './logger.js'
 import { emit } from './harness-handshake.js'
 import { readFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { release } from 'node:os'
 
 export interface AppShell {
   displays: DisplayManager
@@ -77,6 +82,7 @@ export interface AppShell {
   toasts: ToastManager
   poller: Poller
   updates: UpdateService
+  analytics: AnalyticsService
   backdrop: BrowserWindow | null
   onSecondInstance(): void
   dispose(): Promise<void>
@@ -248,6 +254,9 @@ export async function startApp(): Promise<AppShell> {
         menu.popupOverPet()
       },
       onDragStart(): void {
+        // Counted, not captured. Folded into the next heartbeat as one number — a pet dragged
+        // across the screen thirty times in an afternoon is one fact, not thirty events.
+        petInteractions += 1
         petDragging = true
         hoverMenuOpen = false
         controller?.setQuickActions([])
@@ -282,9 +291,18 @@ export async function startApp(): Promise<AppShell> {
         // Main holds the URL and re-validates it here. The renderer only ever reported "the bubble was
         // clicked" and never saw a string — deciding what a click *means* is behaviour, so it lives
         // here rather than in the view.
+        petInteractions += 1
         if (callouts?.showing()?.actions?.length) return
         const url = callouts?.currentUrl()
-        if (url) openExternalChecked(url, { log })
+        if (url) {
+          // Only for broadcasts, and only the id — never the URL, which is the one field in a
+          // manifest entry that could carry something specific to a person.
+          const showing = callouts?.showing()
+          if (showing?.sourceId === 'broadcast' && showing.broadcastId) {
+            void analytics.capture('broadcast_clicked', { broadcast_id: showing.broadcastId })
+          }
+          openExternalChecked(url, { log })
+        }
         // Dismiss either way. A sticky notification has no other way to go, and for a timed one this
         // just means a click gets rid of it early.
         callouts?.dismissShowing()
@@ -502,8 +520,12 @@ export async function startApp(): Promise<AppShell> {
     },
     onNotifications(notifications) {
       for (const entry of notifications) {
+        // Broadcast reach: how many installs a given announcement actually reached. Without it,
+        // publishing to the manifest is sending mail to an address nobody confirms.
+        void analytics.capture('broadcast_shown', { broadcast_id: entry.id })
         callouts.show({
           sourceId: 'broadcast',
+          broadcastId: entry.id,
           text: entry.text,
           tone: entry.tone,
           priority: entry.priority,
@@ -532,10 +554,86 @@ export async function startApp(): Promise<AppShell> {
     showToast: (toast) => toasts.show(toast),
     pollNow: () => poller.pollNow('user'),
     onStateChange: (nextView) => {
+      // Update-adoption lag: the gap between this and the next `app_launched` on a new version is
+      // how long a release actually takes to reach people, which is the number that says whether
+      // the "check for updates" path works at all.
+      if (nextView.state === 'available' && updateState.state !== 'available') {
+        void analytics.capture('update_available', { latest_version: nextView.latestVersion })
+      }
       updateState = { state: nextView.state, latestVersion: nextView.latestVersion }
       menu.refresh()
     },
-    openReleaseNotes: (url) => openExternalChecked(url, { log }),
+    openReleaseNotes: (url) => {
+      void analytics.capture('update_notes_opened', { latest_version: updateState.latestVersion })
+      return openExternalChecked(url, { log })
+    },
+  })
+
+  // ---------------------------------------------------------------------------------------
+  // Analytics
+  // ---------------------------------------------------------------------------------------
+  //
+  // On by default and switched off from the right-click menu. What it may know is described in
+  // analytics/analytics-service.ts; the short version is a random install id and nothing that
+  // identifies a person. The manifest can withdraw it from the whole fleet by publishing
+  // `defaults.analyticsMinutes: 0`, which is what makes shipping it on by default defensible.
+  const sessionStartedAt = Date.now()
+  const sessionId = randomUUID()
+  // An allow-list, not a deny-list. A new setting reports nothing until someone adds it here and
+  // decides that it should — which is the correct default for a file that also holds a screen
+  // position and an install id.
+  const REPORTABLE_SETTINGS = [
+    'movementEnabled',
+    'alwaysOnTop',
+    'petSize',
+    'waterReminderEnabled',
+    'stretchReminderEnabled',
+    'coffeeReminderEnabled',
+    'lunchReminderEnabled',
+    'analyticsEnabled',
+  ] as const
+  // Folded into the heartbeat rather than sent per click: a pet that gets poked forty times in an
+  // afternoon would otherwise cost forty events to say what one number says.
+  let petInteractions = 0
+
+  const analytics = createAnalytics({
+    endpoint: ANALYTICS_ENDPOINT,
+    dir: userDataDir(),
+    fetch: net.fetch.bind(net),
+    userAgent: `KeycodePet/${app.getVersion()}`,
+    log,
+    isEnabled: () => settings.get().analyticsEnabled,
+    getIntervalMinutes: () => manifestDefaults?.analyticsMinutes ?? null,
+    context: {
+      // `start()` mints this before anything is captured, so the fallback is never the one used.
+      installId: settings.get().installId ?? 'unknown',
+      appVersion: app.getVersion(),
+      os: osName(process.platform),
+      osVersion: release(),
+      arch: process.arch,
+      electronVersion: process.versions.electron ?? 'unknown',
+      locale: app.getLocale(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      displayCount: screen.getAllDisplays().length,
+      petId: petMeta.id,
+    },
+    getHeartbeatProperties: () => {
+      const current = settings.get()
+      const interactions = petInteractions
+      petInteractions = 0
+      return {
+        session_id: sessionId,
+        session_minutes: Math.round((Date.now() - sessionStartedAt) / 60_000),
+        movement_enabled: current.movementEnabled,
+        always_on_top: effectiveAlwaysOnTop(),
+        pet_size: effectivePetSize(),
+        water_reminder: current.waterReminderEnabled,
+        stretch_reminder: current.stretchReminderEnabled,
+        coffee_reminder: current.coffeeReminderEnabled,
+        lunch_reminder: current.lunchReminderEnabled,
+        pet_interactions: interactions,
+      }
+    },
   })
 
   log('broadcast polling', {
@@ -547,6 +645,48 @@ export async function startApp(): Promise<AppShell> {
     allowLoopbackHttp,
   })
   poller.start()
+
+  // Fire-and-forget: analytics must never delay the pet appearing, and every failure inside is
+  // already swallowed and logged.
+  void (async () => {
+    // Mint the id before anything is captured. `patchNow` rather than `patch` for the same reason
+    // `seenBroadcastIds` uses it — a crash in the next few hundred milliseconds would otherwise mint
+    // a second id on the next launch and report one machine as two installs.
+    let installId = settings.get().installId
+    const isNewInstall = installId === null
+    if (isNewInstall) {
+      installId = randomUUID()
+      await settings.patchNow({ installId })
+    }
+    analytics.setInstallId(installId ?? 'unknown')
+
+    await analytics.start()
+
+    // `firstRun` is "no settings file existed", not "no install id" — the difference matters exactly
+    // once, on the release that introduces analytics, when every existing user mints an id for the
+    // first time. Without it they would all report as new installs on upgrade day.
+    if (settings.firstRun) await analytics.capture('app_installed')
+
+    // Told, not buried. On-by-default is only defensible if the person is actually informed, and a
+    // paragraph in a README nobody opens does not count — so the pet says it itself, once, the first
+    // time it ever mints an id. Sticky, so it waits to be acknowledged rather than passing by while
+    // someone is looking elsewhere.
+    if (isNewInstall && settings.get().analyticsEnabled) {
+      callouts.show({
+        sourceId: 'broadcast',
+        text: 'I send anonymous usage stats. Turn it off in my right-click menu.',
+        tone: 'info',
+        priority: 'normal',
+        sticky: true,
+        animation: 'idle',
+      })
+    }
+
+    await analytics.capture('app_launched', {
+      migrated_install: isNewInstall && !settings.firstRun,
+    })
+    await analytics.flush()
+  })()
 
   // The controller re-derives the floor every tick, so a display change needs no position fix-up
   // here — only a z-order re-assert, since window managers reorder on reconfiguration.
@@ -581,6 +721,7 @@ export async function startApp(): Promise<AppShell> {
       },
       coffee: current.coffeeReminderEnabled,
       lunch: current.lunchReminderEnabled,
+      analyticsEnabled: current.analyticsEnabled,
       update: updateState,
       // Packaged builds must not ship a "fire now" escape hatch.
       devTools: !app.isPackaged,
@@ -588,7 +729,10 @@ export async function startApp(): Promise<AppShell> {
   }
 
   /**
-   * The whole of crash reporting: nothing is uploaded, ever.
+   * The whole of crash reporting: no crash data is ever uploaded.
+   *
+   * Analytics report *that* the app ran, never *why* it stopped — there is no stack trace, no error
+   * text and no log content in any event. A problem still only reaches us if a person sends it.
    *
    * The app already keeps a log; the gap was that a user had to know where it lives and what to say.
    * This copies a filled-in report to the clipboard, reveals the log file so it can be attached, and
@@ -635,8 +779,11 @@ export async function startApp(): Promise<AppShell> {
     setAlwaysOnTop: (enabled) => pet.setAlwaysOnTopEnabled(enabled),
     effectivePetSize,
     effectiveAlwaysOnTop,
-    showAbout: () => void showAbout(petMeta, settings.recovery?.reason ?? null),
+    showAbout: () =>
+      void showAbout(petMeta, settings.recovery?.reason ?? null, settings.get().analyticsEnabled),
     reportProblem,
+    captureEvent: (event, properties) => analytics.capture(event, properties),
+    flushAnalytics: () => analytics.flush(),
     checkForUpdates: () => {
       // If an update is already known, the item opens its notes; otherwise it runs a real check.
       if (updateState.state === 'available') {
@@ -703,8 +850,19 @@ export async function startApp(): Promise<AppShell> {
   trayRef = tray
 
   // Any settings change re-renders the menus, so a checkbox can never disagree with the store.
-  const stopSettingsWatch = settings.onChange((_next, _prev, changed) => {
+  const stopSettingsWatch = settings.onChange((next, _prev, changed) => {
     menu.refresh()
+
+    // Feature adoption, captured here rather than in each action so there is one place that knows
+    // which settings are reportable and no way for a new toggle to start reporting by accident.
+    //
+    // `position` and `reminders` are excluded on purpose: position is a screen coordinate, and the
+    // reminder deadlines change every few minutes, so both would be noise at best.
+    for (const key of REPORTABLE_SETTINGS) {
+      if (changed.includes(key)) {
+        void analytics.capture('setting_changed', { setting: key, value: next[key] })
+      }
+    }
     // Enabling a reminder must schedule it now rather than at the next 15s tick, and disabling must
     // clear its deadline immediately.
     if (
@@ -784,6 +942,7 @@ export async function startApp(): Promise<AppShell> {
     toasts,
     poller,
     updates,
+    analytics,
     backdrop,
 
     onSecondInstance(): void {
@@ -801,6 +960,24 @@ export async function startApp(): Promise<AppShell> {
       menu.dispose()
       reminders.stop()
       poller.stop()
+
+      // Record the session length, then stop the timer and make one bounded attempt to send.
+      // Bounded because quit is on a deadline: `before-quit` is holding process exit open, and an
+      // unreachable server must not turn "Quit" into a hang. Anything unsent is already on disk and
+      // goes out on the next launch — which is the entire reason the queue exists.
+      await analytics.capture('app_quit', {
+        session_id: sessionId,
+        session_minutes: Math.round((Date.now() - sessionStartedAt) / 60_000),
+      })
+      analytics.stop()
+      await Promise.race([
+        analytics.flush(),
+        new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 1_500)
+          ;(timer as unknown as { unref?: () => void }).unref?.()
+        }),
+      ])
+
       callouts.dispose()
       toasts.destroyAll()
       controller?.stop()
@@ -834,11 +1011,19 @@ export async function startApp(): Promise<AppShell> {
   return shell
 }
 
-async function showAbout(pet: PetMetadata, recoveryReason: string | null): Promise<void> {
+async function showAbout(
+  pet: PetMetadata,
+  recoveryReason: string | null,
+  analyticsEnabled: boolean,
+): Promise<void> {
   const detail = [
     `Version ${app.getVersion()}`,
     `Electron ${process.versions.electron} · Chromium ${process.versions.chrome}`,
     `Pet: ${pet.displayName} (${pet.id})`,
+    '',
+    // Stated here as well as in the menu, because About is where people look to find out what a
+    // program does, and "off" is only reassuring if it is visible somewhere without hunting.
+    `Anonymous usage data: ${analyticsEnabled ? 'on' : 'off'} (change in the right-click menu)`,
     '',
     'Includes code adapted from openpets (MIT).',
     ...(logFilePath() ? ['', `Log: ${logFilePath()}`] : []),

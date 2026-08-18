@@ -162,6 +162,19 @@ export const defaultsSchema = z.object({
    * Anyone who turned it off locally keeps it off; see the note above on fill-versus-override.
    */
   alwaysOnTop: z.boolean().optional().catch(undefined),
+  /**
+   * Minutes between analytics heartbeats, or **`0` to switch analytics off for the whole fleet**.
+   *
+   * The off switch is the point. Everything else here shifts a default; this one can withdraw a
+   * capability from every install without shipping a build, which is the only honest way to ship
+   * something that is on by default. Publish `0` and every pet stops capturing at its next poll.
+   *
+   * Note what it deliberately cannot do: there is no value here that turns analytics *on* for
+   * somebody who switched it off. That is the fill-versus-override rule (see above) applied to the
+   * one setting where getting it wrong would be a betrayal rather than an annoyance — which is why
+   * `analyticsEnabled` is a plain boolean in settings rather than a nullable one.
+   */
+  analyticsMinutes: z.number().int().min(0).max(1_440).optional().catch(undefined),
 })
 
 export const envelopeSchema = z.strictObject({
@@ -178,6 +191,7 @@ export interface SafeDefaults {
   pollMinutes: number | null
   petSize: PetSize | null
   alwaysOnTop: boolean | null
+  analyticsMinutes: number | null
 }
 
 export interface SafeNotification {
@@ -364,6 +378,7 @@ export function parseManifest(body: string): ParsedManifest | null {
         pollMinutes: envelope.data.defaults.pollMinutes ?? null,
         petSize: envelope.data.defaults.petSize ?? null,
         alwaysOnTop: envelope.data.defaults.alwaysOnTop ?? null,
+        analyticsMinutes: envelope.data.defaults.analyticsMinutes ?? null,
       }
     : null
 
