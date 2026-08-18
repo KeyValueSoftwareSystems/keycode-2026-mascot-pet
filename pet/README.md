@@ -1,7 +1,7 @@
-# Pet asset — Argus (partial demo pack)
+# Pet asset — Argos (partial demo pack)
 
 Keycode unicorn mascot in streetwear. Assembled from individual frames in
-`~/Desktop/argus-mascot` via `scripts/assemble-argus-frames.mjs`.
+`~/Desktop/argos-mascot` via `scripts/assemble-argos-frames.mjs`.
 
 ## Files
 
@@ -37,7 +37,7 @@ Sleep phases on row 8: frames 1–8 lie down, 9–18 quiet loop on the ground, 1
 ## Rebuild
 
 ```bash
-node scripts/assemble-argus-frames.mjs /Users/aleena/Desktop/argus-mascot
+node scripts/assemble-argos-frames.mjs /Users/aleena/Desktop/argos-mascot
 node scripts/generate-sprite-css.mjs
 node scripts/generate-alpha-mask.mjs
 node scripts/generate-tray-icon.mjs

@@ -115,7 +115,7 @@ describe('generated sprite CSS', () => {
     }
   })
 
-  it('keeps every Argus jumping-jacks frame on the stretch/jump rows', () => {
+  it('keeps every Argos jumping-jacks frame on the stretch/jump rows', () => {
     // Partial pack: stretch and jumping share the 19-frame jacks row. Do not "optimise" the
     // count down — the design deliverable is all frames, and columns were widened to hold them.
     expect(ANIMATIONS.stretch.frames).toBe(19)
@@ -196,7 +196,7 @@ describe('generated animation module', () => {
   })
 
   it('has no aliases left, and still resolves a trigger that names a real state', () => {
-    // Undrawn Argus poses are real states that share a drawn row (same pattern as failed→idle),
+    // Undrawn Argos poses are real states that share a drawn row (same pattern as failed→idle),
     // not aliases — so the AnimationState union stays complete for motion and broadcasts.
     expect(Object.keys(ANIMATION_ALIASES)).toEqual([])
     expect(resolveTrigger('water-reminder')).toBe('drink')

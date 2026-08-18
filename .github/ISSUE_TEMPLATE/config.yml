@@ -1,6 +1,6 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Installing Argus
+  - name: Installing Argos
     url: https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/blob/main/docs/INSTALL.md
     about: How to install on macOS, Windows and Linux. macOS is signed; Windows may show SmartScreen once.
   - name: Report a security vulnerability

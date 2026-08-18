@@ -25,7 +25,7 @@ body:
       placeholder: |
         Version: 1.7.1
         Platform: darwin arm64
-        Log: /Users/you/Library/Application Support/Argus/logs/main.log
+        Log: /Users/you/Library/Application Support/Argos/logs/main.log
       render: text
     validations:
       required: true

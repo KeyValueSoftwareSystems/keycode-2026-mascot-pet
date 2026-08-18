@@ -31,7 +31,7 @@ const CONTEXT = {
 }
 
 async function tempDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'argus-analytics-'))
+  return mkdtemp(join(tmpdir(), 'argos-analytics-'))
 }
 
 function event(overrides: Partial<QueuedEvent> = {}): QueuedEvent {

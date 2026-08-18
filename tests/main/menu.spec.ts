@@ -63,7 +63,7 @@ describe('menu template', () => {
       item.type === 'separator' ? 'separator' : (item.label ?? ''),
     )
     expect(kinds).toEqual([
-      'Argus',
+      'Argos',
       'separator',
       'Movement',
       'Always on top',

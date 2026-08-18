@@ -25,7 +25,7 @@ function createConfig(env = process.env) {
 
   return {
     appId: 'systems.keyvalue.keycodepet',
-    productName: 'Argus',
+    productName: 'Argos',
     copyright: `Copyright © ${YEAR} KeyValue Systems`,
 
     directories: {
@@ -157,7 +157,7 @@ function createConfig(env = process.env) {
       oneClick: false,
       perMachine: false,
       allowToChangeInstallationDirectory: true,
-      shortcutName: 'Argus',
+      shortcutName: 'Argos',
       createDesktopShortcut: false,
       createStartMenuShortcut: true,
     },

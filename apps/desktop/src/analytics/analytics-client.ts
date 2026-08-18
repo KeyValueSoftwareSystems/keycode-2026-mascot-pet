@@ -68,7 +68,7 @@ export function buildBatch(
         $os_version: context.osVersion,
         $app_version: context.appVersion,
         $device_type: 'Desktop',
-        $lib: 'argus-main',
+        $lib: 'argos-main',
         $lib_version: context.appVersion,
         arch: context.arch,
         electron_version: context.electronVersion,

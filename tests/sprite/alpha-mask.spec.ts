@@ -52,7 +52,7 @@ describe('alpha mask generation', () => {
 
   it('separates per-frame fill from union fill', () => {
     // docs/PROMPT.md §5.4 conflated these, and asserting the wrong one makes the test a lie.
-    // Argus poses reach wider than the old pixel-coder pack, so the union sits higher; the
+    // Argos poses reach wider than the old pixel-coder pack, so the union sits higher; the
     // property pinned here is that union fill stays well above mean per-frame fill.
     const stats = ALPHA_MASK.stats
     const perFramePct = (stats.perFrameOpaqueMean / stats.cellPixels) * 100
@@ -86,7 +86,7 @@ describe('alpha mask generation', () => {
   it('has the measured bounding box', () => {
     // Deliberately a literal: this is the measurement the placement maths is built on, so it should
     // take an edit and a moment's thought when it changes rather than following the code silently.
-    // Argus pack: height-normalized to 150px with feet on footInset 16; centre stays mid-cell.
+    // Argos pack: height-normalized to 150px with feet on footInset 16; centre stays mid-cell.
     // Union top is thinking/review (hand-to-chin reaches above idle's hair).
     expect(ALPHA_MASK.bbox).toEqual({ x: 13, y: 31, width: 167, height: 161 })
     expect(ALPHA_MASK.footInset).toBe(16)

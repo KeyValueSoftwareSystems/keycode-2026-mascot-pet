@@ -214,7 +214,7 @@ export const ANALYTICS = {
 // Product identity
 // ---------------------------------------------------------------------------------------
 
-export const PRODUCT_NAME = 'Argus'
+export const PRODUCT_NAME = 'Argos'
 /** Previous `app.setName()` value; used to copy settings into the new userData folder. */
 export const LEGACY_PRODUCT_NAME = 'Keycode Pet'
 

@@ -354,7 +354,7 @@ Fault injection, so every negative path above can actually be exercised:
 To re-prove "shown exactly once", clear the client's memory between runs:
 
 ```bash
-rm -rf "$HOME/Library/Application Support/Argus"
+rm -rf "$HOME/Library/Application Support/Argos"
 ```
 
 ## Who can publish

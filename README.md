@@ -1,6 +1,6 @@
 <div align="center">
 
-# Argus
+# Argos
 
 **A pixel character that lives on your desktop.** It runs along the bottom of your screen over
 whatever you are working on, reminds you to drink water, and the whole team can make every installed
@@ -20,7 +20,7 @@ pet say something by editing one file.
 > double-click. Windows may still show SmartScreen once (no Authenticode cert).
 > [Install instructions →](docs/INSTALL.md)
 
-> **Argus is Keycode’s unicorn mascot.** Swapping the spritesheet is a file swap plus a JSON edit,
+> **Argos is Keycode’s unicorn mascot.** Swapping the spritesheet is a file swap plus a JSON edit,
 > with no code changes — see [docs/ASSETS.md](docs/ASSETS.md).
 
 ---

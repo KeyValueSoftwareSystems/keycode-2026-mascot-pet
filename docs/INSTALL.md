@@ -1,4 +1,4 @@
-# Installing Argus
+# Installing Argos
 
 Download the file for your machine from the
 [latest release](https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/latest)
@@ -17,12 +17,12 @@ Take the `.dmg` for your chip:
 
 | Your Mac | File |
 |---|---|
-| Apple Silicon (M1 and later) | `Argus-<version>-mac-arm64.dmg` |
-| Intel | `Argus-<version>-mac-x64.dmg` |
+| Apple Silicon (M1 and later) | `Argos-<version>-mac-arm64.dmg` |
+| Intel | `Argos-<version>-mac-x64.dmg` |
 
 Not sure? Apple menu → About This Mac. "Apple M…" means arm64.
 
-1. Open the `.dmg` and drag **Argus** into **Applications**.
+1. Open the `.dmg` and drag **Argos** into **Applications**.
 2. Open it from Applications (double-click is fine).
 3. The pet appears at the bottom of your screen. A tray icon gives you the menu; so does right-clicking
    the pet itself.
@@ -31,7 +31,7 @@ Not sure? Apple menu → About This Mac. "Apple M…" means arm64.
 
 ## Windows
 
-Take `Argus-<version>-win-x64.exe` and run it.
+Take `Argos-<version>-win-x64.exe` and run it.
 
 SmartScreen may say **"Windows protected your PC"** or that the publisher is unrecognised. Click
 **More info**, then **Run anyway**. That is expected until an Authenticode certificate is added —
@@ -43,9 +43,9 @@ it is not a sign the download is corrupt.
 
 | File | How |
 |---|---|
-| `.AppImage` | `chmod +x 'Argus-<version>-linux-x86_64.AppImage'` then run it. Nothing to install. |
-| `.deb` | `sudo apt install ./Argus-<version>-linux-x64.deb` |
-| `.rpm` | `sudo dnf install ./Argus-<version>-linux-x64.rpm` |
+| `.AppImage` | `chmod +x 'Argos-<version>-linux-x86_64.AppImage'` then run it. Nothing to install. |
+| `.deb` | `sudo apt install ./Argos-<version>-linux-x64.deb` |
+| `.rpm` | `sudo dnf install ./Argos-<version>-linux-x64.rpm` |
 | `.tar.gz` | Extract and run the binary inside. |
 
 **Wayland:** the app forces XWayland deliberately. Native Wayland forbids an application from
@@ -82,9 +82,9 @@ unaffected.
 
 | | |
 |---|---|
-| macOS | Delete `Argus.app` from Applications. Settings live in `~/Library/Application Support/Argus` (older installs may still have `~/Library/Application Support/Keycode Pet`, which is copied forward on first launch) |
-| Windows | Settings → Apps → Argus → Uninstall |
-| Linux | `sudo apt remove keycode-pet` (or delete the AppImage). Settings live in `~/.config/Argus` |
+| macOS | Delete `Argos.app` from Applications. Settings live in `~/Library/Application Support/Argos` (older installs may still have `~/Library/Application Support/Keycode Pet`, which is copied forward on first launch) |
+| Windows | Settings → Apps → Argos → Uninstall |
+| Linux | `sudo apt remove keycode-pet` (or delete the AppImage). Settings live in `~/.config/Argos` |
 
 ## Privacy
 

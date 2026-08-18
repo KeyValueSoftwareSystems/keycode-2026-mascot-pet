@@ -316,9 +316,9 @@ function launch(opts) {
     const sawNothing = session.events.length === 0
     const hint = sawNothing
       ? '\n\nThe app exited before saying anything. The usual cause is that another copy of ' +
-        'Argus is\nalready running and holding the single-instance lock, so this one exited ' +
+        'Argos is\nalready running and holding the single-instance lock, so this one exited ' +
         'immediately.\nThe harness runs in its own profile now, so if you see this, check for a ' +
-        'packaged app:\n  pgrep -fl "Argus.app/Contents/MacOS"'
+        'packaged app:\n  pgrep -fl "Argos.app/Contents/MacOS"'
       : ''
     for (const waiter of session.waiters.splice(0)) {
       waiter.reject?.(

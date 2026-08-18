@@ -2,7 +2,7 @@
   "name": "@keycode/desktop",
   "version": "1.14.0",
   "private": true,
-  "description": "Argus — Electron desktop companion",
+  "description": "Argos — Electron desktop companion",
   "license": "MIT",
   "type": "module",
   "main": "dist/main/main.js",

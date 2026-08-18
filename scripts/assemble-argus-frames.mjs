@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Assemble individual Argus frame PNGs into pet/spritesheet.png.
+ * Assemble individual Argos frame PNGs into pet/spritesheet.png.
  *
- *   node scripts/assemble-argus-frames.mjs [/path/to/argus-mascot]
+ *   node scripts/assemble-argos-frames.mjs [/path/to/argos-mascot]
  *
- * Expects subfolders: argus-idle, argus-run-right, argus-jumping-jacks, argus-drinking-water,
- * argus-wave, argus-sleep, argus-thinking, argus-electrocute, argus-panic — with numbered PNGs
+ * Expects subfolders: argos-idle, argos-run-right, argos-jumping-jacks, argos-drinking-water,
+ * argos-wave, argos-sleep, argos-thinking, argos-electrocute, argos-panic — with numbered PNGs
  * (1.png, 2.png, …). Uses every frame. Run-left is a horizontal flip of run-right; jumping-left
  * is a horizontal flip of jumping-jacks; idle-left is a horizontal flip of idle; review-left is
  * a horizontal flip of thinking.
@@ -315,17 +315,17 @@ function lockedTargetScale(files, flip) {
 }
 
 function main() {
-  const root = process.argv[2] ?? '/Users/aleena/Desktop/argus-mascot'
+  const root = process.argv[2] ?? '/Users/aleena/Desktop/argos-mascot'
   const folders = {
-    idle: join(root, 'argus-idle'),
-    runRight: join(root, 'argus-run-right'),
-    jacks: join(root, 'argus-jumping-jacks'),
-    drink: join(root, 'argus-drinking-water'),
-    wave: join(root, 'argus-wave'),
-    sleep: join(root, 'argus-sleep'),
-    thinking: join(root, 'argus-thinking'),
-    electrocute: join(root, 'argus-electrocute'),
-    panic: join(root, 'argus-panic'),
+    idle: join(root, 'argos-idle'),
+    runRight: join(root, 'argos-run-right'),
+    jacks: join(root, 'argos-jumping-jacks'),
+    drink: join(root, 'argos-drinking-water'),
+    wave: join(root, 'argos-wave'),
+    sleep: join(root, 'argos-sleep'),
+    thinking: join(root, 'argos-thinking'),
+    electrocute: join(root, 'argos-electrocute'),
+    panic: join(root, 'argos-panic'),
   }
 
   const idle = listFrames(folders.idle)
