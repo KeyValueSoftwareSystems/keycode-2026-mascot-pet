@@ -773,8 +773,6 @@ export async function startApp(): Promise<AppShell> {
       analyticsEnabled: current.analyticsEnabled,
       autoUpdateEnabled: current.autoUpdateEnabled,
       update: updateState,
-      // Packaged builds must not ship a "fire now" escape hatch.
-      devTools: !app.isPackaged,
     }
   }
 
@@ -846,42 +844,6 @@ export async function startApp(): Promise<AppShell> {
       void updates?.checkNow()
     },
     quit: () => app.quit(),
-    fireReminderNow(kind) {
-      if (kind === 'coffee' || kind === 'lunch') {
-        callouts.show({
-          sourceId: 'reminder',
-          text: CLOCK_REMINDER_MESSAGES[kind],
-          tone: 'info',
-          priority: 'normal',
-          animation: resolveTrigger(CLOCK_REMINDER_TRIGGERS[kind]),
-        })
-        return
-      }
-      callouts.show({
-        sourceId: 'reminder',
-        text: REMINDER_MESSAGES[kind],
-        tone: 'info',
-        priority: 'normal',
-        animation: resolveTrigger(REMINDER_TRIGGERS[kind]),
-        reminderKind: kind,
-        sticky: true,
-        actions: ['ok', 'snooze'],
-        ...(kind === 'water'
-          ? { holdMs: (ANIMATIONS.drink.totalMs ?? ANIMATIONS.drink.durationMs) + DRINK_LOOP_GAP_MS }
-          : kind === 'stretch'
-            ? { holdMs: ANIMATIONS.stretch.totalMs ?? ANIMATIONS.stretch.durationMs }
-            : {}),
-      })
-    },
-    fireGreetingNow(period) {
-      callouts.show({
-        sourceId: 'reminder',
-        text: GREETING_MESSAGES[period],
-        tone: 'info',
-        priority: 'low',
-        animation: resolveTrigger(GREETING_TRIGGERS[period]),
-      })
-    },
     log,
   })
 

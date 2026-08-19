@@ -56,11 +56,6 @@ export interface MenuViewModel {
   analyticsEnabled: boolean
   autoUpdateEnabled: boolean
   update: { state: UpdateState; latestVersion: string | null }
-  /**
-   * Unpackaged builds only. Adds a Dev submenu that fires reminders immediately so they can be
-   * checked without waiting for a clock slot or a 5-minute interval.
-   */
-  devTools?: boolean
 }
 
 export interface MenuActions {
@@ -70,10 +65,6 @@ export interface MenuActions {
   /** `minutes: null` means off. Anything else enables the reminder at that interval. */
   setReminder(kind: 'water' | 'stretch', minutes: number | null): void
   toggleClockReminder(kind: 'coffee' | 'lunch'): void
-  /** Dev-only: play the reminder callout now, without touching deadlines. */
-  fireReminderNow(kind: 'water' | 'stretch' | 'coffee' | 'lunch'): void
-  /** Dev-only: play a time-of-day greeting now. */
-  fireGreetingNow(period: 'morning' | 'afternoon' | 'evening'): void
   resetPosition(): void
   checkForUpdates(): void
   showAbout(): void
@@ -232,22 +223,6 @@ export function buildMenuTemplate(
     // what flushes the settings file. An explicit click keeps the flush in the path.
     { label: 'Quit', click: () => actions.quit() },
   ]
-
-  if (view.devTools) {
-    items.splice(items.length - 1, 0, {
-      label: 'Dev',
-      submenu: [
-        { label: 'Fire drink now', click: () => actions.fireReminderNow('water') },
-        { label: 'Fire stretch now', click: () => actions.fireReminderNow('stretch') },
-        { label: 'Fire coffee now', click: () => actions.fireReminderNow('coffee') },
-        { label: 'Fire lunch now', click: () => actions.fireReminderNow('lunch') },
-        { type: 'separator' },
-        { label: 'Fire good morning', click: () => actions.fireGreetingNow('morning') },
-        { label: 'Fire good afternoon', click: () => actions.fireGreetingNow('afternoon') },
-        { label: 'Fire good evening', click: () => actions.fireGreetingNow('evening') },
-      ],
-    })
-  }
 
   return items
 }

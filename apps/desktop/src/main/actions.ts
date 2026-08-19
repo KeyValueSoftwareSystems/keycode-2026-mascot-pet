@@ -53,9 +53,6 @@ export interface ActionDeps {
    */
   effectivePetSize: () => PetSize
   effectiveAlwaysOnTop: () => boolean
-  /** Dev-only: surface a reminder callout immediately. */
-  fireReminderNow: (kind: 'water' | 'stretch' | 'coffee' | 'lunch') => void
-  fireGreetingNow: (period: 'morning' | 'afternoon' | 'evening') => void
   quit: () => void
   log?: (message: string, meta?: unknown) => void
 }
@@ -158,16 +155,6 @@ export function createActions(deps: ActionDeps): MenuActions {
       })
       deps.evaluateReminders()
       log('clock reminder set', { kind, enabled })
-    },
-
-    fireReminderNow(kind): void {
-      deps.fireReminderNow(kind)
-      log('dev fire reminder', { kind })
-    },
-
-    fireGreetingNow(period): void {
-      deps.fireGreetingNow(period)
-      log('dev fire greeting', { period })
     },
 
     resetPosition(): void {
