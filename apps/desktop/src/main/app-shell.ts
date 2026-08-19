@@ -488,6 +488,7 @@ export async function startApp(): Promise<AppShell> {
   const manifestUrl = resolveManifestUrl(
     process.env,
     DEFAULT_MANIFEST_URL,
+    { allowOverride: !app.isPackaged },
   )
 
   // TWO independent conditions. `app.isPackaged` is not env-overridable, so a shipped build cannot be

@@ -136,6 +136,13 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
       deps.setLastKnownRelease(release.latestVersion)
 
+      const silentMacUpdate =
+        deps.canApplyInPlace && (deps.isAutoUpdateEnabled?.() ?? true)
+      if (silentMacUpdate) {
+        log('update downloading silently', { version: release.latestVersion })
+        return
+      }
+
       deps.submitCallout({
         sourceId: 'update',
         text: `Version ${release.latestVersion} is available`,

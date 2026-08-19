@@ -81,8 +81,13 @@ export interface Poller {
   rescheduleNow(): void
 }
 
-/** Resolve the manifest URL, env override first. */
-export function resolveManifestUrl(env: NodeJS.ProcessEnv, fallback: string): string {
+/** Resolve the manifest URL, env override first unless override use is disabled. */
+export function resolveManifestUrl(
+  env: NodeJS.ProcessEnv,
+  fallback: string,
+  options: { allowOverride?: boolean } = {},
+): string {
+  if (options.allowOverride === false) return fallback
   const override = env.KEYCODE_PET_MANIFEST_URL
   return override && override.length > 0 ? override : fallback
 }

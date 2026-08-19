@@ -105,6 +105,7 @@ function harness(
     pollOutcome?: PollOutcome
     canApplyInPlace?: boolean
     installReturns?: boolean
+    autoUpdateEnabled?: boolean
   } = {},
 ) {
   let lastKnown = options.lastKnownRelease ?? null
@@ -135,6 +136,7 @@ function harness(
       installs.push(before)
       return options.installReturns ?? false
     },
+    isAutoUpdateEnabled: () => options.autoUpdateEnabled ?? true,
   })
 
   return {
@@ -284,11 +286,20 @@ describe('update service', () => {
   it('omits the callout URL and starts a download when the app can apply in place', () => {
     const h = harness({ canApplyInPlace: true })
     h.service.onReleaseFromPoll(release())
-    expect(h.callouts[0]).not.toHaveProperty('url')
+    expect(h.callouts).toEqual([])
     expect(h.downloads).toHaveLength(1)
     h.service.actOnKnownUpdate(async () => {})
     expect(h.opened).toEqual([])
     expect(h.toasts).toEqual([])
+  })
+
+  it('still announces when in-place update is disabled in settings', () => {
+    const h = harness({ canApplyInPlace: true, autoUpdateEnabled: false })
+    h.service.onReleaseFromPoll(release())
+    expect(h.callouts[0]).toMatchObject({
+      text: 'Version 0.9.0 is available',
+    })
+    expect(h.downloads).toEqual([])
   })
 
   it('restarts once the download is ready', () => {

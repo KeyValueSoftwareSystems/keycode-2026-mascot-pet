@@ -523,6 +523,16 @@ describe('poll scheduling', () => {
     )
   })
 
+  it('ignores the env manifest URL when override is disabled', () => {
+    expect(
+      resolveManifestUrl(
+        { KEYCODE_PET_MANIFEST_URL: 'https://x/y' },
+        'https://fallback',
+        { allowOverride: false },
+      ),
+    ).toBe('https://fallback')
+  })
+
   it('ships a default manifest URL that a packaged build can actually fetch', () => {
     // The shipped default lives in constants.ts and is wired through app-shell.ts. Neither file can
     // be imported here (electron) — read the source instead, the same way tests/renderer/discipline.spec.ts does.
@@ -536,7 +546,7 @@ describe('poll scheduling', () => {
       'utf8',
     )
     expect(
-      /resolveManifestUrl\(\s*process\.env,\s*DEFAULT_MANIFEST_URL,?\s*\)/.test(shell),
+      /resolveManifestUrl\(\s*process\.env,\s*DEFAULT_MANIFEST_URL(?:\s*,[\s\S]*?)?\)/.test(shell),
       'app-shell.ts must pass DEFAULT_MANIFEST_URL to resolveManifestUrl',
     ).toBe(true)
 
