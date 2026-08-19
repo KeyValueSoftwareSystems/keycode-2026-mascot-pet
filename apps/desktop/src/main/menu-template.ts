@@ -54,6 +54,7 @@ export interface MenuViewModel {
   coffee: boolean
   lunch: boolean
   analyticsEnabled: boolean
+  autoUpdateEnabled: boolean
   update: { state: UpdateState; latestVersion: string | null }
   /**
    * Unpackaged builds only. Adds a Dev submenu that fires reminders immediately so they can be
@@ -77,6 +78,7 @@ export interface MenuActions {
   checkForUpdates(): void
   showAbout(): void
   toggleAnalytics(): void
+  toggleAutoUpdate(): void
   reportProblem(): void
   quit(): void
 }
@@ -216,6 +218,12 @@ export function buildMenuTemplate(
       checked: view.analyticsEnabled,
       click: () => actions.toggleAnalytics(),
     },
+    {
+      label: 'Auto-update',
+      type: 'checkbox',
+      checked: view.autoUpdateEnabled,
+      click: () => actions.toggleAutoUpdate(),
+    },
     // Nothing is uploaded automatically here: a problem only reaches us if a person chooses to send
     // it. This makes that one click instead of finding a log by hand.
     { label: 'Report a problem…', click: () => actions.reportProblem() },
@@ -260,6 +268,7 @@ export const MENU_ITEM_ORDER = [
   'update',
   'about',
   'analytics',
+  'autoUpdate',
   'report',
   'separator',
   'quit',

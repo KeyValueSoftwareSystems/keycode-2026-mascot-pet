@@ -328,7 +328,7 @@ export async function startApp(): Promise<AppShell> {
         petInteractions += 1
         const showing = callouts?.showing()
         if (showing?.actions?.length) return
-        if (showing?.sourceId === 'update' && showing.clickable) {
+        if (showing?.sourceId === 'update' && updateState.state === 'ready') {
           updates?.actOnKnownUpdate(async () => {
             installingUpdate = true
             await settings.flush()
@@ -404,7 +404,9 @@ export async function startApp(): Promise<AppShell> {
               text: showing.text,
               tone: showing.tone,
               pinned: Boolean(showing.pin),
-              clickable: Boolean(callouts.currentUrl() || showing.clickable),
+              clickable: Boolean(
+                callouts.currentUrl() || showing.clickable || (showing.sourceId === 'update' && updateState.state === 'ready'),
+              ),
               // Sticky entries have no expiry, so a click is the only way they go.
               dismissible: Boolean(showing.sticky) && !(showing.actions && showing.actions.length > 0),
               actions: showing.actions ? [...showing.actions] : [],
@@ -630,6 +632,7 @@ export async function startApp(): Promise<AppShell> {
     canApplyInPlace: macUpdater.canApply,
     beginDownload: () => macUpdater.check(),
     installAndRelaunch: (beforeQuitForUpdate) => macUpdater.install(beforeQuitForUpdate),
+    isAutoUpdateEnabled: () => settings.get().autoUpdateEnabled,
   })
 
   // ---------------------------------------------------------------------------------------
@@ -785,6 +788,7 @@ export async function startApp(): Promise<AppShell> {
       coffee: current.coffeeReminderEnabled,
       lunch: current.lunchReminderEnabled,
       analyticsEnabled: current.analyticsEnabled,
+      autoUpdateEnabled: current.autoUpdateEnabled,
       update: updateState,
       // Packaged builds must not ship a "fire now" escape hatch.
       devTools: !app.isPackaged,

@@ -64,6 +64,8 @@ export interface UpdateServiceDeps {
   canApplyInPlace?: boolean
   beginDownload?: () => void
   installAndRelaunch?: (beforeQuitForUpdate: () => Promise<void>) => boolean
+  /** Whether auto-downloading / in-place updating should be used on macOS. */
+  isAutoUpdateEnabled?: () => boolean
 }
 
 export interface UpdateService {
@@ -125,7 +127,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
       // dedupe, because a further version must be able to announce again.
       const alreadyAnnounced = deps.getLastKnownRelease() === release.latestVersion
       setState('available')
-      deps.beginDownload?.()
+      if (deps.isAutoUpdateEnabled?.() ?? true) deps.beginDownload?.()
 
       if (alreadyAnnounced) {
         log('update already announced', { version: release.latestVersion })
@@ -188,10 +190,9 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
     actOnKnownUpdate(beforeQuitForUpdate): void {
       if (state !== 'available' && state !== 'ready') return
-      if (deps.canApplyInPlace && deps.installAndRelaunch) {
+      if (deps.canApplyInPlace && deps.installAndRelaunch && (deps.isAutoUpdateEnabled?.() ?? true)) {
         if (deps.installAndRelaunch(beforeQuitForUpdate)) return
         deps.beginDownload?.()
-        deps.showToast({ text: 'Downloading the update…', tone: 'info' })
         return
       }
       deps.openReleaseNotes(notesUrl)
@@ -199,6 +200,10 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
     onDownloaded(): void {
       if (!latestVersion) return
+      if (!(deps.isAutoUpdateEnabled?.() ?? true)) {
+        setState('available')
+        return
+      }
       setState('ready')
       const version = latestVersion
       deps.submitCallout({
@@ -210,7 +215,6 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
         animation: 'waving',
         clickable: true,
       })
-      deps.showToast({ text: `Restart now to install ${version}`, tone: 'success' })
     },
 
     view,

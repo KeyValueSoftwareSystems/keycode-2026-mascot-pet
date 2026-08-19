@@ -30,6 +30,7 @@ function view(overrides: Partial<MenuViewModel> = {}): MenuViewModel {
     coffee: true,
     lunch: true,
     analyticsEnabled: true,
+    autoUpdateEnabled: true,
     update: { state: 'idle', latestVersion: null },
     ...overrides,
   }
@@ -48,6 +49,7 @@ function noopActions(): MenuActions {
     checkForUpdates: () => {},
     showAbout: () => {},
     toggleAnalytics: () => {},
+    toggleAutoUpdate: () => {},
     reportProblem: () => {},
     quit: () => {},
   }
@@ -77,6 +79,7 @@ describe('menu template', () => {
       'Check for updates…',
       'About',
       'Share anonymous usage data',
+      'Auto-update',
       'Report a problem…',
       'separator',
       'Quit',
@@ -174,6 +177,7 @@ describe('menu template', () => {
       checkForUpdates: vi.fn(),
       showAbout: vi.fn(),
       toggleAnalytics: vi.fn(),
+      toggleAutoUpdate: vi.fn(),
       reportProblem: vi.fn(),
       quit: vi.fn(),
     }
@@ -187,6 +191,7 @@ describe('menu template', () => {
     expect(actions.checkForUpdates).toHaveBeenCalledOnce()
     expect(actions.showAbout).toHaveBeenCalledOnce()
     expect(actions.toggleAnalytics).toHaveBeenCalledOnce()
+    expect(actions.toggleAutoUpdate).toHaveBeenCalledOnce()
     expect(actions.reportProblem).toHaveBeenCalledOnce()
     expect(actions.quit).toHaveBeenCalledOnce()
   })

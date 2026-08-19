@@ -19,7 +19,7 @@
 import { z } from 'zod'
 import { DEFAULT_PET_SIZE, PET_SIZES, type PetSize } from '../config/constants.js'
 
-export const SETTINGS_SCHEMA_VERSION = 8 as const
+export const SETTINGS_SCHEMA_VERSION = 9 as const
 
 /** Cap on remembered broadcast ids. See `seenBroadcastIds` below. */
 export const SEEN_IDS_MAX = 500
@@ -115,6 +115,14 @@ export const settingsSchema = z.strictObject({
   analyticsEnabled: z.boolean(),
 
   /**
+   * Whether the app should automatically download and stage macOS in-place updates.
+   *
+   * When disabled, update notices remain available and the old manual path is preserved
+   * (open the update notes/download page rather than installing in place).
+   */
+  autoUpdateEnabled: z.boolean(),
+
+  /**
    * Random per-install id, or null until first launch mints one.
    *
    * A UUID rather than a machine fingerprint. A fingerprint would survive reinstalls, which is the
@@ -153,6 +161,7 @@ export const DEFAULT_SETTINGS: Settings = {
   seenBroadcastIds: [],
   lastKnownRelease: null,
   analyticsEnabled: true,
+  autoUpdateEnabled: true,
   installId: null,
 }
 
@@ -260,6 +269,11 @@ function migrate(raw: Record<string, unknown>): Record<string, unknown> {
   // the id has to be written back with a forced flush to be worth anything. First launch mints it.
   if (out['schemaVersion'] === 7) {
     out = { ...out, schemaVersion: 8, analyticsEnabled: true, installId: null }
+  }
+
+  // v8 → v9: auto-update preference. Enabled by default to match the product's "seamless" goal.
+  if (out['schemaVersion'] === 8) {
+    out = { ...out, schemaVersion: 9, autoUpdateEnabled: true }
   }
 
   return out

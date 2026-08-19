@@ -288,7 +288,7 @@ describe('update service', () => {
     expect(h.downloads).toHaveLength(1)
     h.service.actOnKnownUpdate(async () => {})
     expect(h.opened).toEqual([])
-    expect(h.toasts.at(-1)).toEqual({ text: 'Downloading the update…', tone: 'info' })
+    expect(h.toasts).toEqual([])
   })
 
   it('restarts once the download is ready', () => {

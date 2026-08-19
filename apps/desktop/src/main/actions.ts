@@ -73,7 +73,7 @@ export function createActions(deps: ActionDeps): MenuActions {
    * Reads the store and writes the inverse — never trusts the menu item's own `checked`, which is a
    * rendering of state and can be stale if a menu rebuild raced a click.
    */
-  const toggle = (key: 'movementEnabled' | 'analyticsEnabled'): boolean => {
+  const toggle = (key: 'movementEnabled' | 'analyticsEnabled' | 'autoUpdateEnabled'): boolean => {
     const next = !settings.get()[key]
     settings.patch({ [key]: next })
     return next
@@ -216,6 +216,11 @@ export function createActions(deps: ActionDeps): MenuActions {
 
       const enabled = toggle('analyticsEnabled')
       log('analytics toggled', { enabled })
+    },
+
+    toggleAutoUpdate(): void {
+      const enabled = toggle('autoUpdateEnabled')
+      log('auto update toggled', { enabled })
     },
 
     reportProblem(): void {
