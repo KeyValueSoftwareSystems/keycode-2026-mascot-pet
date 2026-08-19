@@ -30,7 +30,7 @@
     "analyticsMinutes": 30
   },
   "release": {
-    "latestVersion": "1.14.4",
+    "latestVersion": "1.14.5",
     "notesUrl": "https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/",
     "mandatory": false
   }
