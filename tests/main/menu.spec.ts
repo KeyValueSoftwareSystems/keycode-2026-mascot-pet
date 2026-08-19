@@ -207,6 +207,13 @@ describe('update menu item', () => {
     })
   })
 
+  it('asks to restart once a Mac update is downloaded', () => {
+    expect(updateItemLabel({ state: 'ready', latestVersion: '0.4.0' })).toEqual({
+      label: 'Restart to update…',
+      enabled: true,
+    })
+  })
+
   it('falls back to the neutral label after an error rather than showing a sticky failure', () => {
     // A background check that failed is not worth nagging about; clicking retries.
     expect(updateItemLabel({ state: 'error', latestVersion: null })).toEqual({

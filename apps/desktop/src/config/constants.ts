@@ -221,6 +221,12 @@ export const LEGACY_PRODUCT_NAME = 'Keycode Pet'
 export const DEFAULT_MANIFEST_URL =
   'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/manifest.json'
 
+/** Squirrel.Mac JSON feeds, one per architecture. Overridable via KEYCODE_PET_UPDATE_FEED_URL. */
+export const DEFAULT_MAC_UPDATE_FEED_URL = {
+  arm64: 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/updates/darwin-arm64.json',
+  x64: 'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/updates/darwin-x64.json',
+} as const
+
 /** Where the code lives, and where a problem report goes. */
 export const REPO_URL = 'https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet'
 export const ISSUES_URL = `${REPO_URL}/issues/new`

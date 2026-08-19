@@ -23,7 +23,7 @@ import {
   type PetSize,
 } from '../config/constants.js'
 
-export type UpdateState = 'idle' | 'checking' | 'available' | 'current' | 'error'
+export type UpdateState = 'idle' | 'checking' | 'available' | 'ready' | 'current' | 'error'
 
 export interface ReminderView {
   enabled: boolean
@@ -127,6 +127,8 @@ export function updateItemLabel(update: MenuViewModel['update']): { label: strin
         label: `Update available: ${update.latestVersion ?? 'newer version'}`,
         enabled: true,
       }
+    case 'ready':
+      return { label: 'Restart to update…', enabled: true }
     // 'error' deliberately falls back to the neutral label rather than showing a sticky failure.
     // A background check that failed is not something to nag about; the user can retry by clicking.
     case 'idle':
