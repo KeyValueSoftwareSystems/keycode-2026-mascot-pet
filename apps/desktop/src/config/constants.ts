@@ -147,6 +147,14 @@ export const MANIFEST_MAX_PER_POLL = 3
 
 export const BROADCAST_DURATION_MS = { min: 2_000, max: 30_000 } as const
 
+/**
+ * How long the first-run analytics notice stays up.
+ *
+ * Long enough to read twice without hurrying, short enough that it clears itself. It follows the
+ * greeting, and making a second bubble demand its own click is how a welcome turns into a queue.
+ */
+export const FIRST_RUN_NOTICE_MS = 12_000
+
 export const POLL = {
   /*
    * 1 minute.

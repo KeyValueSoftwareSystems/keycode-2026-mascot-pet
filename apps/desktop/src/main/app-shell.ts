@@ -33,7 +33,12 @@ import { createCalloutHost, type CalloutHost } from './callout-host.js'
 import { createToastManager, type ToastManager } from './toast.js'
 import { REMINDER_MESSAGES, REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
 import { CLOCK_REMINDER_MESSAGES, CLOCK_REMINDER_TRIGGERS } from '../reminders/clock-reminders.js'
-import { GREETING_MESSAGES, GREETING_TRIGGERS } from '../reminders/greetings.js'
+import {
+  GREETING_MESSAGES,
+  GREETING_TRIGGERS,
+  greetingKey,
+  periodAt,
+} from '../reminders/greetings.js'
 import {
   createPoller,
   resolveManifestUrl,
@@ -53,6 +58,7 @@ import {
   DEFAULT_MANIFEST_URL,
   DEFAULT_PET_SIZE,
   DRINK_LOOP_GAP_MS,
+  FIRST_RUN_NOTICE_MS,
   ISSUES_URL,
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
@@ -111,6 +117,17 @@ export async function startApp(): Promise<AppShell> {
   const displays = createDisplayManager()
   const settings = await SettingsStore.open({ dir: userDataDir(), log })
   const petMeta = readPetMetadata()
+
+  // A brand-new install introduces itself ("Hi, I'm Argus — on duty!"), so the time-of-day greeting
+  // would be a second hello in the same second. Marking this period as already greeted lets the
+  // introduction stand in for it; every later period greets normally, starting tomorrow morning.
+  //
+  // Done here, before the reminder service is built, because greetings are evaluated on its first
+  // tick — writing this any later loses the race and both bubbles fire.
+  if (settings.firstRun) {
+    const period = periodAt(Date.now())
+    if (period !== null) settings.patch({ lastGreetingKey: greetingKey(Date.now(), period) })
+  }
 
   if (settings.recovery) {
     // Surfaced in About rather than as a dialog: a modal at launch would be a jarring first
@@ -709,6 +726,26 @@ export async function startApp(): Promise<AppShell> {
   })
   poller.start()
 
+  // The pet introduces itself, once, on a genuinely new install.
+  //
+  // Gated on `settings.firstRun` — "no settings file existed" — rather than on the analytics install
+  // id. Those differ for anyone upgrading into the analytics release: they mint an id for the first
+  // time but have had the pet for months, and being introduced to it would be strange.
+  //
+  // Sticky, so it waits to be acknowledged rather than passing by while someone is looking
+  // elsewhere. Dismissing it is also the first click on the pet, which teaches the interaction
+  // without a tutorial.
+  if (settings.firstRun) {
+    callouts.show({
+      sourceId: 'broadcast',
+      text: `Hi, I'm ${petMeta.displayName} — on duty! 👋`,
+      tone: 'info',
+      priority: 'normal',
+      sticky: true,
+      animation: 'waving',
+    })
+  }
+
   // Fire-and-forget: analytics must never delay the pet appearing, and every failure inside is
   // already swallowed and logged.
   void (async () => {
@@ -730,17 +767,22 @@ export async function startApp(): Promise<AppShell> {
     // first time. Without it they would all report as new installs on upgrade day.
     if (settings.firstRun) await analytics.capture('app_installed')
 
-    // Told, not buried. On-by-default is only defensible if the person is actually informed, and a
-    // paragraph in a README nobody opens does not count — so the pet says it itself, once, the first
-    // time it ever mints an id. Sticky, so it waits to be acknowledged rather than passing by while
-    // someone is looking elsewhere.
+    // The disclosure still happens — it just follows the hello instead of replacing it.
+    //
+    // On-by-default is only defensible if the person is actually told, and a paragraph in a README
+    // nobody opens does not count. Timed rather than sticky: this one is an FYI, and queueing two
+    // bubbles that each demand a click to clear is how a welcome becomes an interruption. It is
+    // still repeated in About and in the menu, both of which state the current setting.
+    //
+    // Gated on `isNewInstall`, not `firstRun`: someone upgrading into the analytics release mints an
+    // id for the first time and is owed the notice too, even though they are not new to the pet.
     if (isNewInstall && settings.get().analyticsEnabled) {
       callouts.show({
         sourceId: 'broadcast',
-        text: 'I send anonymous usage stats. Turn it off in my right-click menu.',
+        text: 'I send anonymous usage stats — switch them off in my right-click menu.',
         tone: 'info',
-        priority: 'normal',
-        sticky: true,
+        priority: 'low',
+        durationMs: FIRST_RUN_NOTICE_MS,
         animation: 'idle',
       })
     }
