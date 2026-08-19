@@ -33,12 +33,7 @@ import { createCalloutHost, type CalloutHost } from './callout-host.js'
 import { createToastManager, type ToastManager } from './toast.js'
 import { REMINDER_MESSAGES, REMINDER_TRIGGERS } from '../reminders/reminder-scheduler.js'
 import { CLOCK_REMINDER_MESSAGES, CLOCK_REMINDER_TRIGGERS } from '../reminders/clock-reminders.js'
-import {
-  GREETING_MESSAGES,
-  GREETING_TRIGGERS,
-  greetingKey,
-  periodAt,
-} from '../reminders/greetings.js'
+import { GREETING_MESSAGES, GREETING_TRIGGERS } from '../reminders/greetings.js'
 import {
   createPoller,
   resolveManifestUrl,
@@ -58,7 +53,6 @@ import {
   DEFAULT_MANIFEST_URL,
   DEFAULT_PET_SIZE,
   DRINK_LOOP_GAP_MS,
-  FIRST_RUN_NOTICE_MS,
   ISSUES_URL,
   PRODUCT_NAME,
   STRETCH_INTERVAL_MS,
@@ -118,16 +112,6 @@ export async function startApp(): Promise<AppShell> {
   const settings = await SettingsStore.open({ dir: userDataDir(), log })
   const petMeta = readPetMetadata()
 
-  // A brand-new install introduces itself ("Hi, I'm Argus — on duty!"), so the time-of-day greeting
-  // would be a second hello in the same second. Marking this period as already greeted lets the
-  // introduction stand in for it; every later period greets normally, starting tomorrow morning.
-  //
-  // Done here, before the reminder service is built, because greetings are evaluated on its first
-  // tick — writing this any later loses the race and both bubbles fire.
-  if (settings.firstRun) {
-    const period = periodAt(Date.now())
-    if (period !== null) settings.patch({ lastGreetingKey: greetingKey(Date.now(), period) })
-  }
 
   if (settings.recovery) {
     // Surfaced in About rather than as a dialog: a modal at launch would be a jarring first
@@ -767,25 +751,12 @@ export async function startApp(): Promise<AppShell> {
     // first time. Without it they would all report as new installs on upgrade day.
     if (settings.firstRun) await analytics.capture('app_installed')
 
-    // The disclosure still happens — it just follows the hello instead of replacing it.
+    // No analytics notice in a bubble. The pet's first words are a greeting, and a consent-form
+    // sentence in the middle of one reads as an interruption rather than as courtesy.
     //
-    // On-by-default is only defensible if the person is actually told, and a paragraph in a README
-    // nobody opens does not count. Timed rather than sticky: this one is an FYI, and queueing two
-    // bubbles that each demand a click to clear is how a welcome becomes an interruption. It is
-    // still repeated in About and in the menu, both of which state the current setting.
-    //
-    // Gated on `isNewInstall`, not `firstRun`: someone upgrading into the analytics release mints an
-    // id for the first time and is owed the notice too, even though they are not new to the pet.
-    if (isNewInstall && settings.get().analyticsEnabled) {
-      callouts.show({
-        sourceId: 'broadcast',
-        text: 'I send anonymous usage stats — switch them off in my right-click menu.',
-        tone: 'info',
-        priority: 'low',
-        durationMs: FIRST_RUN_NOTICE_MS,
-        animation: 'idle',
-      })
-    }
+    // The disclosure is not gone, it has moved to where someone looks for it rather than where they
+    // cannot avoid it: the About dialog states the current setting on every open, the menu item
+    // shows it as a tick, and README / INSTALL / SECURITY / the site footer all describe it.
 
     await analytics.capture('app_launched', {
       migrated_install: isNewInstall && !settings.firstRun,
