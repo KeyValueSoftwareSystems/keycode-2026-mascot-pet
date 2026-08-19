@@ -121,7 +121,7 @@ function harness(
     setLastKnownRelease: (version) => {
       lastKnown = version
     },
-    submitCallout: (request) => callouts.push(request as Record<string, unknown>),
+    submitCallout: (request) => callouts.push(request as unknown as Record<string, unknown>),
     showToast: (toast) => toasts.push(toast),
     pollNow: async () => options.pollOutcome ?? { kind: 'ok', surfaced: 0, unchanged: false },
     onStateChange: (view) => states.push(view.state),
@@ -296,6 +296,12 @@ describe('update service', () => {
     h.service.onReleaseFromPoll(release())
     h.service.onDownloaded()
     expect(h.service.view().state).toBe('ready')
+    expect(h.callouts.at(-1)).toMatchObject({
+      sourceId: 'update',
+      text: 'Restart now to install 0.9.0',
+      clickable: true,
+      sticky: true,
+    })
     h.service.actOnKnownUpdate(async () => {})
     expect(h.installs).toHaveLength(1)
     expect(h.opened).toEqual([])

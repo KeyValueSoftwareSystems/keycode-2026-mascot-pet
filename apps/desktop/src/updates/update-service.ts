@@ -200,7 +200,17 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
     onDownloaded(): void {
       if (!latestVersion) return
       setState('ready')
-      deps.showToast({ text: 'Restart to update', tone: 'success' })
+      const version = latestVersion
+      deps.submitCallout({
+        sourceId: 'update',
+        text: `Restart now to install ${version}`,
+        tone: 'success',
+        priority: 'high',
+        sticky: true,
+        animation: 'waving',
+        clickable: true,
+      })
+      deps.showToast({ text: `Restart now to install ${version}`, tone: 'success' })
     },
 
     view,

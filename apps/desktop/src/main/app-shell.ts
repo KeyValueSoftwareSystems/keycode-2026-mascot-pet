@@ -326,12 +326,19 @@ export async function startApp(): Promise<AppShell> {
         // clicked" and never saw a string — deciding what a click *means* is behaviour, so it lives
         // here rather than in the view.
         petInteractions += 1
-        if (callouts?.showing()?.actions?.length) return
+        const showing = callouts?.showing()
+        if (showing?.actions?.length) return
+        if (showing?.sourceId === 'update' && showing.clickable) {
+          updates?.actOnKnownUpdate(async () => {
+            installingUpdate = true
+            await settings.flush()
+          })
+          return
+        }
         const url = callouts?.currentUrl()
         if (url) {
           // Only for broadcasts, and only the id — never the URL, which is the one field in a
           // manifest entry that could carry something specific to a person.
-          const showing = callouts?.showing()
           if (showing?.sourceId === 'broadcast' && showing.broadcastId) {
             void analytics.capture('broadcast_clicked', { broadcast_id: showing.broadcastId })
           }
@@ -397,7 +404,7 @@ export async function startApp(): Promise<AppShell> {
               text: showing.text,
               tone: showing.tone,
               pinned: Boolean(showing.pin),
-              clickable: Boolean(callouts.currentUrl()),
+              clickable: Boolean(callouts.currentUrl() || showing.clickable),
               // Sticky entries have no expiry, so a click is the only way they go.
               dismissible: Boolean(showing.sticky) && !(showing.actions && showing.actions.length > 0),
               actions: showing.actions ? [...showing.actions] : [],

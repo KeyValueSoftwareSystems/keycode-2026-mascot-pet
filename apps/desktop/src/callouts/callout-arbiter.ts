@@ -42,6 +42,8 @@ export interface CalloutRequest {
   text: string
   tone: Tone
   priority: Priority
+  /** Whether clicking the bubble should trigger a main-process action even without a URL. */
+  clickable?: boolean
   durationMs?: number
   /** Sticky entries are not displaced by higher priority and do not auto-expire without a duration. */
   sticky?: boolean
