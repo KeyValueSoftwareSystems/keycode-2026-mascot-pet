@@ -31,7 +31,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Validate before publishing, with the client's own parser. A malformed envelope does not degrade
       # gracefully — every install ignores the entire file and shows nothing, silently.
