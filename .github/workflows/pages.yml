@@ -35,7 +35,7 @@ jobs:
 
       # Validate before publishing, with the client's own parser. A malformed envelope does not degrade
       # gracefully — every install ignores the entire file and shows nothing, silently.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.6.0
       - uses: actions/setup-node@v4
