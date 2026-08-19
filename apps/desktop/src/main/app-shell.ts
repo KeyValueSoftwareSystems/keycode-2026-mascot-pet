@@ -112,6 +112,7 @@ export async function startApp(): Promise<AppShell> {
   const settings = await SettingsStore.open({ dir: userDataDir(), log })
   const petMeta = readPetMetadata()
 
+
   if (settings.recovery) {
     // Surfaced in About rather than as a dialog: a modal at launch would be a jarring first
     // impression for a problem the app has already recovered from.
@@ -695,6 +696,26 @@ export async function startApp(): Promise<AppShell> {
   })
   poller.start()
 
+  // The pet introduces itself, once, on a genuinely new install.
+  //
+  // Gated on `settings.firstRun` — "no settings file existed" — rather than on the analytics install
+  // id. Those differ for anyone upgrading into the analytics release: they mint an id for the first
+  // time but have had the pet for months, and being introduced to it would be strange.
+  //
+  // Sticky, so it waits to be acknowledged rather than passing by while someone is looking
+  // elsewhere. Dismissing it is also the first click on the pet, which teaches the interaction
+  // without a tutorial.
+  if (settings.firstRun) {
+    callouts.show({
+      sourceId: 'broadcast',
+      text: `Hi, I'm ${petMeta.displayName} — on duty! 👋`,
+      tone: 'info',
+      priority: 'normal',
+      sticky: true,
+      animation: 'waving',
+    })
+  }
+
   // Fire-and-forget: analytics must never delay the pet appearing, and every failure inside is
   // already swallowed and logged.
   void (async () => {
@@ -716,20 +737,12 @@ export async function startApp(): Promise<AppShell> {
     // first time. Without it they would all report as new installs on upgrade day.
     if (settings.firstRun) await analytics.capture('app_installed')
 
-    // Told, not buried. On-by-default is only defensible if the person is actually informed, and a
-    // paragraph in a README nobody opens does not count — so the pet says it itself, once, the first
-    // time it ever mints an id. Sticky, so it waits to be acknowledged rather than passing by while
-    // someone is looking elsewhere.
-    if (isNewInstall && settings.get().analyticsEnabled) {
-      callouts.show({
-        sourceId: 'broadcast',
-        text: 'I send anonymous usage stats. Turn it off in my right-click menu.',
-        tone: 'info',
-        priority: 'normal',
-        sticky: true,
-        animation: 'idle',
-      })
-    }
+    // No analytics notice in a bubble. The pet's first words are a greeting, and a consent-form
+    // sentence in the middle of one reads as an interruption rather than as courtesy.
+    //
+    // The disclosure is not gone, it has moved to where someone looks for it rather than where they
+    // cannot avoid it: the About dialog states the current setting on every open, the menu item
+    // shows it as a tick, and README / INSTALL / SECURITY / the site footer all describe it.
 
     await analytics.capture('app_launched', {
       migrated_install: isNewInstall && !settings.firstRun,
