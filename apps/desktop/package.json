@@ -1,6 +1,6 @@
 {
   "name": "@keycode/desktop",
-  "version": "1.14.6",
+  "version": "1.14.7",
   "private": true,
   "description": "Argos — Electron desktop companion",
   "license": "MIT",
