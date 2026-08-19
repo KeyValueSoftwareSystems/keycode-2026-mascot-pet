@@ -2,6 +2,15 @@
   "version": 1,
   "notifications": [
     {
+      "id": "good-eve-20260819T1244",
+      "text": "Good Eve :)",
+      "tone": "success",
+      "priority": "normal",
+      "animation": "jumping",
+      "startsAt": "2026-08-19T12:43:34Z",
+      "expiresAt": "2026-08-19T12:59:34Z"
+    },
+    {
       "id": "hey-everyone-this-is-a-test-notification-20260818T1222",
       "text": "Hey everyone. This is a test notification. ",
       "tone": "info",
