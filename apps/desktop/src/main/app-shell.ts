@@ -43,6 +43,7 @@ import {
 import type { SafeDefaults } from '../broadcast/manifest-schema.js'
 import { appendSeenId } from './settings-schema.js'
 import { createUpdateService, type UpdateService } from '../updates/update-service.js'
+import { createMacAutoUpdater } from '../updates/mac-auto-updater.js'
 import { createAnalytics, type AnalyticsService } from '../analytics/analytics-service.js'
 import { osName } from '../analytics/analytics-client.js'
 import { openExternalChecked } from './open-external.js'
@@ -587,6 +588,16 @@ export async function startApp(): Promise<AppShell> {
     },
   })
 
+  let installingUpdate = false
+  const macUpdater = createMacAutoUpdater({
+    packaged: app.isPackaged,
+    platform: process.platform,
+    arch: process.arch,
+    execPath: process.execPath,
+    log,
+    onDownloaded: () => updates?.onDownloaded(),
+  })
+
   updates = createUpdateService({
     currentVersion: app.getVersion(),
     log,
@@ -609,6 +620,9 @@ export async function startApp(): Promise<AppShell> {
       void analytics.capture('update_notes_opened', { latest_version: updateState.latestVersion })
       return openExternalChecked(url, { log })
     },
+    canApplyInPlace: macUpdater.canApply,
+    beginDownload: () => macUpdater.check(),
+    installAndRelaunch: (beforeQuitForUpdate) => macUpdater.install(beforeQuitForUpdate),
   })
 
   // ---------------------------------------------------------------------------------------
@@ -827,9 +841,12 @@ export async function startApp(): Promise<AppShell> {
     captureEvent: (event, properties) => analytics.capture(event, properties),
     flushAnalytics: () => analytics.flush(),
     checkForUpdates: () => {
-      // If an update is already known, the item opens its notes; otherwise it runs a real check.
-      if (updateState.state === 'available') {
-        updates?.openNotes()
+      // If an update is already known: Mac installs (or starts the download); other OSes open notes.
+      if (updateState.state === 'available' || updateState.state === 'ready') {
+        updates?.actOnKnownUpdate(async () => {
+          installingUpdate = true
+          await settings.flush()
+        })
         return
       }
       void updates?.checkNow()
@@ -1043,6 +1060,9 @@ export async function startApp(): Promise<AppShell> {
   // here and awaited by holding the quit until it settles.
   let quitting = false
   app.on('before-quit', (event) => {
+    // Squirrel.Mac applies the swap after a normal quit. preventDefault + app.exit(0) would
+    // kill the process and the new version would never launch.
+    if (installingUpdate) return
     if (quitting) return
     quitting = true
     event.preventDefault()

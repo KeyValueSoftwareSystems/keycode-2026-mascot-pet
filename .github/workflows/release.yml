@@ -385,6 +385,20 @@ jobs:
           with open(path, 'w') as f:
               json.dump(m, f, indent=2, ensure_ascii=False)
               f.write('\n')
+
+          # Squirrel.Mac JSON feeds. Packaged Mac clients fetch these and apply the zip in place.
+          repo = os.environ.get('GITHUB_REPOSITORY', 'KeyValueSoftwareSystems/keycode-2026-mascot-pet')
+          tag = tag if tag.startswith('v') else f'v{version}'
+          os.makedirs('site/updates', exist_ok=True)
+          for arch in ('arm64', 'x64'):
+              feed = collections.OrderedDict([
+                  ('url', f'https://github.com/{repo}/releases/download/{tag}/Argos-{version}-mac-{arch}.zip'),
+                  ('name', version),
+              ])
+              feed_path = f'site/updates/darwin-{arch}.json'
+              with open(feed_path, 'w') as f:
+                  json.dump(feed, f, indent=2, ensure_ascii=False)
+                  f.write('\n')
           print('announcing', version)
           PY
 
@@ -406,11 +420,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          if git diff --quiet -- site/manifest.json; then
+          if git diff --quiet -- site/manifest.json site/updates; then
             echo "release block unchanged; nothing to push"
             exit 0
           fi
-          git add site/manifest.json
+          git add site/manifest.json site/updates
           git commit -m "release: announce ${{ github.ref_name }}"
           git push origin main
 

@@ -18,7 +18,9 @@
  *   3. Windows NSIS and Linux AppImage would each need their own handling, for an install base of a
  *      handful of colleagues who can click a link.
  *
- * So: no new dependency, and the runtime dependency list stays at exactly `zod`.
+ * So: no electron-updater, and the runtime dependency list stays at exactly `zod`. Signed macOS
+ * builds now use Electron's built-in autoUpdater instead: download in the background, restart on
+ * click. Windows and Linux still open the download page.
  *
  * ---------------------------------------------------------------------------------------
  * One deliberate exception to "failure is silent".
@@ -55,6 +57,13 @@ export interface UpdateServiceDeps {
   onStateChange: (view: UpdateView) => void
   openReleaseNotes: (url: string | null) => boolean
   log?: (message: string, meta?: unknown) => void
+  /**
+   * Packaged macOS, not running from a DMG. When true, an available update downloads itself and
+   * "Restart to update" swaps the .app; the notes URL is not attached to the callout.
+   */
+  canApplyInPlace?: boolean
+  beginDownload?: () => void
+  installAndRelaunch?: (beforeQuitForUpdate: () => Promise<void>) => boolean
 }
 
 export interface UpdateService {
@@ -64,6 +73,9 @@ export interface UpdateService {
   checkNow(): Promise<void>
   /** Open the notes for the currently known release. */
   openNotes(): boolean
+  /** Menu click while an update is known: install on Mac, otherwise open notes. */
+  actOnKnownUpdate(beforeQuitForUpdate: () => Promise<void>): void
+  onDownloaded(): void
   view(): UpdateView
 }
 
@@ -90,7 +102,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
   return {
     onReleaseFromPoll(release: SafeRelease | null): void {
       if (!release) {
-        if (state !== 'available') setState('current')
+        if (state !== 'available' && state !== 'ready') setState('current')
         return
       }
 
@@ -105,10 +117,15 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
       latestVersion = release.latestVersion
 
+      if (state === 'ready' && deps.getLastKnownRelease() === release.latestVersion) {
+        return
+      }
+
       // Announce once per *version*, not once per install — deliberately different from broadcast
       // dedupe, because a further version must be able to announce again.
       const alreadyAnnounced = deps.getLastKnownRelease() === release.latestVersion
       setState('available')
+      deps.beginDownload?.()
 
       if (alreadyAnnounced) {
         log('update already announced', { version: release.latestVersion })
@@ -126,7 +143,8 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
         priority: release.mandatory ? 'high' : 'normal',
         ...(release.mandatory ? { pin: true, sticky: true } : {}),
         animation: 'jumping',
-        ...(release.notesUrl ? { url: release.notesUrl } : {}),
+        // On Mac the bubble must not open the download page; restart is the menu item.
+        ...(!deps.canApplyInPlace && release.notesUrl ? { url: release.notesUrl } : {}),
       })
 
       log('update available', { version: release.latestVersion, mandatory: release.mandatory })
@@ -149,9 +167,9 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
         }
 
         if (latestVersion && isNewer(latestVersion, deps.currentVersion)) {
-          setState('available')
+          if (state !== 'ready') setState('available')
           // Only speak up if this is news; the callout already fired if it was.
-          if (latestVersion === before) {
+          if (latestVersion === before && state !== 'ready') {
             deps.showToast({ text: `Version ${latestVersion} is available`, tone: 'success' })
           }
           return
@@ -166,6 +184,23 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
     openNotes(): boolean {
       return deps.openReleaseNotes(notesUrl)
+    },
+
+    actOnKnownUpdate(beforeQuitForUpdate): void {
+      if (state !== 'available' && state !== 'ready') return
+      if (deps.canApplyInPlace && deps.installAndRelaunch) {
+        if (deps.installAndRelaunch(beforeQuitForUpdate)) return
+        deps.beginDownload?.()
+        deps.showToast({ text: 'Downloading the update…', tone: 'info' })
+        return
+      }
+      deps.openReleaseNotes(notesUrl)
+    },
+
+    onDownloaded(): void {
+      if (!latestVersion) return
+      setState('ready')
+      deps.showToast({ text: 'Restart to update', tone: 'success' })
     },
 
     view,

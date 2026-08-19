@@ -238,11 +238,24 @@ describe('general', () => {
       'https://keyvaluesoftwaresystems.github.io/keycode-2026-mascot-pet/'
     const yml = readFileSync(resolve(REPO, '.github/workflows/release.yml'), 'utf8')
     const manifest = JSON.parse(readFileSync(resolve(REPO, 'site/manifest.json'), 'utf8')) as {
-      release?: { notesUrl?: string }
+      release?: { notesUrl?: string; latestVersion?: string }
     }
     expect(yml).toContain(downloadPage)
     expect(yml).not.toMatch(/releases\/tag\//)
     expect(manifest.release?.notesUrl).toBe(downloadPage)
+
+    const version = manifest.release?.latestVersion
+    expect(version).toBeTruthy()
+    for (const arch of ['arm64', 'x64'] as const) {
+      const feed = JSON.parse(
+        readFileSync(resolve(REPO, `site/updates/darwin-${arch}.json`), 'utf8'),
+      ) as { url: string; name: string }
+      expect(feed.name).toBe(version)
+      expect(feed.url).toBe(
+        `https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/download/v${version}/Argos-${version}-mac-${arch}.zip`,
+      )
+    }
+    expect(yml).toContain('site/updates/darwin-')
   })
 
   it('has a stable app id', () => {

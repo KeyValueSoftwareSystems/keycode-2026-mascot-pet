@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { isNewer, parseVersion, SEMVER_CORE } from '../../apps/desktop/src/updates/version-compare.js'
 import { createUpdateService } from '../../apps/desktop/src/updates/update-service.js'
+import { canApplyMacUpdate, macUpdateFeedUrl } from '../../apps/desktop/src/updates/mac-update-feed.js'
+import { DEFAULT_MAC_UPDATE_FEED_URL } from '../../apps/desktop/src/config/constants.js'
 import type { SafeRelease } from '../../apps/desktop/src/broadcast/manifest-schema.js'
 import type { PollOutcome } from '../../apps/desktop/src/broadcast/broadcast-poller.js'
 
@@ -57,6 +59,32 @@ describe('version comparison', () => {
   })
 })
 
+describe('mac update feed', () => {
+  it('is only for a packaged Mac not running from a disk image', () => {
+    expect(
+      canApplyMacUpdate({ packaged: true, platform: 'darwin', execPath: '/Applications/Argos.app/Contents/MacOS/Argos' }),
+    ).toBe(true)
+    expect(
+      canApplyMacUpdate({ packaged: false, platform: 'darwin', execPath: '/Applications/Argos.app/Contents/MacOS/Argos' }),
+    ).toBe(false)
+    expect(
+      canApplyMacUpdate({ packaged: true, platform: 'win32', execPath: 'C\\\\Argos.exe' }),
+    ).toBe(false)
+    expect(
+      canApplyMacUpdate({
+        packaged: true,
+        platform: 'darwin',
+        execPath: '/Volumes/Argos 1.14.3/Argos.app/Contents/MacOS/Argos',
+      }),
+    ).toBe(false)
+  })
+
+  it('picks the Pages feed for the architecture', () => {
+    expect(macUpdateFeedUrl({ arch: 'arm64' })).toBe(DEFAULT_MAC_UPDATE_FEED_URL.arm64)
+    expect(macUpdateFeedUrl({ arch: 'x64' })).toBe(DEFAULT_MAC_UPDATE_FEED_URL.x64)
+  })
+})
+
 // ---------------------------------------------------------------------------------------
 // Update service
 // ---------------------------------------------------------------------------------------
@@ -75,6 +103,8 @@ function harness(
     currentVersion?: string
     lastKnownRelease?: string | null
     pollOutcome?: PollOutcome
+    canApplyInPlace?: boolean
+    installReturns?: boolean
   } = {},
 ) {
   let lastKnown = options.lastKnownRelease ?? null
@@ -82,6 +112,8 @@ function harness(
   const toasts: Array<{ text: string; tone: string }> = []
   const states: string[] = []
   const opened: Array<string | null> = []
+  const downloads: boolean[] = []
+  const installs: Array<() => Promise<void>> = []
 
   const service = createUpdateService({
     currentVersion: options.currentVersion ?? '0.5.0',
@@ -97,6 +129,12 @@ function harness(
       opened.push(url)
       return url !== null
     },
+    canApplyInPlace: options.canApplyInPlace,
+    beginDownload: () => downloads.push(true),
+    installAndRelaunch: (before) => {
+      installs.push(before)
+      return options.installReturns ?? false
+    },
   })
 
   return {
@@ -105,6 +143,8 @@ function harness(
     toasts,
     states,
     opened,
+    downloads,
+    installs,
     get lastKnown() {
       return lastKnown
     },
@@ -231,5 +271,41 @@ describe('update service', () => {
   it('reports failure when there is no notes URL to open', () => {
     const h = harness()
     expect(h.service.openNotes()).toBe(false)
+  })
+
+  it('opens notes when the user acts on an available update', () => {
+    const h = harness()
+    h.service.onReleaseFromPoll(release())
+    h.service.actOnKnownUpdate(async () => {})
+    expect(h.opened).toEqual(['https://example.com/releases'])
+    expect(h.installs).toEqual([])
+  })
+
+  it('omits the callout URL and starts a download when the app can apply in place', () => {
+    const h = harness({ canApplyInPlace: true })
+    h.service.onReleaseFromPoll(release())
+    expect(h.callouts[0]).not.toHaveProperty('url')
+    expect(h.downloads).toHaveLength(1)
+    h.service.actOnKnownUpdate(async () => {})
+    expect(h.opened).toEqual([])
+    expect(h.toasts.at(-1)).toEqual({ text: 'Downloading the update…', tone: 'info' })
+  })
+
+  it('restarts once the download is ready', () => {
+    const h = harness({ canApplyInPlace: true, installReturns: true })
+    h.service.onReleaseFromPoll(release())
+    h.service.onDownloaded()
+    expect(h.service.view().state).toBe('ready')
+    h.service.actOnKnownUpdate(async () => {})
+    expect(h.installs).toHaveLength(1)
+    expect(h.opened).toEqual([])
+  })
+
+  it('keeps ready across a poll of the same version', () => {
+    const h = harness({ canApplyInPlace: true })
+    h.service.onReleaseFromPoll(release())
+    h.service.onDownloaded()
+    h.service.onReleaseFromPoll(release())
+    expect(h.service.view().state).toBe('ready')
   })
 })
