@@ -579,7 +579,7 @@ describe('hover', () => {
     expect(state.animation === 'idle' || state.animation === 'idle-left').toBe(true)
   })
 
-  it('wakes on a click instead of panicking, while lying down', () => {
+  it('starts dragging from sleep, so a sleeping pet can be repositioned', () => {
     let state = initialState({ seed: 24, x: 700, now: 0, movementEnabled: false })
     let now = 0
     while (state.animation !== 'sleep' && now < 30_000) {
@@ -593,9 +593,8 @@ describe('hover', () => {
       settings: { movementEnabled: false },
       pending: [{ kind: 'drag-start' }],
     })
-    expect(state.dragging).toBe(false)
-    expect(state.animation).toBe('sleep-exit')
-    expect(state.animation).not.toBe('panic')
+    expect(state.dragging).toBe(true)
+    expect(state.animation).toBe('panic')
   })
 
   it('does not put a sleeping pet back to sleep when a reminder bubble hides the hover menu', () => {

@@ -141,25 +141,6 @@ function applyTrigger(state: MotionState, trigger: MotionTrigger, input: MotionI
     }
 
     case 'drag-start': {
-      const lying =
-        state.animation === config.sleepAnimation ||
-        state.animation === config.sleepEnterAnimation
-      const waking = state.animation === config.sleepExitAnimation
-      if (lying) {
-        return {
-          ...adopt(
-            state,
-            planAct(state.rngSeed, input.now, state.facing, config.sleepExitAnimation, {
-              playful: true,
-            }),
-          ),
-          dragging: false,
-          hovering: true,
-        }
-      }
-      if (waking) {
-        return { ...state, dragging: false, hovering: true }
-      }
       const choice = planAct(state.rngSeed, input.now, state.facing, config.dragAnimation, {
         // Held for as long as the drag lasts; drag-end replaces it.
         holdMs: Number.MAX_SAFE_INTEGER,

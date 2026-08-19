@@ -184,11 +184,8 @@ export async function startApp(): Promise<AppShell> {
   const syncHoverMenu = (): void => {
     const animation = controller?.animation()
     const freeze = pointerOverPet && !callouts?.showing()
-    const waking =
-      animation === 'sleep' || animation === 'sleep-enter' || animation === 'sleep-exit'
     const hideZap =
       petDragging ||
-      waking ||
       animation === 'electrocute' ||
       animation === 'panic'
     const showZap = freeze && !hoverNeedsReenter && !settingsMenuOpen && !hideZap
@@ -273,20 +270,6 @@ export async function startApp(): Promise<AppShell> {
         menu.popupOverPet()
       },
       onDragStart(): void {
-        const animation = controller?.animation()
-        if (
-          animation === 'sleep' ||
-          animation === 'sleep-enter' ||
-          animation === 'sleep-exit'
-        ) {
-          // A click on a sleeper is a nudge, not a pickup.
-          if (!hoverFrozen) {
-            hoverFrozen = true
-            controller?.enqueue({ kind: 'hover-start' })
-          }
-          controller?.tickNow()
-          return
-        }
         // Counted, not captured. Folded into the next heartbeat as one number — a pet dragged
         // across the screen thirty times in an afternoon is one fact, not thirty events.
         petInteractions += 1
