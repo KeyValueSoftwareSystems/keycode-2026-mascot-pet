@@ -42,7 +42,7 @@
     "@types/node": "^26.1.2",
     "electron": "^42.8.0",
     "electron-builder": "^26.10.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
   }
