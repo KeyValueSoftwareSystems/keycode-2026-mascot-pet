@@ -165,7 +165,9 @@
         </p>
 
         <div class="dl">
-          <a class="btn primary" id="dl-primary" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/download/v1.12.3/Argos-1.12.3-mac-arm64.dmg">Download Argos for Mac</a>
+          <a class="btn primary" id="dl-primary" href="https://github.com/KeyValueSoftwareSystems/keycode-2026-mascot-pet/releases/download/v1.15.0/Argos-1.15.0-mac-arm64.dmg">Download Argos for Mac</a>
+          <!-- Linux visitors only: the .deb alongside the AppImage. Hidden for everyone else. -->
+          <a class="btn" id="dl-secondary" hidden></a>
           <p class="dl-meta" id="dl-cap">For your computer</p>
           <p class="dl-meta" id="dl-others" hidden></p>
           <p class="dl-meta">
@@ -356,7 +358,8 @@
         var primary = document.getElementById('dl-primary')
         var cap = document.getElementById('dl-cap')
         var others = document.getElementById('dl-others')
-        if (!primary || !cap || !others) return
+        var secondary = document.getElementById('dl-secondary')
+        if (!primary || !cap || !others || !secondary) return
 
         var ua = navigator.userAgent || ''
         var platform = navigator.platform || ''
@@ -386,7 +389,17 @@
             'mac-arm': { href: href('Argos-' + version + '-mac-arm64.dmg'), label: 'Download Argos for Mac', platform: 'For macOS (Apple Silicon)' },
             'mac-intel': { href: href('Argos-' + version + '-mac-x64.dmg'), label: 'Download Argos for Mac', platform: 'For macOS (Intel)' },
             win: { href: href('Argos-' + version + '-win-x64.exe'), label: 'Download Argos for Windows', platform: 'For Windows' },
-            linux: { href: href('Argos-' + version + '-linux-x86_64.AppImage'), label: 'Download Argos for Linux', platform: 'For Linux' },
+            // Two Linux builds are surfaced, with the .deb leading: it is the better install on
+            // Debian and Ubuntu — menu entry, icon, `apt remove` — where the AppImage needs a
+            // `chmod +x` and integrates with nothing.
+            //
+            // A browser cannot tell one distribution from another, so this is a bet on the audience
+            // rather than a detection. The AppImage is offered as a second button for exactly that
+            // reason: it runs on any distribution, so nobody who is not on Debian or Ubuntu is left
+            // with a file their system cannot open. The .rpm and .tar.gz builds are still published
+            // on the Releases page.
+            linux: { href: href('Argos-' + version + '-linux-x86_64.AppImage'), label: 'Download Argos for Linux', platform: 'For Linux (AppImage)' },
+            'linux-deb': { href: href('Argos-' + version + '-linux-amd64.deb'), label: 'Download Argos for Linux', platform: 'For Linux (Deb)' },
           }
         }
 
@@ -395,9 +408,13 @@
             { id: 'mac-arm', label: 'Mac (Apple Silicon)' },
             { id: 'mac-intel', label: 'Mac (Intel)' },
             { id: 'win', label: 'Windows' },
-            { id: 'linux', label: 'Linux' },
+            { id: 'linux-deb', label: 'Linux (Deb)' },
+            { id: 'linux', label: 'Linux (AppImage)' },
           ]
-          return order.filter(function (item) { return item.id !== id })
+          // A Linux visitor already has both builds as buttons, so neither belongs in this line as
+          // well — otherwise the same download is offered twice, two inches apart.
+          var hide = id === 'linux-deb' || id === 'linux' ? ['linux', 'linux-deb'] : [id]
+          return order.filter(function (item) { return hide.indexOf(item.id) === -1 })
             .map(function (item) { return { id: item.id, href: all[item.id].href, label: item.label } })
         }
 
@@ -428,6 +445,20 @@
           primary.onclick = function () {
             trackDownload(id, id, version)
           }
+
+          // On Linux, offer both builds as buttons rather than making people hunt for the .deb in
+          // the "Other platforms" line.
+          if (id === 'linux-deb') {
+            secondary.textContent = 'Download the AppImage instead'
+            secondary.href = all['linux'].href
+            secondary.onclick = function () {
+              trackDownload('linux', id, version)
+            }
+            secondary.hidden = false
+          } else {
+            secondary.hidden = true
+          }
+
           others.replaceChildren()
           others.appendChild(document.createTextNode('Other platforms: '))
           otherLinks(id, all).forEach(function (item, i) {
@@ -464,7 +495,7 @@
         function guessId(arch) {
           if (isMac()) return arch === 'intel' ? 'mac-intel' : 'mac-arm'
           if (isWin()) return 'win'
-          if (isLinux()) return 'linux'
+          if (isLinux()) return 'linux-deb'
           return 'mac-arm'
         }
 
