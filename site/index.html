@@ -36,6 +36,16 @@
         }
       }
       * { box-sizing: border-box; }
+      /*
+       * The `hidden` attribute only hides an element via a UA-stylesheet `display: none`, which any
+       * author rule setting `display` silently beats. `.btn` sets `display: inline-flex`, so a
+       * hidden button stayed on the page as an empty 55x31 box for every non-Linux visitor.
+       *
+       * Declared once, globally, rather than as `.btn[hidden]`: the next element given `hidden` will
+       * have the same problem the moment it also has a `display`, and that is not a bug worth
+       * discovering twice.
+       */
+      [hidden] { display: none !important; }
       html { scroll-behavior: smooth; }
       body {
         margin: 0;
