@@ -2,6 +2,15 @@
   "version": 1,
   "notifications": [
     {
+      "id": "hello-20260820T0553",
+      "text": "Hello....",
+      "tone": "success",
+      "priority": "normal",
+      "animation": "review",
+      "startsAt": "2026-08-20T05:52:32Z",
+      "expiresAt": "2026-08-20T05:58:32Z"
+    },
+    {
       "id": "test-20260820T0528",
       "text": "Test",
       "tone": "error",
