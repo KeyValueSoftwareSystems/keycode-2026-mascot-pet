@@ -1,6 +1,16 @@
 {
   "version": 1,
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "thanks-for-installing-20260820T1027",
+      "text": "Thanks for installing! 😄",
+      "tone": "info",
+      "priority": "normal",
+      "animation": "waving",
+      "startsAt": "2026-08-20T10:26:30Z",
+      "expiresAt": "2026-08-21T10:27:30Z"
+    }
+  ],
   "defaults": {
     "waterMinutes": 5,
     "stretchMinutes": 15,
