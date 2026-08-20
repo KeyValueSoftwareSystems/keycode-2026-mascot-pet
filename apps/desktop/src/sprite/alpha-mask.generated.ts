@@ -177,5 +177,5 @@ export const ALPHA_MASK: AlphaMaskData = {
     shapeRectsArea: 21648,
     maskArea: 21648,
   },
-  sourceSha256: 'd641ab703b3803d00ac3ffea199ebf35282a6b3acf09f37c9a0cebae4c508054',
+  sourceSha256: '507f31173ef712a872275f70d6808334e28e92bc97817c5890faaa9748b77b1d',
 }
