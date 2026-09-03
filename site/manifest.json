@@ -2,13 +2,13 @@
   "version": 1,
   "notifications": [
     {
-      "id": "thanks-for-installing-20260820T1027",
-      "text": "Thanks for installing! 😄",
+      "id": "team-registration-closes-soon-3rd-sept-20260903T0523",
+      "text": "Team Registration closes soon. 3rd Sept!",
       "tone": "info",
-      "priority": "normal",
+      "priority": "high",
       "animation": "waving",
-      "startsAt": "2026-08-20T10:26:30Z",
-      "expiresAt": "2026-08-21T10:27:30Z"
+      "startsAt": "2026-09-03T05:22:03Z",
+      "expiresAt": "2026-09-04T05:23:03Z"
     }
   ],
   "defaults": {
