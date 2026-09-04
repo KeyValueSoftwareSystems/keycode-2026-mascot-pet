@@ -73,6 +73,13 @@ export interface PetWindow {
    */
   bubbleBand(): { y: number; side: BubbleSide; visible: boolean }
   /**
+   * Whether a status crown is on the pet's head right now.
+   *
+   * The harness needs it because the crown legitimately paints outside the character, in the
+   * ring A2 otherwise requires to be fully transparent.
+   */
+  crownVisible(): boolean
+  /**
    * Change the pet's size.
    *
    * Resizes the window and re-derives the placement, then keeps the pet where it was: the body's
@@ -191,6 +198,8 @@ export async function createPetWindow(options: {
   let lastOverlayVisible = false
   /** Whether the hover quick-action menu is up. Drives the shape region on Linux. */
   let lastQuickMenuVisible = false
+  /** The crown on the last frame, for the harness. 'none' means bare-headed. */
+  let lastClaudeState: PetFrame['claudeState'] = 'none'
 
   /**
    * The Linux input-and-drawing region for what is currently on screen.
@@ -340,6 +349,7 @@ export async function createPetWindow(options: {
       lastAnimation = parsed.data.animation
       lastBubbleVisible = parsed.data.bubble !== null
       lastOverlayVisible = frameNeedsCellRegion(parsed.data)
+      lastClaudeState = parsed.data.claudeState
       lastQuickMenuVisible = parsed.data.quickActions.length > 0
       win.webContents.send(IPC.frame, parsed.data)
       forwarding.setForceInteractive(
@@ -371,6 +381,10 @@ export async function createPetWindow(options: {
     spriteRect(): Rectangle {
       const bounds = win.isDestroyed() ? { x, y } : win.getBounds()
       return spriteScreenRect(ALPHA_MASK, bounds, placement.spriteOrigin, placement.scale) as Rectangle
+    },
+
+    crownVisible(): boolean {
+      return lastClaudeState !== 'none'
     },
 
     bubbleBand(): { y: number; side: BubbleSide; visible: boolean } {

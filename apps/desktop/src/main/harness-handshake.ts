@@ -67,6 +67,14 @@ export type HandshakeEvent =
       /** Whether a bubble was actually on screen for this capture. Pet window only. */
       bubbleVisible?: boolean
       /**
+       * Whether the pet was wearing a status crown for this capture. Pet window only.
+       *
+       * The crown floats above the head, so it paints in the ring A2 requires to be
+       * transparent. A2 is about the *window* being see-through; app-painted content there is
+       * not the bug it is looking for.
+       */
+      crownVisible?: boolean
+      /**
        * Whether the pet is sitting on the floor. False means it has been freely placed, in which
        * case asserting feet-on-floor would fail on correct behaviour.
        */
@@ -91,6 +99,7 @@ export type HandshakeEvent =
       bubbleEdgeY?: number
       bubbleSide?: 'above' | 'below'
       bubbleVisible?: boolean
+      crownVisible?: boolean
     }
   | { ev: 'error'; where: string; message: string }
 

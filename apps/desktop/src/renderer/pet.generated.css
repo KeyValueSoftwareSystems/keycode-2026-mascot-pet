@@ -300,45 +300,67 @@
   animation: kp-waving-1 2700ms steps(18, jump-none) 1 forwards;
 }
 
-/* The status cap rides the same clock as the sprite; see buildCapCss. */
-#claude-cap {
+/* The status crown. Size, art and clock are all generated; see buildCrownCss. */
+#claude-crown {
+  width: calc(28px * var(--pet-scale, 1));
+  height: calc(22px * var(--pet-scale, 1));
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  /* Same reason as the sprite: without it the browser smooths the pixel art into mush. */
+  image-rendering: pixelated;
+  /* Composes with the `translate` the keyframes animate. That puts the anchor on the head;
+     this centres the crown on it and lifts it clear by 4px of daylight. */
+  transform: translate(-50%, calc(-100% - 4px * var(--pet-scale, 1)));
   animation-timing-function: step-end;
 }
 
-@keyframes kp-cap-drink-0 {
-  0% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  9.0909% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  18.1818% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  27.2727% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  36.3636% { translate: calc(92px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  45.4545% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  54.5455% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  63.6364% { translate: calc(96px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  72.7273% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  81.8182% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  90.9091% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+html[data-claude-state="waiting"] #claude-crown {
+  display: block;
+  background-image: url('./crown-waiting.png');
 }
-@keyframes kp-cap-drink-1 {
-  0% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  9.0909% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  18.1818% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  27.2727% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  36.3636% { translate: calc(92px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  45.4545% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  54.5455% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  63.6364% { translate: calc(96px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  72.7273% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  81.8182% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
-  90.9091% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+html[data-claude-state="running"] #claude-crown {
+  display: block;
+  background-image: url('./crown-running.png');
 }
-html[data-pet-state="drink"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-drink-0 2200ms step-end 2 forwards;
-}
-html[data-pet-state="drink"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-drink-1 2200ms step-end 2 forwards;
+html[data-claude-state="idle"] #claude-crown {
+  display: block;
+  background-image: url('./crown-idle.png');
 }
 
-@keyframes kp-cap-electrocute-0 {
+@keyframes kp-crown-drink-0 {
+  0% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  9.0909% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  18.1818% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  27.2727% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  36.3636% { translate: calc(92px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  45.4545% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  54.5455% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  63.6364% { translate: calc(96px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  72.7273% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  81.8182% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  90.9091% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+}
+@keyframes kp-crown-drink-1 {
+  0% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  9.0909% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  18.1818% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  27.2727% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  36.3636% { translate: calc(92px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  45.4545% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  54.5455% { translate: calc(90px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  63.6364% { translate: calc(96px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  72.7273% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  81.8182% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+  90.9091% { translate: calc(104px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
+}
+html[data-pet-state="drink"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-drink-0 2200ms step-end 2 forwards;
+}
+html[data-pet-state="drink"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-drink-1 2200ms step-end 2 forwards;
+}
+
+@keyframes kp-crown-electrocute-0 {
   0% { translate: calc(106px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   4.7619% { translate: calc(98px * var(--pet-scale, 1)) calc(48px * var(--pet-scale, 1)); }
   9.5238% { translate: calc(85px * var(--pet-scale, 1)) calc(46px * var(--pet-scale, 1)); }
@@ -361,7 +383,7 @@ html[data-pet-state="drink"][data-pet-nonce="1"] #claude-cap {
   90.4762% { translate: calc(110px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   95.2381% { translate: calc(110px * var(--pet-scale, 1)) calc(48px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-electrocute-1 {
+@keyframes kp-crown-electrocute-1 {
   0% { translate: calc(106px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   4.7619% { translate: calc(98px * var(--pet-scale, 1)) calc(48px * var(--pet-scale, 1)); }
   9.5238% { translate: calc(85px * var(--pet-scale, 1)) calc(46px * var(--pet-scale, 1)); }
@@ -384,59 +406,59 @@ html[data-pet-state="drink"][data-pet-nonce="1"] #claude-cap {
   90.4762% { translate: calc(110px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   95.2381% { translate: calc(110px * var(--pet-scale, 1)) calc(48px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="electrocute"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-electrocute-0 2100ms step-end 1 forwards;
+html[data-pet-state="electrocute"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-electrocute-0 2100ms step-end 1 forwards;
 }
-html[data-pet-state="electrocute"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-electrocute-1 2100ms step-end 1 forwards;
-}
-
-@keyframes kp-cap-failed-0 {
-  0% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  50% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
-}
-@keyframes kp-cap-failed-1 {
-  0% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
-  50% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
-}
-html[data-pet-state="failed"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-failed-0 1220ms step-end 2 forwards;
-}
-html[data-pet-state="failed"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-failed-1 1220ms step-end 2 forwards;
+html[data-pet-state="electrocute"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-electrocute-1 2100ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-idle-0 {
+@keyframes kp-crown-failed-0 {
   0% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   50% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-idle-1 {
+@keyframes kp-crown-failed-1 {
   0% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   50% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="idle"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-idle-0 2000ms step-end infinite forwards;
+html[data-pet-state="failed"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-failed-0 1220ms step-end 2 forwards;
 }
-html[data-pet-state="idle"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-idle-1 2000ms step-end infinite forwards;
+html[data-pet-state="failed"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-failed-1 1220ms step-end 2 forwards;
 }
 
-@keyframes kp-cap-idle-left-0 {
+@keyframes kp-crown-idle-0 {
+  0% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  50% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
+}
+@keyframes kp-crown-idle-1 {
+  0% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
+  50% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
+}
+html[data-pet-state="idle"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-idle-0 2000ms step-end infinite forwards;
+}
+html[data-pet-state="idle"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-idle-1 2000ms step-end infinite forwards;
+}
+
+@keyframes kp-crown-idle-left-0 {
   0% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   50% { translate: calc(84px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-idle-left-1 {
+@keyframes kp-crown-idle-left-1 {
   0% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   50% { translate: calc(84px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="idle-left"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-idle-left-0 2000ms step-end infinite forwards;
+html[data-pet-state="idle-left"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-idle-left-0 2000ms step-end infinite forwards;
 }
-html[data-pet-state="idle-left"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-idle-left-1 2000ms step-end infinite forwards;
+html[data-pet-state="idle-left"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-idle-left-1 2000ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-jumping-0 {
+@keyframes kp-crown-jumping-0 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -457,7 +479,7 @@ html[data-pet-state="idle-left"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-jumping-1 {
+@keyframes kp-crown-jumping-1 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -478,14 +500,14 @@ html[data-pet-state="idle-left"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="jumping"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-jumping-0 4800ms step-end 1 forwards;
+html[data-pet-state="jumping"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-jumping-0 4800ms step-end 1 forwards;
 }
-html[data-pet-state="jumping"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-jumping-1 4800ms step-end 1 forwards;
+html[data-pet-state="jumping"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-jumping-1 4800ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-jumping-left-0 {
+@keyframes kp-crown-jumping-left-0 {
   0% { translate: calc(85px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(92px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -506,7 +528,7 @@ html[data-pet-state="jumping"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-jumping-left-1 {
+@keyframes kp-crown-jumping-left-1 {
   0% { translate: calc(85px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(92px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -527,14 +549,14 @@ html[data-pet-state="jumping"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(86px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="jumping-left"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-jumping-left-0 4800ms step-end 1 forwards;
+html[data-pet-state="jumping-left"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-jumping-left-0 4800ms step-end 1 forwards;
 }
-html[data-pet-state="jumping-left"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-jumping-left-1 4800ms step-end 1 forwards;
+html[data-pet-state="jumping-left"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-jumping-left-1 4800ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-jumping-right-0 {
+@keyframes kp-crown-jumping-right-0 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -555,7 +577,7 @@ html[data-pet-state="jumping-left"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-jumping-right-1 {
+@keyframes kp-crown-jumping-right-1 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -576,14 +598,14 @@ html[data-pet-state="jumping-left"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="jumping-right"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-jumping-right-0 4800ms step-end 1 forwards;
+html[data-pet-state="jumping-right"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-jumping-right-0 4800ms step-end 1 forwards;
 }
-html[data-pet-state="jumping-right"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-jumping-right-1 4800ms step-end 1 forwards;
+html[data-pet-state="jumping-right"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-jumping-right-1 4800ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-panic-0 {
+@keyframes kp-crown-panic-0 {
   0% { translate: calc(97px * var(--pet-scale, 1)) calc(47px * var(--pet-scale, 1)); }
   5% { translate: calc(97px * var(--pet-scale, 1)) calc(47px * var(--pet-scale, 1)); }
   10% { translate: calc(97px * var(--pet-scale, 1)) calc(47px * var(--pet-scale, 1)); }
@@ -605,7 +627,7 @@ html[data-pet-state="jumping-right"][data-pet-nonce="1"] #claude-cap {
   90% { translate: calc(97px * var(--pet-scale, 1)) calc(46px * var(--pet-scale, 1)); }
   95% { translate: calc(100px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-panic-1 {
+@keyframes kp-crown-panic-1 {
   0% { translate: calc(97px * var(--pet-scale, 1)) calc(47px * var(--pet-scale, 1)); }
   5% { translate: calc(97px * var(--pet-scale, 1)) calc(47px * var(--pet-scale, 1)); }
   10% { translate: calc(97px * var(--pet-scale, 1)) calc(47px * var(--pet-scale, 1)); }
@@ -627,14 +649,14 @@ html[data-pet-state="jumping-right"][data-pet-nonce="1"] #claude-cap {
   90% { translate: calc(97px * var(--pet-scale, 1)) calc(46px * var(--pet-scale, 1)); }
   95% { translate: calc(100px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="panic"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-panic-0 2400ms step-end infinite forwards;
+html[data-pet-state="panic"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-panic-0 2400ms step-end infinite forwards;
 }
-html[data-pet-state="panic"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-panic-1 2400ms step-end infinite forwards;
+html[data-pet-state="panic"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-panic-1 2400ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-review-0 {
+@keyframes kp-crown-review-0 {
   0% { translate: calc(106px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   4.7619% { translate: calc(109px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   9.5238% { translate: calc(109px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
@@ -657,7 +679,7 @@ html[data-pet-state="panic"][data-pet-nonce="1"] #claude-cap {
   90.4762% { translate: calc(107px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   95.2381% { translate: calc(106px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-review-1 {
+@keyframes kp-crown-review-1 {
   0% { translate: calc(106px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   4.7619% { translate: calc(109px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   9.5238% { translate: calc(109px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
@@ -680,14 +702,14 @@ html[data-pet-state="panic"][data-pet-nonce="1"] #claude-cap {
   90.4762% { translate: calc(107px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   95.2381% { translate: calc(106px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="review"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-review-0 4200ms step-end infinite forwards;
+html[data-pet-state="review"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-review-0 4200ms step-end infinite forwards;
 }
-html[data-pet-state="review"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-review-1 4200ms step-end infinite forwards;
+html[data-pet-state="review"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-review-1 4200ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-review-left-0 {
+@keyframes kp-crown-review-left-0 {
   0% { translate: calc(86px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   4.7619% { translate: calc(84px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   9.5238% { translate: calc(83px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
@@ -710,7 +732,7 @@ html[data-pet-state="review"][data-pet-nonce="1"] #claude-cap {
   90.4762% { translate: calc(85px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   95.2381% { translate: calc(86px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-review-left-1 {
+@keyframes kp-crown-review-left-1 {
   0% { translate: calc(86px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   4.7619% { translate: calc(84px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   9.5238% { translate: calc(83px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
@@ -733,14 +755,14 @@ html[data-pet-state="review"][data-pet-nonce="1"] #claude-cap {
   90.4762% { translate: calc(85px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
   95.2381% { translate: calc(86px * var(--pet-scale, 1)) calc(41px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="review-left"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-review-left-0 4200ms step-end infinite forwards;
+html[data-pet-state="review-left"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-review-left-0 4200ms step-end infinite forwards;
 }
-html[data-pet-state="review-left"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-review-left-1 4200ms step-end infinite forwards;
+html[data-pet-state="review-left"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-review-left-1 4200ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-running-0 {
+@keyframes kp-crown-running-0 {
   0% { translate: calc(109px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   16.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   33.3333% { translate: calc(109px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
@@ -748,7 +770,7 @@ html[data-pet-state="review-left"][data-pet-nonce="1"] #claude-cap {
   66.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   83.3333% { translate: calc(108px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-running-1 {
+@keyframes kp-crown-running-1 {
   0% { translate: calc(109px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   16.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   33.3333% { translate: calc(109px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
@@ -756,14 +778,14 @@ html[data-pet-state="review-left"][data-pet-nonce="1"] #claude-cap {
   66.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   83.3333% { translate: calc(108px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="running"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-running-0 1400ms step-end infinite forwards;
+html[data-pet-state="running"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-running-0 1400ms step-end infinite forwards;
 }
-html[data-pet-state="running"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-running-1 1400ms step-end infinite forwards;
+html[data-pet-state="running"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-running-1 1400ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-running-left-0 {
+@keyframes kp-crown-running-left-0 {
   0% { translate: calc(82px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   16.6667% { translate: calc(82px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   33.3333% { translate: calc(83px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
@@ -771,7 +793,7 @@ html[data-pet-state="running"][data-pet-nonce="1"] #claude-cap {
   66.6667% { translate: calc(83px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   83.3333% { translate: calc(83px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-running-left-1 {
+@keyframes kp-crown-running-left-1 {
   0% { translate: calc(82px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   16.6667% { translate: calc(82px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   33.3333% { translate: calc(83px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
@@ -779,14 +801,14 @@ html[data-pet-state="running"][data-pet-nonce="1"] #claude-cap {
   66.6667% { translate: calc(83px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   83.3333% { translate: calc(83px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="running-left"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-running-left-0 1400ms step-end infinite forwards;
+html[data-pet-state="running-left"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-running-left-0 1400ms step-end infinite forwards;
 }
-html[data-pet-state="running-left"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-running-left-1 1400ms step-end infinite forwards;
+html[data-pet-state="running-left"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-running-left-1 1400ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-running-right-0 {
+@keyframes kp-crown-running-right-0 {
   0% { translate: calc(109px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   16.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   33.3333% { translate: calc(109px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
@@ -794,7 +816,7 @@ html[data-pet-state="running-left"][data-pet-nonce="1"] #claude-cap {
   66.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   83.3333% { translate: calc(108px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-running-right-1 {
+@keyframes kp-crown-running-right-1 {
   0% { translate: calc(109px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   16.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(45px * var(--pet-scale, 1)); }
   33.3333% { translate: calc(109px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
@@ -802,14 +824,14 @@ html[data-pet-state="running-left"][data-pet-nonce="1"] #claude-cap {
   66.6667% { translate: calc(109px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   83.3333% { translate: calc(108px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="running-right"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-running-right-0 1400ms step-end infinite forwards;
+html[data-pet-state="running-right"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-running-right-0 1400ms step-end infinite forwards;
 }
-html[data-pet-state="running-right"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-running-right-1 1400ms step-end infinite forwards;
+html[data-pet-state="running-right"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-running-right-1 1400ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-sleep-0 {
+@keyframes kp-crown-sleep-0 {
   0% { translate: calc(121px * var(--pet-scale, 1)) calc(128px * var(--pet-scale, 1)); }
   10% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
   20% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
@@ -821,7 +843,7 @@ html[data-pet-state="running-right"][data-pet-nonce="1"] #claude-cap {
   80% { translate: calc(121px * var(--pet-scale, 1)) calc(128px * var(--pet-scale, 1)); }
   90% { translate: calc(121px * var(--pet-scale, 1)) calc(128px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-sleep-1 {
+@keyframes kp-crown-sleep-1 {
   0% { translate: calc(121px * var(--pet-scale, 1)) calc(128px * var(--pet-scale, 1)); }
   10% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
   20% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
@@ -833,14 +855,14 @@ html[data-pet-state="running-right"][data-pet-nonce="1"] #claude-cap {
   80% { translate: calc(121px * var(--pet-scale, 1)) calc(128px * var(--pet-scale, 1)); }
   90% { translate: calc(121px * var(--pet-scale, 1)) calc(128px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="sleep"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-sleep-0 4000ms step-end infinite forwards;
+html[data-pet-state="sleep"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-sleep-0 4000ms step-end infinite forwards;
 }
-html[data-pet-state="sleep"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-sleep-1 4000ms step-end infinite forwards;
+html[data-pet-state="sleep"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-sleep-1 4000ms step-end infinite forwards;
 }
 
-@keyframes kp-cap-sleep-enter-0 {
+@keyframes kp-crown-sleep-enter-0 {
   0% { translate: calc(108px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
   12.5% { translate: calc(96px * var(--pet-scale, 1)) calc(57px * var(--pet-scale, 1)); }
   25% { translate: calc(108px * var(--pet-scale, 1)) calc(87px * var(--pet-scale, 1)); }
@@ -850,7 +872,7 @@ html[data-pet-state="sleep"][data-pet-nonce="1"] #claude-cap {
   75% { translate: calc(121px * var(--pet-scale, 1)) calc(127px * var(--pet-scale, 1)); }
   87.5% { translate: calc(120px * var(--pet-scale, 1)) calc(127px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-sleep-enter-1 {
+@keyframes kp-crown-sleep-enter-1 {
   0% { translate: calc(108px * var(--pet-scale, 1)) calc(43px * var(--pet-scale, 1)); }
   12.5% { translate: calc(96px * var(--pet-scale, 1)) calc(57px * var(--pet-scale, 1)); }
   25% { translate: calc(108px * var(--pet-scale, 1)) calc(87px * var(--pet-scale, 1)); }
@@ -860,14 +882,14 @@ html[data-pet-state="sleep"][data-pet-nonce="1"] #claude-cap {
   75% { translate: calc(121px * var(--pet-scale, 1)) calc(127px * var(--pet-scale, 1)); }
   87.5% { translate: calc(120px * var(--pet-scale, 1)) calc(127px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="sleep-enter"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-sleep-enter-0 3200ms step-end 1 forwards;
+html[data-pet-state="sleep-enter"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-sleep-enter-0 3200ms step-end 1 forwards;
 }
-html[data-pet-state="sleep-enter"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-sleep-enter-1 3200ms step-end 1 forwards;
+html[data-pet-state="sleep-enter"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-sleep-enter-1 3200ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-sleep-exit-0 {
+@keyframes kp-crown-sleep-exit-0 {
   0% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
   14.2857% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
   28.5714% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
@@ -876,7 +898,7 @@ html[data-pet-state="sleep-enter"][data-pet-nonce="1"] #claude-cap {
   71.4286% { translate: calc(119px * var(--pet-scale, 1)) calc(100px * var(--pet-scale, 1)); }
   85.7143% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-sleep-exit-1 {
+@keyframes kp-crown-sleep-exit-1 {
   0% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
   14.2857% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
   28.5714% { translate: calc(121px * var(--pet-scale, 1)) calc(129px * var(--pet-scale, 1)); }
@@ -885,14 +907,14 @@ html[data-pet-state="sleep-enter"][data-pet-nonce="1"] #claude-cap {
   71.4286% { translate: calc(119px * var(--pet-scale, 1)) calc(100px * var(--pet-scale, 1)); }
   85.7143% { translate: calc(105px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="sleep-exit"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-sleep-exit-0 2800ms step-end 1 forwards;
+html[data-pet-state="sleep-exit"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-sleep-exit-0 2800ms step-end 1 forwards;
 }
-html[data-pet-state="sleep-exit"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-sleep-exit-1 2800ms step-end 1 forwards;
+html[data-pet-state="sleep-exit"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-sleep-exit-1 2800ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-stretch-0 {
+@keyframes kp-crown-stretch-0 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -913,7 +935,7 @@ html[data-pet-state="sleep-exit"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-stretch-1 {
+@keyframes kp-crown-stretch-1 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(44px * var(--pet-scale, 1)); }
   5.2632% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   10.5263% { translate: calc(100px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
@@ -934,14 +956,14 @@ html[data-pet-state="sleep-exit"][data-pet-nonce="1"] #claude-cap {
   89.4737% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
   94.7368% { translate: calc(106px * var(--pet-scale, 1)) calc(42px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="stretch"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-stretch-0 5600ms step-end 1 forwards;
+html[data-pet-state="stretch"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-stretch-0 5600ms step-end 1 forwards;
 }
-html[data-pet-state="stretch"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-stretch-1 5600ms step-end 1 forwards;
+html[data-pet-state="stretch"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-stretch-1 5600ms step-end 1 forwards;
 }
 
-@keyframes kp-cap-waving-0 {
+@keyframes kp-crown-waving-0 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   5.5556% { translate: calc(108px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   11.1111% { translate: calc(110px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
@@ -961,7 +983,7 @@ html[data-pet-state="stretch"][data-pet-nonce="1"] #claude-cap {
   88.8889% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   94.4444% { translate: calc(107px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-@keyframes kp-cap-waving-1 {
+@keyframes kp-crown-waving-1 {
   0% { translate: calc(107px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   5.5556% { translate: calc(108px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   11.1111% { translate: calc(110px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
@@ -981,9 +1003,9 @@ html[data-pet-state="stretch"][data-pet-nonce="1"] #claude-cap {
   88.8889% { translate: calc(109px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
   94.4444% { translate: calc(107px * var(--pet-scale, 1)) calc(49px * var(--pet-scale, 1)); }
 }
-html[data-pet-state="waving"][data-pet-nonce="0"] #claude-cap {
-  animation: kp-cap-waving-0 2700ms step-end 1 forwards;
+html[data-pet-state="waving"][data-pet-nonce="0"] #claude-crown {
+  animation: kp-crown-waving-0 2700ms step-end 1 forwards;
 }
-html[data-pet-state="waving"][data-pet-nonce="1"] #claude-cap {
-  animation: kp-cap-waving-1 2700ms step-end 1 forwards;
+html[data-pet-state="waving"][data-pet-nonce="1"] #claude-crown {
+  animation: kp-crown-waving-1 2700ms step-end 1 forwards;
 }

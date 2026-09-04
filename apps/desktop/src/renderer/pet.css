@@ -464,49 +464,22 @@ html[data-overlay='sleep-z'] #zzz {
 }
 
 /*
-  Claude Code status cap.
+  Claude Code status crown.
 
-  A plain square standing in for cap art, positioned exactly where the art will go so the
-  anchoring proven here is the anchoring the art inherits.
+  Placement is split in three, and each part lives where its facts live. Here: the crown is
+  parked on the sprite cell's corner, because only this file knows the cell exists. In
+  `pet.generated.css`: its size, its art and the gap above the head, because those come out of
+  `scripts/lib/crowns.mjs` and the art itself. Also generated: one keyframe stop per animation
+  frame, holding that frame's real head anchor.
 
-  Placement is split in two: this rule sizes the cap and parks it on the sprite cell's corner,
-  and `pet.generated.css` animates the `translate` property through one stop per animation frame,
-  holding each frame's real head anchor. That split is why the geometry stays generated — the
-  per-frame head positions come out of the art, and nothing here hardcodes one.
+  Anchoring to --body-top instead would pin the crown to a per-state constant, and the pet's
+  bounce is background-position stepping -- the sprite element never moves, so the crown would
+  hang in the air while the character bobs underneath it.
 */
-#claude-cap {
+#claude-crown {
   position: absolute;
-  /* The cell's corner is the origin; the generated per-frame keyframes translate from here.
-     Anchoring to --body-top instead would pin the cap to a per-state constant, and the pet's
-     bounce is background-position stepping — the sprite element never moves, so the cap would
-     hang in the air while the character bobs underneath it. */
   left: var(--sprite-x, 0px);
   top: var(--sprite-y, 0px);
-  width: calc(26px * var(--pet-scale, 1));
-  height: calc(13px * var(--pet-scale, 1));
-  /* Composes with the `translate` property the keyframes animate: that puts the anchor on the
-     head, this centres the cap on it and drops it far enough to sit on the hair. */
-  transform: translate(-50%, -20%);
   display: none;
   pointer-events: none;
-  border-radius: 3px;
-  /* A dark keyline so the square reads against light wallpaper as well as dark. */
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.5),
-    0 1px 3px rgba(0, 0, 0, 0.35);
-}
-
-html[data-claude-state='waiting'] #claude-cap {
-  display: block;
-  background: #e5484d;
-}
-
-html[data-claude-state='running'] #claude-cap {
-  display: block;
-  background: #f5a524;
-}
-
-html[data-claude-state='idle'] #claude-cap {
-  display: block;
-  background: #30a46c;
 }

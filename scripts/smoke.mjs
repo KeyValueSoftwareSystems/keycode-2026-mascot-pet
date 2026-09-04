@@ -889,20 +889,27 @@ async function assertPass(session, opts, name) {
     }
     const colours = assertNotBlank(png, region, 'A3 not-blank')
     const fill = assertSpritePainted(png, region, 'A1 sprite-painted')
-    const ring = assertWindowTransparentAround(
-      png,
-      region,
-      'A2 window-transparent',
-      Math.max(8, Math.round(24 * scale)),
-      // Gated on main reporting a bubble actually on screen — never on `--callout`, because a
-      // broadcast or a reminder raises one with no flag involved. Absent, the full ring is checked.
-      captured.bubbleVisible && captured.bubbleEdgeY !== undefined
-        ? {
-            edge: Math.round((captured.bubbleEdgeY - captured.bounds.y) * scale),
-            side: captured.bubbleSide ?? 'above',
-          }
-        : null,
-    )
+    // A2 asks whether the *window* is see-through. A status crown floats in the gap above the
+    // head, which is inside the ring, so it would fail an assertion it is not the subject of.
+    // Skipped rather than narrowed: the crown's exact band is per animation frame and lives in
+    // the generated stylesheet, so main cannot report a bound tight enough to be worth trusting.
+    // Gated on main reporting a crown actually worn, so ordinary runs still check the full ring.
+    const ring = captured.crownVisible
+      ? null
+      : assertWindowTransparentAround(
+          png,
+          region,
+          'A2 window-transparent',
+          Math.max(8, Math.round(24 * scale)),
+          // Gated on main reporting a bubble actually on screen — never on `--callout`, because a
+          // broadcast or a reminder raises one with no flag involved. Absent, the full ring is checked.
+          captured.bubbleVisible && captured.bubbleEdgeY !== undefined
+            ? {
+                edge: Math.round((captured.bubbleEdgeY - captured.bounds.y) * scale),
+                side: captured.bubbleSide ?? 'above',
+              }
+            : null,
+        )
     // `floorLocked` is absent on builds before free placement, where floor-locked was the only mode.
     const floorLocked = captured.floorLocked ?? true
     assertFeetOnFloor(spriteRect, pet.display, 'A4 feet-on-floor', floorLocked)
@@ -915,14 +922,16 @@ async function assertPass(session, opts, name) {
     )
     console.log(`  ✓ A1 sprite painted (${(fill * 100).toFixed(1)}% of the bbox has alpha)`)
     console.log(
-      `  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring` +
-        `${
-          captured.bubbleVisible
-            ? captured.bubbleSide === 'below'
-              ? ', down to the feet — a bubble is up below the pet'
-              : ', from the hair down — a bubble is up'
-            : ''
-        })`,
+      ring === null
+        ? '  · A2 skipped — a status crown is worn, and it paints in the ring by design'
+        : `  ✓ A2 window transparent around the sprite (${(ring * 100).toFixed(1)}% of ring` +
+          `${
+            captured.bubbleVisible
+              ? captured.bubbleSide === 'below'
+                ? ', down to the feet — a bubble is up below the pet'
+                : ', from the hair down — a bubble is up'
+              : ''
+          })`,
     )
     console.log(`  ✓ A3 image is not blank (${colours} distinct colours)`)
     console.log(

@@ -56,6 +56,7 @@ import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { loadSpritesheet, ROOT, SPRITESHEET_PNG } from './lib/spritesheet.mjs'
 import { headAnchorsByFrame } from './lib/mask.mjs'
+import { CROWNS, CROWN_WIDTH, CROWN_HEIGHT, CROWN_GAP } from './lib/crowns.mjs'
 import { decodePng } from './lib/png.mjs'
 import { emitOrCheck, reportResults, cssBanner, tsBanner } from './lib/generated-file.mjs'
 
@@ -83,7 +84,7 @@ function keyframesName(state, nonce) {
  * Offsets are emitted in unscaled cell space and multiplied by `--pet-scale` here, so the cap
  * tracks the head at every pet size without the renderer computing anything.
  */
-function buildCapCss(sheet, states, anchors) {
+function buildCrownCss(sheet, states, anchors) {
   const lines = []
 
   for (const state of states) {
@@ -91,7 +92,7 @@ function buildCapCss(sheet, states, anchors) {
     const iterations = state.iterations === 'infinite' ? 'infinite' : String(state.iterations)
 
     for (const nonce of NONCES) {
-      lines.push(`@keyframes ${capKeyframesName(state.name, nonce)} {`)
+      lines.push(`@keyframes ${crownKeyframesName(state.name, nonce)} {`)
       frames.forEach((anchor, index) => {
         // Stop i opens the window in which the sprite is showing frame i, matching the
         // `steps(n, jump-none)` the sprite runs on.
@@ -105,8 +106,8 @@ function buildCapCss(sheet, states, anchors) {
 
     for (const nonce of NONCES) {
       lines.push(
-        `html[data-pet-state="${state.name}"][data-pet-nonce="${nonce}"] #claude-cap {`,
-        `  animation: ${capKeyframesName(state.name, nonce)} ${state.durationMs}ms step-end ${iterations} forwards;`,
+        `html[data-pet-state="${state.name}"][data-pet-nonce="${nonce}"] #claude-crown {`,
+        `  animation: ${crownKeyframesName(state.name, nonce)} ${state.durationMs}ms step-end ${iterations} forwards;`,
         '}',
       )
     }
@@ -116,8 +117,8 @@ function buildCapCss(sheet, states, anchors) {
   return lines
 }
 
-function capKeyframesName(state, nonce) {
-  return `kp-cap-${state}-${nonce}`
+function crownKeyframesName(state, nonce) {
+  return `kp-crown-${state}-${nonce}`
 }
 
 function buildCss(sheet, states, holdStrategy, anchors) {
@@ -176,13 +177,31 @@ function buildCss(sheet, states, holdStrategy, anchors) {
   }
 
   lines.push(
-    '/* The status cap rides the same clock as the sprite; see buildCapCss. */',
-    '#claude-cap {',
+    '/* The status crown. Size, art and clock are all generated; see buildCrownCss. */',
+    '#claude-crown {',
+    `  width: calc(${CROWN_WIDTH}px * var(--pet-scale, 1));`,
+    `  height: calc(${CROWN_HEIGHT}px * var(--pet-scale, 1));`,
+    '  background-repeat: no-repeat;',
+    '  background-size: 100% 100%;',
+    '  /* Same reason as the sprite: without it the browser smooths the pixel art into mush. */',
+    '  image-rendering: pixelated;',
+    '  /* Composes with the `translate` the keyframes animate. That puts the anchor on the head;',
+    `     this centres the crown on it and lifts it clear by ${CROWN_GAP}px of daylight. */`,
+    `  transform: translate(-50%, calc(-100% - ${CROWN_GAP}px * var(--pet-scale, 1)));`,
     '  animation-timing-function: step-end;',
     '}',
     '',
-    ...buildCapCss(sheet, states, anchors),
   )
+
+  for (const crown of CROWNS) {
+    lines.push(
+      `html[data-claude-state="${crown.state}"] #claude-crown {`,
+      '  display: block;',
+      `  background-image: url('./${crown.file}');`,
+      '}',
+    )
+  }
+  lines.push('', ...buildCrownCss(sheet, states, anchors))
 
   return `${lines.join('\n').trimEnd()}\n`
 }

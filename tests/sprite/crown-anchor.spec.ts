@@ -63,23 +63,23 @@ describe('per-frame head anchors', () => {
   })
 })
 
-describe('generated cap keyframes', () => {
+describe('generated crown keyframes', () => {
   const { states } = loadSpritesheet() as {
     states: Array<{ name: string; frames: number; durationMs: number; iterations?: unknown }>
   }
 
-  it('emits a cap keyframe rule per state per nonce', () => {
+  it('emits a crown keyframe rule per state per nonce', () => {
     for (const state of states) {
       for (const nonce of [0, 1]) {
-        expect(CSS, `${state.name}/${nonce}`).toContain(`@keyframes kp-cap-${state.name}-${nonce}`)
+        expect(CSS, `${state.name}/${nonce}`).toContain(`@keyframes kp-crown-${state.name}-${nonce}`)
       }
     }
   })
 
   it('gives multi-frame states one stop per frame', () => {
-    // One stop per frame is what makes the cap land on the real head position rather than on a
+    // One stop per frame is what makes the crown land on the real head position rather than on a
     // linear interpolation between the first and last — the head tops are not a ramp.
-    const block = CSS.slice(CSS.indexOf('@keyframes kp-cap-jumping-0'))
+    const block = CSS.slice(CSS.indexOf('@keyframes kp-crown-jumping-0'))
     const body = block.slice(0, block.indexOf('}\n@') + 1)
     const stops = body.match(/^\s+[\d.]+% \{/gm) ?? []
     const jumping = states.find((s) => s.name === 'jumping')!
@@ -87,15 +87,15 @@ describe('generated cap keyframes', () => {
   })
 
   it('steps rather than interpolates, and scales with the pet', () => {
-    expect(CSS).toMatch(/#claude-cap[\s\S]*?animation-timing-function:\s*step-end/)
-    expect(CSS).toMatch(/@keyframes kp-cap-idle-0[\s\S]*?var\(--pet-scale/)
+    expect(CSS).toMatch(/#claude-crown \{[\s\S]*?animation-timing-function:\s*step-end/)
+    expect(CSS).toMatch(/@keyframes kp-crown-idle-0[\s\S]*?var\(--pet-scale/)
   })
 
-  it('runs the cap on the same clock as the sprite', () => {
-    // Out of phase by even one frame and the cap lands on the wrong head position all the way
+  it('runs the crown on the same clock as the sprite', () => {
+    // Out of phase by even one frame and the crown lands on the wrong head position all the way
     // through the loop. Same duration, same iteration count, restarted by the same nonce flip.
     for (const state of states) {
-      const rule = CSS.slice(CSS.indexOf(`[data-pet-state="${state.name}"][data-pet-nonce="0"] #claude-cap`))
+      const rule = CSS.slice(CSS.indexOf(`[data-pet-state="${state.name}"][data-pet-nonce="0"] #claude-crown`))
       const decl = rule.slice(0, rule.indexOf('}'))
       expect(decl, state.name).toContain(`${state.durationMs}ms`)
     }

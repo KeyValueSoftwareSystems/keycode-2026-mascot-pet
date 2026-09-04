@@ -928,6 +928,7 @@ export async function startApp(): Promise<AppShell> {
     backdrop: () => backdrop,
     spriteRect: () => pet.spriteRect(),
     bubbleBand: () => pet.bubbleBand(),
+    crownVisible: () => pet.crownVisible(),
     setMovement: (enabled) => {
       // The same three steps `toggleMovement` takes — durable setting, immediate trigger, out-of-phase
       // tick — so freezing the pet for a screenshot goes through the real path rather than a back door

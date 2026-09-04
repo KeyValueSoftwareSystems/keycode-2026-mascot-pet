@@ -55,7 +55,7 @@ Claude Code hook  ──writes word──▶  ~/.argos/claude-state
                                      pet.ts                 (one attribute set)
                                           │  html[data-claude-state]
                                           ▼
-                                     pet.css                (#claude-cap square)
+                                     pet.css                (#claude-crown square)
 ```
 
 Each arrow is one-directional and each box has one job. The renderer stays dumb, which
@@ -138,7 +138,7 @@ renderer-discipline test.
 
 **`apps/desktop/src/renderer/pet.css`** (changed)
 
-`#claude-cap`, built on the `#zzz` pattern: absolutely positioned from `--body-cx` and
+`#claude-crown`, built on the `#zzz` pattern: absolutely positioned from `--body-cx` and
 `--body-top`, offset by a scaled amount. Those custom properties are already per-animation-state
 and scale-aware, so the square tracks the head through every pose and every pet size without any
 new arithmetic.

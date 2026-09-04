@@ -1,6 +1,6 @@
-# Claude Code status cap
+# Claude Code status crown
 
-The pet wears a coloured square that follows what Claude Code is doing.
+The pet wears a crown that follows what Claude Code is doing.
 
 | Colour | Meaning |
 |---|---|
@@ -9,10 +9,11 @@ The pet wears a coloured square that follows what Claude Code is doing.
 | 🟢 green | the task finished; ready for a new one |
 | *no cap* | no Claude Code session, or the last signal is over 15 minutes old |
 
-This is a spike: a square, not cap art, and a single session. Two sessions at once will fight
-over the colour.
+Single session for now: two at once will fight over the colour.
 
-![The pet wearing a red status square, with a speech bubble above it](demo/claude-cap-waiting.png)
+| 🔴 waiting | 🟡 running | 🟢 idle |
+|---|---|---|
+| ![red crown](demo/crown-waiting.png) | ![gold crown](demo/crown-running.png) | ![green crown](demo/crown-idle.png) |
 
 ## How it works
 
@@ -98,7 +99,7 @@ rather than replacing it.
 }
 ```
 
-`PreToolUse` is what returns the cap to amber after you approve a prompt — answering a
+`PreToolUse` is what returns the crown to amber after you approve a prompt — answering a
 permission request does not fire `Notification` again.
 
 `PreToolUse` and `PostToolUse` carry no `matcher`, which matches every tool. `"*"` is
@@ -112,10 +113,10 @@ With Argos running:
 
 ```bash
 mkdir -p ~/.argos
-echo waiting > ~/.argos/claude-state   # red
-echo running > ~/.argos/claude-state   # amber
-echo idle    > ~/.argos/claude-state   # green
-rm ~/.argos/claude-state               # gone
+echo waiting > ~/.argos/claude-state   # red crown
+echo running > ~/.argos/claude-state   # gold crown
+echo idle    > ~/.argos/claude-state   # green crown
+rm ~/.argos/claude-state               # bare-headed
 ```
 
 The colour changes within a second. This is the integration test worth running first: if these
@@ -127,5 +128,14 @@ Point Argos at a different file with `ARGOS_CLAUDE_STATE_FILE`.
 
 - **One session.** The last hook to fire wins, whichever session it came from.
 - **Stale state.** A session killed with `Ctrl+C` never fires `SessionEnd`. Its file lingers, and
-  the cap stays until the file is 15 minutes old.
+  the crown stays until the file is 15 minutes old.
 - **macOS only, so far.** The Linux shape-region handling is written but unverified.
+
+## The art
+
+`pet/crowns-source/` holds the full-size crowns; `pnpm generate` downsamples them to the size
+they are worn at and writes `pet/crown-*.png`. Nothing hand-places them: the size, the gap above
+the head and the per-animation-frame position all come out of `scripts/lib/crowns.mjs` and the
+sprite art, into `pet.generated.css`.
+
+To change a crown, replace its source PNG and run `pnpm generate`.

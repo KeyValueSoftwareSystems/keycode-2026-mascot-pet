@@ -7,9 +7,9 @@
  * 1. **The preload.** It is `.cjs` on purpose — a sandboxed preload cannot be an ES module — so
  *    tsc (which is compiling ESM TypeScript) does not emit it, and Vite does not own it either.
  *
- * 2. **The spritesheet.** The generated CSS refers to it by literal filename, so it must not be
- *    fingerprinted by the bundler; and it cannot be copied at runtime because in a packaged app
- *    `dist/` lives inside a read-only asar archive.
+ * 2. **The spritesheet and the status crowns.** The generated CSS refers to them by literal
+ *    filename, so they must not be fingerprinted by the bundler; and they cannot be copied at
+ *    runtime because in a packaged app `dist/` lives inside a read-only asar archive.
  *
  * Runs after `vite build`, which empties `dist/renderer`.
  */
@@ -18,6 +18,7 @@ import { copyFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CROWNS } from './lib/crowns.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -29,6 +30,7 @@ const COPIES = [
   ['apps/desktop/src/preload/pet-preload.cjs', 'preload/pet-preload.cjs'],
   ['apps/desktop/src/preload/toast-preload.cjs', 'preload/toast-preload.cjs'],
   ['pet/spritesheet.png', 'renderer/spritesheet.png'],
+  ...CROWNS.map((crown) => [`pet/${crown.file}`, `renderer/${crown.file}`]),
 ]
 
 async function main() {

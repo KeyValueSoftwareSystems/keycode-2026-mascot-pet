@@ -487,12 +487,12 @@ Then add to `tests/renderer/discipline.spec.ts`, inside the existing
     expect(pet).toContain('claudeState')
 
     const css = read(join(RENDERER_DIR, 'pet.css'))
-    expect(css).toMatch(/#claude-cap/)
+    expect(css).toMatch(/#claude-crown/)
     expect(css).toMatch(/\[data-claude-state='waiting'\]/)
     expect(css).toMatch(/\[data-claude-state='running'\]/)
     expect(css).toMatch(/\[data-claude-state='idle'\]/)
     // The cap tracks the head, not the window corner.
-    expect(css).toMatch(/#claude-cap[\s\S]*?var\(--body-cx/)
+    expect(css).toMatch(/#claude-crown[\s\S]*?var\(--body-cx/)
   })
 ```
 
@@ -547,7 +547,7 @@ In `apps/desktop/src/renderer/pet.html`, directly after the `#zzz` div:
 
 ```html
     <!-- Claude Code status cap. A square for now; the real cap art will inherit this anchor. -->
-    <div id="claude-cap" aria-hidden="true"></div>
+    <div id="claude-crown" aria-hidden="true"></div>
 ```
 
 - [ ] **Step 5: Publish the state from the renderer**
@@ -574,7 +574,7 @@ Append to `apps/desktop/src/renderer/pet.css`:
   published per animation state and already multiplied by the scale, so this tracks the head
   through every pose and every pet size without any arithmetic of its own.
 */
-#claude-cap {
+#claude-crown {
   position: absolute;
   left: var(--body-cx, 50%);
   top: calc(var(--body-top, 0px) - 3px * var(--pet-scale, 1));
@@ -590,17 +590,17 @@ Append to `apps/desktop/src/renderer/pet.css`:
     0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
-html[data-claude-state='waiting'] #claude-cap {
+html[data-claude-state='waiting'] #claude-crown {
   display: block;
   background: #e5484d;
 }
 
-html[data-claude-state='running'] #claude-cap {
+html[data-claude-state='running'] #claude-crown {
   display: block;
   background: #f5a524;
 }
 
-html[data-claude-state='idle'] #claude-cap {
+html[data-claude-state='idle'] #claude-crown {
   display: block;
   background: #30a46c;
 }
