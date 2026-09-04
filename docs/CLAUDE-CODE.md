@@ -28,44 +28,46 @@ rather than replacing it.
 ```json
 {
   "hooks": {
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "mkdir -p ~/.argos && echo waiting > ~/.argos/claude-state"
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "mkdir -p ~/.argos && echo running > ~/.argos/claude-state"
+            "command": "mkdir -p ~/.argos && echo running > ~/.argos/claude-state",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p ~/.argos && echo waiting > ~/.argos/claude-state",
+            "timeout": 5
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "mkdir -p ~/.argos && echo running > ~/.argos/claude-state"
+            "command": "mkdir -p ~/.argos && echo running > ~/.argos/claude-state",
+            "timeout": 5
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "mkdir -p ~/.argos && echo running > ~/.argos/claude-state"
+            "command": "mkdir -p ~/.argos && echo running > ~/.argos/claude-state",
+            "timeout": 5
           }
         ]
       }
@@ -75,14 +77,21 @@ rather than replacing it.
         "hooks": [
           {
             "type": "command",
-            "command": "mkdir -p ~/.argos && echo idle > ~/.argos/claude-state"
+            "command": "mkdir -p ~/.argos && echo idle > ~/.argos/claude-state",
+            "timeout": 5
           }
         ]
       }
     ],
     "SessionEnd": [
       {
-        "hooks": [{ "type": "command", "command": "rm -f ~/.argos/claude-state" }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rm -f ~/.argos/claude-state",
+            "timeout": 5
+          }
+        ]
       }
     ]
   }
@@ -91,6 +100,11 @@ rather than replacing it.
 
 `PreToolUse` is what returns the cap to amber after you approve a prompt — answering a
 permission request does not fire `Notification` again.
+
+`PreToolUse` and `PostToolUse` carry no `matcher`, which matches every tool. `"*"` is
+commonly written for this, but an omitted matcher is the form the settings schema guarantees.
+
+Claude Code picks the hooks up without a restart — its settings watcher reloads the file.
 
 ## Testing it without Claude
 
