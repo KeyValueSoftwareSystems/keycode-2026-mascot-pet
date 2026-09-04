@@ -25,6 +25,7 @@ import { SettingsStore } from './settings-store.js'
 import { createTray, type TrayController } from './tray.js'
 import { createPetWindow, type PetWindow } from './pet-window.js'
 import { createPetController, type PetController } from './pet-controller.js'
+import { createClaudeStateSource } from '../claude/claude-state-source.js'
 import { createMenuController, type MenuController } from './menu.js'
 import { createActions } from './actions.js'
 import type { MenuViewModel, UpdateState } from './menu-template.js'
@@ -350,10 +351,22 @@ export async function startApp(): Promise<AppShell> {
     },
   })
 
+  // Claude Code's state, for the cap. `tickNow` rather than waiting for the next tick: a colour
+  // that lags the terminal by a tick is not worth having, and `tickNow` is the existing seam for
+  // exactly this — it runs the tick body out of phase without resetting the interval.
+  const claudeState = createClaudeStateSource({
+    log,
+    onChange() {
+      controller?.tickNow()
+    },
+  })
+  claudeState.start()
+
   controller = createPetController({
     pet,
     displays,
     getMovementEnabled: () => settings.get().movementEnabled,
+    getClaudeState: () => claudeState.current(),
     onPositionChanged(displayKey, petCentreX, feetY) {
       settings.patch({ position: { displayKey, x: petCentreX, feetY } })
     },
@@ -1016,6 +1029,7 @@ export async function startApp(): Promise<AppShell> {
       callouts.dispose()
       toasts.destroyAll()
       controller?.stop()
+      claudeState.stop()
       // Flush before tearing anything down — an unflushed position or reminder deadline is
       // exactly the state that must survive a quit.
       await settings.flush()
