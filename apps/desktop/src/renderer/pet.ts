@@ -71,6 +71,11 @@ function applyFrame(frame: PetFrame): void {
 
   root.dataset.overlay = frame.overlay
   root.dataset.claudeState = frame.claudeState
+  // Also on the root, because the cap is a sibling of #sprite and CSS cannot reach across to
+  // read an attribute off it. The nonce comes too: the cap restarts with the sprite or it
+  // drifts out of phase and lands on the wrong head position for the whole loop.
+  root.dataset.petState = frame.animation
+  root.dataset.petNonce = String(frame.animationNonce)
   bubble.dataset.side = frame.bubbleSide
   quickMenu.dataset.actions = frame.quickActions.join(' ')
   quickMenu.hidden = frame.quickActions.length === 0

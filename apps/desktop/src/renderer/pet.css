@@ -467,17 +467,26 @@ html[data-overlay='sleep-z'] #zzz {
   Claude Code status cap.
 
   A plain square standing in for cap art, positioned exactly where the art will go so the
-  anchoring proven here is the anchoring the art inherits. `--body-cx` and `--body-top` are
-  published per animation state and already multiplied by the scale, so this tracks the head
-  through every pose and every pet size without any arithmetic of its own.
+  anchoring proven here is the anchoring the art inherits.
+
+  Placement is split in two: this rule sizes the cap and parks it on the sprite cell's corner,
+  and `pet.generated.css` animates the `translate` property through one stop per animation frame,
+  holding each frame's real head anchor. That split is why the geometry stays generated — the
+  per-frame head positions come out of the art, and nothing here hardcodes one.
 */
 #claude-cap {
   position: absolute;
-  left: var(--body-cx, 50%);
-  top: calc(var(--body-top, 0px) - 3px * var(--pet-scale, 1));
+  /* The cell's corner is the origin; the generated per-frame keyframes translate from here.
+     Anchoring to --body-top instead would pin the cap to a per-state constant, and the pet's
+     bounce is background-position stepping — the sprite element never moves, so the cap would
+     hang in the air while the character bobs underneath it. */
+  left: var(--sprite-x, 0px);
+  top: var(--sprite-y, 0px);
   width: calc(26px * var(--pet-scale, 1));
   height: calc(13px * var(--pet-scale, 1));
-  transform: translateX(-50%);
+  /* Composes with the `translate` property the keyframes animate: that puts the anchor on the
+     head, this centres the cap on it and drops it far enough to sit on the hair. */
+  transform: translate(-50%, -20%);
   display: none;
   pointer-events: none;
   border-radius: 3px;

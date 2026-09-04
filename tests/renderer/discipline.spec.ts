@@ -137,7 +137,7 @@ describe('hand-written CSS carries no generated geometry', () => {
     expect(css).toMatch(/var\(--body-top/)
   })
 
-  it('anchors the status cap to the character through the same custom properties', () => {
+  it('paints the status cap from state the renderer publishes', () => {
     // Two halves in two files again: the renderer publishes the state, the CSS paints it. Either
     // half being dropped leaves a cap that is silently never shown, which looks exactly like
     // "Claude is not running" and so would not be noticed.
@@ -149,8 +149,26 @@ describe('hand-written CSS carries no generated geometry', () => {
     expect(css).toMatch(/\[data-claude-state='waiting'\]/)
     expect(css).toMatch(/\[data-claude-state='running'\]/)
     expect(css).toMatch(/\[data-claude-state='idle'\]/)
-    // The cap tracks the head, not the window corner.
-    expect(css).toMatch(/#claude-cap[\s\S]*?var\(--body-cx/)
+  })
+
+  it('leaves the cap\'s per-frame geometry to the generator', () => {
+    // The cap has to bob with the pet, and the pet's bounce is background-position stepping --
+    // the sprite element never moves. So the cap cannot hang off --body-top, which is a
+    // per-state constant chosen precisely so the speech bubble does NOT bob. It rides generated
+    // per-frame keyframes instead, and the hand-written rule may only park it on the cell.
+    const css = read(join(RENDERER_DIR, 'pet.css'))
+    const rule = css.slice(css.indexOf('#claude-cap {'))
+    const decl = rule.slice(0, rule.indexOf('}'))
+    expect(decl, 'cap is pinned to the non-bobbing bubble anchor').not.toMatch(/var\(--body-top/)
+    expect(decl).toMatch(/var\(--sprite-x/)
+    expect(decl).toMatch(/var\(--sprite-y/)
+
+    // The renderer must publish the sprite's state and nonce on the root: the cap is a sibling
+    // of #sprite, so CSS cannot read them off it, and without the nonce the cap does not restart
+    // with the sprite and drifts a frame out of phase for the whole loop.
+    const pet = read(join(RENDERER_DIR, 'pet.ts'))
+    expect(pet).toContain('petState')
+    expect(pet).toContain('petNonce')
   })
 
   it('scales the sprite by transform, and publishes the scale', () => {

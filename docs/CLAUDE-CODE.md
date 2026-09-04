@@ -128,9 +128,4 @@ Point Argos at a different file with `ARGOS_CLAUDE_STATE_FILE`.
 - **One session.** The last hook to fire wins, whichever session it came from.
 - **Stale state.** A session killed with `Ctrl+C` never fires `SessionEnd`. Its file lingers, and
   the cap stays until the file is 15 minutes old.
-- **The cap drifts sideways in some poses.** It hangs off `--body-cx`, which is the centre of the
-  character's *bounding box*, not the centre of its head. In `idle` and `running` the two agree
-  closely enough; in `jumping` the pet leans and the cap is visibly left of the head. The alpha
-  mask publishes `headTopByState` but no matching head centre, so fixing this properly means
-  generating one — worth doing before the real cap art lands, pointless before then.
 - **macOS only, so far.** The Linux shape-region handling is written but unverified.
