@@ -21,7 +21,7 @@ import { advance, initialState } from '../motion/motion-engine.js'
 import { DEFAULT_MOTION_CONFIG, type MotionConfig } from '../motion/motion-config.js'
 import type { MotionState, MotionTrigger } from '../motion/types.js'
 import { ANIMATIONS, resolveTrigger, type Trigger, type AnimationState } from '../pet-animations.generated.js'
-import type { PetFrame, Tone } from '../pet-frame.js'
+import type { ClaudeState, PetFrame, Tone } from '../pet-frame.js'
 import { DRINK_LOOP_GAP_MS } from '../config/constants.js'
 import {
   floorForWorkArea,
@@ -48,6 +48,13 @@ export interface PetControllerOptions {
   pet: PetWindow
   displays: DisplayManager
   getMovementEnabled: () => boolean
+  /**
+   * Claude Code's state, for the status cap.
+   *
+   * Injected as a getter, like `getMovementEnabled`, so the controller stays ignorant of where
+   * the state comes from and the tests need no filesystem.
+   */
+  getClaudeState?: () => ClaudeState
   /** `feetY` is null when the pet is floor-locked, meaning "re-derive it on launch". */
   onPositionChanged: (displayKey: string, petCentreX: number, feetY: number | null) => void
   /** Fired after a tick when the pose changed, so the hover chip can return after electrocute. */
@@ -114,6 +121,7 @@ export interface PetController {
 export function createPetController(options: PetControllerOptions): PetController {
   const config = options.config ?? DEFAULT_MOTION_CONFIG
   const now = options.now ?? Date.now
+  const getClaudeState = options.getClaudeState ?? ((): ClaudeState => 'none')
   const log = options.log ?? (() => {})
   const { pet, displays } = options
 
@@ -165,6 +173,7 @@ export function createPetController(options: PetControllerOptions): PetControlle
         : null,
       quickActions: callout ? [] : [...quickActions],
       overlay: animation === config.sleepAnimation ? 'sleep-z' : 'none',
+      claudeState: getClaudeState(),
     }
   }
 

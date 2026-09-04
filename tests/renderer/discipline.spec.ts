@@ -137,6 +137,22 @@ describe('hand-written CSS carries no generated geometry', () => {
     expect(css).toMatch(/var\(--body-top/)
   })
 
+  it('anchors the status cap to the character through the same custom properties', () => {
+    // Two halves in two files again: the renderer publishes the state, the CSS paints it. Either
+    // half being dropped leaves a cap that is silently never shown, which looks exactly like
+    // "Claude is not running" and so would not be noticed.
+    const pet = read(join(RENDERER_DIR, 'pet.ts'))
+    expect(pet).toContain('claudeState')
+
+    const css = read(join(RENDERER_DIR, 'pet.css'))
+    expect(css).toMatch(/#claude-cap/)
+    expect(css).toMatch(/\[data-claude-state='waiting'\]/)
+    expect(css).toMatch(/\[data-claude-state='running'\]/)
+    expect(css).toMatch(/\[data-claude-state='idle'\]/)
+    // The cap tracks the head, not the window corner.
+    expect(css).toMatch(/#claude-cap[\s\S]*?var\(--body-cx/)
+  })
+
   it('scales the sprite by transform, and publishes the scale', () => {
     // The generated keyframes step `background-position` in absolute pixels off the unscaled sheet.
     // Resizing the element or its background-size to change the pet's size would invalidate every one

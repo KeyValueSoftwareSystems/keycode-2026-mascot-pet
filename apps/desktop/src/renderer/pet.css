@@ -462,3 +462,42 @@ html[data-overlay='sleep-z'] #zzz {
     transform: translate(16px, -26px) rotate(10deg);
   }
 }
+
+/*
+  Claude Code status cap.
+
+  A plain square standing in for cap art, positioned exactly where the art will go so the
+  anchoring proven here is the anchoring the art inherits. `--body-cx` and `--body-top` are
+  published per animation state and already multiplied by the scale, so this tracks the head
+  through every pose and every pet size without any arithmetic of its own.
+*/
+#claude-cap {
+  position: absolute;
+  left: var(--body-cx, 50%);
+  top: calc(var(--body-top, 0px) - 3px * var(--pet-scale, 1));
+  width: calc(26px * var(--pet-scale, 1));
+  height: calc(13px * var(--pet-scale, 1));
+  transform: translateX(-50%);
+  display: none;
+  pointer-events: none;
+  border-radius: 3px;
+  /* A dark keyline so the square reads against light wallpaper as well as dark. */
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+html[data-claude-state='waiting'] #claude-cap {
+  display: block;
+  background: #e5484d;
+}
+
+html[data-claude-state='running'] #claude-cap {
+  display: block;
+  background: #f5a524;
+}
+
+html[data-claude-state='idle'] #claude-cap {
+  display: block;
+  background: #30a46c;
+}

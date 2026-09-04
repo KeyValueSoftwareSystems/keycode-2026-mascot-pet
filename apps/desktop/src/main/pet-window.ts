@@ -27,7 +27,7 @@ import {
   spriteScreenRect,
   type BubbleSide,
 } from '../sprite/alpha-mask.js'
-import { IPC, petFrameSchema, type PetFrame } from '../pet-frame.js'
+import { IPC, frameNeedsCellRegion, petFrameSchema, type PetFrame } from '../pet-frame.js'
 import { rendererFile, paths } from './paths.js'
 import { emit } from './harness-handshake.js'
 import type { DisplaySnapshot, Floor } from './display-manager.js'
@@ -183,7 +183,11 @@ export async function createPetWindow(options: {
   let lastAnimation: string | null = null
   /** Whether the last frame carried a bubble. Drives the shape region and the callout raise. */
   let lastBubbleVisible = false
-  /** Whether the last frame carried a CSS overlay — the sleep Z's. Drives the shape region. */
+  /**
+   * Whether the last frame painted inside the sprite cell but outside the character mask — the
+   * sleep Z's, or the Claude status cap. Drives the shape region, which on Linux governs what is
+   * painted at all.
+   */
   let lastOverlayVisible = false
   /** Whether the hover quick-action menu is up. Drives the shape region on Linux. */
   let lastQuickMenuVisible = false
@@ -335,7 +339,7 @@ export async function createPetWindow(options: {
       const previous = { lastAnimation, lastBubbleVisible, lastOverlayVisible, lastQuickMenuVisible }
       lastAnimation = parsed.data.animation
       lastBubbleVisible = parsed.data.bubble !== null
-      lastOverlayVisible = parsed.data.overlay !== 'none'
+      lastOverlayVisible = frameNeedsCellRegion(parsed.data)
       lastQuickMenuVisible = parsed.data.quickActions.length > 0
       win.webContents.send(IPC.frame, parsed.data)
       forwarding.setForceInteractive(

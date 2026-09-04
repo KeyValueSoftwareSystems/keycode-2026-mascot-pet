@@ -70,6 +70,7 @@ function applyFrame(frame: PetFrame): void {
   sprite.dataset.facing = frame.facing
 
   root.dataset.overlay = frame.overlay
+  root.dataset.claudeState = frame.claudeState
   bubble.dataset.side = frame.bubbleSide
   quickMenu.dataset.actions = frame.quickActions.join(' ')
   quickMenu.hidden = frame.quickActions.length === 0
