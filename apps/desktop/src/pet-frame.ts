@@ -18,6 +18,17 @@ import { ANIMATION_STATES } from './pet-animations.generated.js'
 export const TONES = ['info', 'success', 'warning', 'error'] as const
 export type Tone = (typeof TONES)[number]
 
+/**
+ * Claude Code's state, as the pet displays it.
+ *
+ * `none` is the absence of a signal — no state file, an unreadable one, or one too old to
+ * believe — and paints no cap at all. Every failure resolves here, because a status indicator
+ * that lies is worse than one that is absent: an absent cap is visibly absent, a wrong cap is
+ * silently wrong.
+ */
+export const CLAUDE_STATES = ['none', 'waiting', 'running', 'idle'] as const
+export type ClaudeState = (typeof CLAUDE_STATES)[number]
+
 /** Bubble text is clamped in main before it ever reaches here. */
 export const BUBBLE_TEXT_MAX = 200
 
