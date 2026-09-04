@@ -261,7 +261,7 @@ made every install think a phantom `0.6.0` was available.
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | The screenshot loop, and **what is not verified** |
 | [DECISIONS.md](DECISIONS.md) | Every deviation from the brief, the issue, or openpets — with reasons |
 | [docs/ASSETS.md](docs/ASSETS.md) | Swapping the art with no code changes |
-| [docs/CLAUDE-CODE.md](docs/CLAUDE-CODE.md) | Wiring Claude Code's state to a coloured cap on the pet |
+| [docs/CLAUDE-CODE.md](docs/CLAUDE-CODE.md) | The Claude Code status crown — what it does, what you need, how to wire it up |
 | [docs/PROMPT.md](docs/PROMPT.md) | The implementation brief this was built from, errors corrected in place |
 | [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
 | [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) | openpets (MIT), Noto Color Emoji (OFL 1.1 / Apache-2.0) |
