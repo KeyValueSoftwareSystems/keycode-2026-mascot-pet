@@ -36,7 +36,7 @@
     "package:win-ci-only": "pnpm build && electron-builder --win --config electron-builder.config.cjs"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
