@@ -309,8 +309,8 @@
   /* Same reason as the sprite: without it the browser smooths the pixel art into mush. */
   image-rendering: pixelated;
   /* Composes with the `translate` the keyframes animate. That puts the anchor on the head;
-     this centres the crown on it and lifts it clear by 4px of daylight. */
-  transform: translate(-50%, calc(-100% - 4px * var(--pet-scale, 1)));
+     this centres the crown on it and lifts it clear by 1px of daylight. */
+  transform: translate(-50%, calc(-100% - 1px * var(--pet-scale, 1)));
   animation-timing-function: step-end;
 }
 

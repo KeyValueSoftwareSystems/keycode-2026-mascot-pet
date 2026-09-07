@@ -26,6 +26,7 @@ import { createTray, type TrayController } from './tray.js'
 import { createPetWindow, type PetWindow } from './pet-window.js'
 import { createPetController, type PetController } from './pet-controller.js'
 import { createClaudeStateSource } from '../claude/claude-state-source.js'
+import { ensureClaudeHooksInstalled } from '../claude/ensure-claude-hooks.js'
 import { createMenuController, type MenuController } from './menu.js'
 import { createActions } from './actions.js'
 import type { MenuViewModel, UpdateState } from './menu-template.js'
@@ -354,6 +355,8 @@ export async function startApp(): Promise<AppShell> {
   // Claude Code's state, for the cap. `tickNow` rather than waiting for the next tick: a colour
   // that lags the terminal by a tick is not worth having, and `tickNow` is the existing seam for
   // exactly this — it runs the tick body out of phase without resetting the interval.
+  // Hooks are merged into ~/.claude/settings.json here so the crown works without a manual setup step.
+  ensureClaudeHooksInstalled({ log })
   const claudeState = createClaudeStateSource({
     log,
     onChange() {

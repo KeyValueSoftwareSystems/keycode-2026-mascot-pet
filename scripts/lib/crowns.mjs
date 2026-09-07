@@ -30,4 +30,4 @@ export const CROWN_HEIGHT = 22
  * reaches as high as the hair does, and reads as "status floating above the pet" rather than as
  * a costume change.
  */
-export const CROWN_GAP = 4
+export const CROWN_GAP = 1

@@ -96,10 +96,10 @@ Worth knowing if you touch the art or the placement:
 
 ## Integrating it
 
-### 1. Add the hooks
+Argos merges these hooks into `~/.claude/settings.json` on launch (idempotent; existing hooks
+are kept). You do not need to edit the file by hand.
 
-Open `~/.claude/settings.json`. **If it already has a `hooks` key, merge into it** — do not replace
-it, or you will drop whatever else you had.
+The hooks Argos installs:
 
 ```json
 {
@@ -173,8 +173,6 @@ it, or you will drop whatever else you had.
 `PreToolUse` and `PostToolUse` carry no `matcher`, which matches every tool. `"*"` is commonly
 written for this, but an omitted matcher is the form the settings schema guarantees.
 
-### 2. That is it
-
 Claude Code reloads `settings.json` on its own — no restart. Start a task and the crown appears.
 
 Check what is installed at any time with `/hooks`.
@@ -205,8 +203,8 @@ while it works, red at the prompt, gold again once you approve, green when it st
 
 | Symptom | Likely cause |
 |---|---|
-| No crown ever | Argos is not running, or the hooks are not installed. Run the `echo` test above to tell which. |
-| `echo` test works, real sessions do not | The hooks are not firing. Check `/hooks`, and check your `settings.json` is valid JSON — an invalid file silently disables **every** setting in it. |
+| No crown ever | Argos is not running, or Claude Code has not fired a hook yet. Run the `echo` test above to confirm the transport. |
+| `echo` test works, real sessions do not | Claude Code is not loading hooks. Check `/hooks`, and that `~/.claude/settings.json` is valid JSON — an invalid file silently disables **every** setting in it (Argos will not overwrite a broken file). |
 | Crown stuck on one colour | A session died without `SessionEnd`. It clears itself after 15 minutes, or `rm ~/.argos/claude-state` now. |
 | Crown flickers gold ↔ green | Expected. Every tool call writes `running` and every turn end writes `idle`. |
 | Crown is wrong with two sessions open | Known. See Limits. |
