@@ -16,8 +16,8 @@
   },
   "scripts": {
     "postinstall": "install-electron",
-    "generate": "node scripts/generate-sprite-css.mjs && node scripts/generate-alpha-mask.mjs",
-    "generate:check": "node scripts/generate-sprite-css.mjs --check && node scripts/generate-alpha-mask.mjs --check",
+    "generate": "node scripts/generate-crowns.mjs && node scripts/generate-sprite-css.mjs && node scripts/generate-alpha-mask.mjs",
+    "generate:check": "node scripts/generate-crowns.mjs --check && node scripts/generate-sprite-css.mjs --check && node scripts/generate-alpha-mask.mjs --check",
     "build": "pnpm generate:check && pnpm -F @keycode/desktop build",
     "dev": "pnpm -F @keycode/desktop dev",
     "typecheck": "pnpm -F @keycode/desktop typecheck",

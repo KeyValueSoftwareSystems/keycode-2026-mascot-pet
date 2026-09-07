@@ -85,6 +85,8 @@ export interface HarnessTargets {
   /** The line the speech bubble cannot cross, and which side of the pet it is on. See
    * PetWindow.bubbleBand. */
   bubbleBand?: () => { y: number; side: 'above' | 'below'; visible: boolean }
+  /** Whether the pet is wearing a status crown. See PetWindow.crownVisible. */
+  crownVisible?: () => boolean
   /** Whether the pet is floor-locked, so the harness knows if feet-on-floor is assertable. */
   floorLocked?: () => boolean
   /** Place the pet at an absolute position, as a drop would. */
@@ -125,6 +127,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           const isPet = command.window === 'pet'
           const rect = isPet ? targets.spriteRect?.() : undefined
           const bubble = isPet ? targets.bubbleBand?.() : undefined
+          const crownVisible = isPet ? targets.crownVisible?.() : undefined
           const floorLocked = isPet ? targets.floorLocked?.() : undefined
           const petScale = isPet ? targets.petScale?.() : undefined
           emit({
@@ -138,6 +141,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
             ...(bubble === undefined
               ? {}
               : { bubbleEdgeY: bubble.y, bubbleSide: bubble.side, bubbleVisible: bubble.visible }),
+            ...(crownVisible === undefined ? {} : { crownVisible }),
             ...(floorLocked === undefined ? {} : { floorLocked }),
             ...(petScale === undefined ? {} : { petScale }),
           })
@@ -209,6 +213,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           return
         }
         const bubble = targets.bubbleBand?.()
+        const crownVisible = targets.crownVisible?.()
         emit({
           ev: 'geometry',
           bounds: win.getContentBounds(),
@@ -218,6 +223,7 @@ export function installHarnessControl(targets: HarnessTargets): () => void {
           ...(bubble === undefined
             ? {}
             : { bubbleEdgeY: bubble.y, bubbleSide: bubble.side, bubbleVisible: bubble.visible }),
+          ...(crownVisible === undefined ? {} : { crownVisible }),
         })
         return
       }

@@ -53,7 +53,11 @@
  */
 
 import { join } from 'node:path'
-import { loadSpritesheet, ROOT } from './lib/spritesheet.mjs'
+import { readFileSync } from 'node:fs'
+import { loadSpritesheet, ROOT, SPRITESHEET_PNG } from './lib/spritesheet.mjs'
+import { headAnchorsByFrame } from './lib/mask.mjs'
+import { CROWNS, CROWN_WIDTH, CROWN_HEIGHT, CROWN_GAP } from './lib/crowns.mjs'
+import { decodePng } from './lib/png.mjs'
 import { emitOrCheck, reportResults, cssBanner, tsBanner } from './lib/generated-file.mjs'
 
 const CSS_OUT = join(ROOT, 'apps', 'desktop', 'src', 'renderer', 'pet.generated.css')
@@ -66,7 +70,58 @@ function keyframesName(state, nonce) {
   return `kp-${state}-${nonce}`
 }
 
-function buildCss(sheet, states, holdStrategy) {
+/**
+ * The status cap's keyframes.
+ *
+ * The pet's bounce is `background-position` stepping, so the sprite element itself never moves
+ * and nothing can be made to follow it by parenting. The cap is therefore given its own
+ * animation, on the same clock, with one stop per frame holding that frame's real head anchor.
+ *
+ * `step-end` rather than a two-endpoint ramp: the head tops are not a ramp (jumping runs
+ * 44,42,42,42,50,...), so interpolating between the first and last would put the cap in the
+ * wrong place on most frames. One stop per frame, each held until the next, lands it exactly.
+ *
+ * Offsets are emitted in unscaled cell space and multiplied by `--pet-scale` here, so the cap
+ * tracks the head at every pet size without the renderer computing anything.
+ */
+function buildCrownCss(sheet, states, anchors) {
+  const lines = []
+
+  for (const state of states) {
+    const frames = anchors[state.name]
+    const iterations = state.iterations === 'infinite' ? 'infinite' : String(state.iterations)
+
+    for (const nonce of NONCES) {
+      lines.push(`@keyframes ${crownKeyframesName(state.name, nonce)} {`)
+      frames.forEach((anchor, index) => {
+        // Stop i opens the window in which the sprite is showing frame i, matching the
+        // `steps(n, jump-none)` the sprite runs on.
+        const pct = ((index / frames.length) * 100).toFixed(4).replace(/\.?0+$/, '')
+        lines.push(
+          `  ${pct}% { translate: calc(${anchor.cx}px * var(--pet-scale, 1)) calc(${anchor.top}px * var(--pet-scale, 1)); }`,
+        )
+      })
+      lines.push('}')
+    }
+
+    for (const nonce of NONCES) {
+      lines.push(
+        `html[data-pet-state="${state.name}"][data-pet-nonce="${nonce}"] #claude-crown {`,
+        `  animation: ${crownKeyframesName(state.name, nonce)} ${state.durationMs}ms step-end ${iterations} forwards;`,
+        '}',
+      )
+    }
+    lines.push('')
+  }
+
+  return lines
+}
+
+function crownKeyframesName(state, nonce) {
+  return `kp-crown-${state}-${nonce}`
+}
+
+function buildCss(sheet, states, holdStrategy, anchors) {
   const lines = [cssBanner()]
 
   lines.push(
@@ -120,6 +175,33 @@ function buildCss(sheet, states, holdStrategy) {
     }
     lines.push('')
   }
+
+  lines.push(
+    '/* The status crown. Size, art and clock are all generated; see buildCrownCss. */',
+    '#claude-crown {',
+    `  width: calc(${CROWN_WIDTH}px * var(--pet-scale, 1));`,
+    `  height: calc(${CROWN_HEIGHT}px * var(--pet-scale, 1));`,
+    '  background-repeat: no-repeat;',
+    '  background-size: 100% 100%;',
+    '  /* Same reason as the sprite: without it the browser smooths the pixel art into mush. */',
+    '  image-rendering: pixelated;',
+    '  /* Composes with the `translate` the keyframes animate. That puts the anchor on the head;',
+    `     this centres the crown on it and lifts it clear by ${CROWN_GAP}px of daylight. */`,
+    `  transform: translate(-50%, calc(-100% - ${CROWN_GAP}px * var(--pet-scale, 1)));`,
+    '  animation-timing-function: step-end;',
+    '}',
+    '',
+  )
+
+  for (const crown of CROWNS) {
+    lines.push(
+      `html[data-claude-state="${crown.state}"] #claude-crown {`,
+      '  display: block;',
+      `  background-image: url('./${crown.file}');`,
+      '}',
+    )
+  }
+  lines.push('', ...buildCrownCss(sheet, states, anchors))
 
   return `${lines.join('\n').trimEnd()}\n`
 }
@@ -230,9 +312,10 @@ function main() {
   }
 
   const { sheet, states, aliases, reactionMap } = loadSpritesheet()
+  const anchors = headAnchorsByFrame(decodePng(readFileSync(SPRITESHEET_PNG)), sheet, states)
 
   const results = [
-    emitOrCheck(CSS_OUT, buildCss(sheet, states, holdStrategy), { check }),
+    emitOrCheck(CSS_OUT, buildCss(sheet, states, holdStrategy, anchors), { check }),
     emitOrCheck(TS_OUT, buildTs(sheet, states, aliases, reactionMap), { check }),
   ]
 

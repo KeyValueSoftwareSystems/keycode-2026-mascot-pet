@@ -137,6 +137,47 @@ describe('hand-written CSS carries no generated geometry', () => {
     expect(css).toMatch(/var\(--body-top/)
   })
 
+  it('paints the status crown from state the renderer publishes', () => {
+    // Two halves in two files again: the renderer publishes the state, the CSS paints it. Either
+    // half being dropped leaves a crown that is silently never shown, which looks exactly like
+    // "Claude is not running" and so would not be noticed.
+    const pet = read(join(RENDERER_DIR, 'pet.ts'))
+    expect(pet).toContain('claudeState')
+
+    const css = read(join(RENDERER_DIR, 'pet.css'))
+    expect(css).toMatch(/#claude-crown/)
+
+    // The per-state rules live in the generated stylesheet rather than in pet.css, because the
+    // crown filenames come out of scripts/lib/crowns.mjs and hand-copying them here is exactly
+    // how the art and the stylesheet drift apart.
+    const generated = read(join(RENDERER_DIR, 'pet.generated.css'))
+    for (const state of ['waiting', 'running', 'idle']) {
+      expect(generated, state).toMatch(
+        new RegExp(`\\[data-claude-state="${state}"\\] #claude-crown \\{[^}]*crown-${state}\\.png`),
+      )
+    }
+  })
+
+  it('leaves the crown\'s per-frame geometry to the generator', () => {
+    // The crown has to bob with the pet, and the pet's bounce is background-position stepping --
+    // the sprite element never moves. So the crown cannot hang off --body-top, which is a
+    // per-state constant chosen precisely so the speech bubble does NOT bob. It rides generated
+    // per-frame keyframes instead, and the hand-written rule may only park it on the cell.
+    const css = read(join(RENDERER_DIR, 'pet.css'))
+    const rule = css.slice(css.indexOf('#claude-crown {'))
+    const decl = rule.slice(0, rule.indexOf('}'))
+    expect(decl, 'crown is pinned to the non-bobbing bubble anchor').not.toMatch(/var\(--body-top/)
+    expect(decl).toMatch(/var\(--sprite-x/)
+    expect(decl).toMatch(/var\(--sprite-y/)
+
+    // The renderer must publish the sprite's state and nonce on the root: the cap is a sibling
+    // of #sprite, so CSS cannot read them off it, and without the nonce the crown does not restart
+    // with the sprite and drifts a frame out of phase for the whole loop.
+    const pet = read(join(RENDERER_DIR, 'pet.ts'))
+    expect(pet).toContain('petState')
+    expect(pet).toContain('petNonce')
+  })
+
   it('scales the sprite by transform, and publishes the scale', () => {
     // The generated keyframes step `background-position` in absolute pixels off the unscaled sheet.
     // Resizing the element or its background-size to change the pet's size would invalidate every one

@@ -18,6 +18,17 @@ import { ANIMATION_STATES } from './pet-animations.generated.js'
 export const TONES = ['info', 'success', 'warning', 'error'] as const
 export type Tone = (typeof TONES)[number]
 
+/**
+ * Claude Code's state, as the pet displays it.
+ *
+ * `none` is the absence of a signal — no state file, an unreadable one, or one too old to
+ * believe — and paints no cap at all. Every failure resolves here, because a status indicator
+ * that lies is worse than one that is absent: an absent cap is visibly absent, a wrong cap is
+ * silently wrong.
+ */
+export const CLAUDE_STATES = ['none', 'waiting', 'running', 'idle'] as const
+export type ClaudeState = (typeof CLAUDE_STATES)[number]
+
 /** Bubble text is clamped in main before it ever reaches here. */
 export const BUBBLE_TEXT_MAX = 200
 
@@ -103,6 +114,16 @@ export const petFrameSchema = z.strictObject({
 
   /** Pure-CSS overlays. `sleep-z` is what lets `sleep` ship with no new art. */
   overlay: z.enum(['none', 'sleep-z']),
+
+  /**
+   * Claude Code's state, painted as a coloured cap on the pet's head.
+   *
+   * Its own field rather than another value on `overlay`, because the two are independent axes:
+   * `overlay` is single-valued and already owned by the sleep Z's, and a sleeping pet must still
+   * be able to wear the cap. Folding them together would make "asleep and waiting"
+   * unrepresentable.
+   */
+  claudeState: z.enum(CLAUDE_STATES),
 })
 
 export type PetFrame = z.infer<typeof petFrameSchema>
@@ -129,3 +150,20 @@ export const IPC = {
   bubbleAction: 'keycode-pet:bubble-action',
   quickAction: 'keycode-pet:quick-action',
 } as const
+
+/**
+ * Does this frame paint anything outside the character's own mask but inside the sprite cell?
+ *
+ * `setShape` determines the area where the system permits *drawing* — outside it, no pixels are
+ * drawn at all. The sleep Z's sit above the hair and the status cap sits on it, both in mask
+ * cells that are transparent, so both need the region widened to the whole cell or they are
+ * silently invisible on Linux. See the long note in `sprite/alpha-mask.ts`.
+ *
+ * A function here rather than an expression at the call site so it can be tested without a
+ * window: `pet-window.ts` is Electron all the way down.
+ */
+export function frameNeedsCellRegion(
+  frame: Pick<PetFrame, 'overlay' | 'claudeState'>,
+): boolean {
+  return frame.overlay !== 'none' || frame.claudeState !== 'none'
+}

@@ -10,6 +10,14 @@
 /** Alpha above this counts as opaque. Low enough to keep antialiased edges, high enough to drop dust. */
 export const ALPHA_THRESHOLD = 8
 
+/**
+ * Rows below the top of the head used to find its horizontal centre.
+ *
+ * Deep enough to span the skull and shallow enough to exclude the shoulders, which on this
+ * art are much wider and would drag the centre towards the body.
+ */
+export const HEAD_BAND = 12
+
 /** Mask resolution. 4px keeps the mask tiny (312 bytes) while staying finer than any limb. */
 export const GRANULARITY = 4
 
@@ -68,6 +76,71 @@ export function buildUnion(png, sheet, states) {
   }
 
   return { union, perFrameOpaque, footInsetByState, headTopByState }
+}
+
+/**
+ * Per-frame head anchor for every state: where the top of the head is, and where it is centred.
+ *
+ * This is the deliberate opposite of `headTopByState`. That one collapses a state's frames to
+ * their minimum so the speech bubble does not jitter with the pet's breathing — correct for a
+ * bubble, wrong for anything worn *on* the head. The pet's bounce is entirely
+ * `background-position` stepping, so the sprite element never moves and a hat pinned to a
+ * per-state constant floats while the character bobs underneath it.
+ *
+ * `cx` is the centre of the head specifically, not of the whole body: measured across the top
+ * `HEAD_BAND` rows of the frame, because the body's bounding-box centre barely moves while the
+ * head swings several pixels in a leaning pose.
+ *
+ * @param {{width:number,height:number,data:Uint8Array}} png
+ * @param {{frameWidth:number,frameHeight:number}} sheet
+ * @param {Array<{row:number,frames:number,name:string,startColumn?:number}>} states
+ * @returns {Record<string, Array<{top:number, cx:number}>>}
+ */
+export function headAnchorsByFrame(png, sheet, states) {
+  const { frameWidth: fw, frameHeight: fh } = sheet
+  const alpha = (x, y) => {
+    if (x < 0 || y < 0 || x >= png.width || y >= png.height) return 0
+    return png.data[(y * png.width + x) * 4 + 3]
+  }
+
+  const out = {}
+  for (const state of states) {
+    const frames = []
+    for (let frame = 0; frame < state.frames; frame += 1) {
+      const originX = ((state.startColumn ?? 0) + frame) * fw
+      const originY = state.row * fh
+
+      let top = fh
+      for (let y = 0; y < fh && top === fh; y += 1) {
+        for (let x = 0; x < fw; x += 1) {
+          if (alpha(originX + x, originY + y) > ALPHA_THRESHOLD) {
+            top = y
+            break
+          }
+        }
+      }
+
+      // A fully transparent cell (art in progress, or a short row) has no head to anchor to.
+      // Fall back to the cell centre rather than emitting NaN into a stylesheet.
+      if (top === fh) {
+        frames.push({ top: 0, cx: Math.round(fw / 2) })
+        continue
+      }
+
+      let minX = fw
+      let maxX = -1
+      for (let y = top; y < Math.min(fh, top + HEAD_BAND); y += 1) {
+        for (let x = 0; x < fw; x += 1) {
+          if (alpha(originX + x, originY + y) <= ALPHA_THRESHOLD) continue
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+        }
+      }
+      frames.push({ top, cx: Math.round((minX + maxX) / 2) })
+    }
+    out[state.name] = frames
+  }
+  return out
 }
 
 /** Tight bounding box of the set pixels. */

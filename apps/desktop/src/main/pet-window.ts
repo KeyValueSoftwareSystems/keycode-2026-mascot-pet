@@ -27,7 +27,7 @@ import {
   spriteScreenRect,
   type BubbleSide,
 } from '../sprite/alpha-mask.js'
-import { IPC, petFrameSchema, type PetFrame } from '../pet-frame.js'
+import { IPC, frameNeedsCellRegion, petFrameSchema, type PetFrame } from '../pet-frame.js'
 import { rendererFile, paths } from './paths.js'
 import { emit } from './harness-handshake.js'
 import type { DisplaySnapshot, Floor } from './display-manager.js'
@@ -72,6 +72,13 @@ export interface PetWindow {
    * assertion would then measure the bubble and report a transparency failure.
    */
   bubbleBand(): { y: number; side: BubbleSide; visible: boolean }
+  /**
+   * Whether a status crown is on the pet's head right now.
+   *
+   * The harness needs it because the crown legitimately paints outside the character, in the
+   * ring A2 otherwise requires to be fully transparent.
+   */
+  crownVisible(): boolean
   /**
    * Change the pet's size.
    *
@@ -183,10 +190,16 @@ export async function createPetWindow(options: {
   let lastAnimation: string | null = null
   /** Whether the last frame carried a bubble. Drives the shape region and the callout raise. */
   let lastBubbleVisible = false
-  /** Whether the last frame carried a CSS overlay — the sleep Z's. Drives the shape region. */
+  /**
+   * Whether the last frame painted inside the sprite cell but outside the character mask — the
+   * sleep Z's, or the Claude status cap. Drives the shape region, which on Linux governs what is
+   * painted at all.
+   */
   let lastOverlayVisible = false
   /** Whether the hover quick-action menu is up. Drives the shape region on Linux. */
   let lastQuickMenuVisible = false
+  /** The crown on the last frame, for the harness. 'none' means bare-headed. */
+  let lastClaudeState: PetFrame['claudeState'] = 'none'
 
   /**
    * The Linux input-and-drawing region for what is currently on screen.
@@ -335,7 +348,8 @@ export async function createPetWindow(options: {
       const previous = { lastAnimation, lastBubbleVisible, lastOverlayVisible, lastQuickMenuVisible }
       lastAnimation = parsed.data.animation
       lastBubbleVisible = parsed.data.bubble !== null
-      lastOverlayVisible = parsed.data.overlay !== 'none'
+      lastOverlayVisible = frameNeedsCellRegion(parsed.data)
+      lastClaudeState = parsed.data.claudeState
       lastQuickMenuVisible = parsed.data.quickActions.length > 0
       win.webContents.send(IPC.frame, parsed.data)
       forwarding.setForceInteractive(
@@ -367,6 +381,10 @@ export async function createPetWindow(options: {
     spriteRect(): Rectangle {
       const bounds = win.isDestroyed() ? { x, y } : win.getBounds()
       return spriteScreenRect(ALPHA_MASK, bounds, placement.spriteOrigin, placement.scale) as Rectangle
+    },
+
+    crownVisible(): boolean {
+      return lastClaudeState !== 'none'
     },
 
     bubbleBand(): { y: number; side: BubbleSide; visible: boolean } {
