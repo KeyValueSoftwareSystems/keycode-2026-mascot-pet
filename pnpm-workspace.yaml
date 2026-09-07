@@ -6,3 +6,9 @@ packages:
 # building the Windows NSIS target, which happens on a Windows CI runner, never here.
 allowBuilds:
   electron-winstaller: false
+
+# Transitive security pins that Dependabot cannot bump through electron-builder's
+# ajv → fast-uri and plist → @xmldom/xmldom ranges (security_update_not_possible).
+overrides:
+  fast-uri: 3.1.7
+  '@xmldom/xmldom': 0.8.15
